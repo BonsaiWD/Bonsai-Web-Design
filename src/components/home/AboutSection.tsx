@@ -2,11 +2,11 @@
 
 import styled from 'styled-components';
 import { Section, Container } from '../layout/Container';
-import { motion } from 'framer-motion';
+import { motion, stagger, type Variants } from 'framer-motion';
 import Image from 'next/image';
 import GradientText from '../common/GradientText';
 import AnimatedCounter from '../common/AnimatedCounter';
-import { DUR, EASE_OUT, RISE } from '@/lib/motion';
+import { DUR, EASE_OUT, RISE, STAGGER } from '@/lib/motion';
 
 // Headshots render at up to 350px: full container width on small phones, and
 // the 1fr column of a 1fr / 1.5fr grid (128px gap) between 768px and ~1046px.
@@ -25,10 +25,58 @@ const AboutWrapper = styled(Section)`
   overflow: clip;
 `;
 
-const Header = styled.div`
+// Studio intro (formerly its own section) leads into the team
+const Intro = styled(motion.div)`
   text-align: center;
-  margin-bottom: ${({ theme }) => theme.spacing.xxl};
+  margin-bottom: ${({ theme }) => theme.spacing.xxxl};
+
+  @media (max-width: 768px) {
+    margin-bottom: ${({ theme }) => theme.spacing.xxl};
+  }
 `;
+
+const Eyebrow = styled(motion.p)`
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.primary};
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+`;
+
+const IntroCopy = styled(motion.p)`
+  max-width: 560px;
+  margin: 0 auto ${({ theme }) => theme.spacing.lg};
+  font-size: 1.15rem;
+  line-height: 1.8;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+const ProjectStat = styled(motion.div)`
+  margin-top: ${({ theme }) => theme.spacing.xl};
+`;
+
+const TeamTitle = styled.h3`
+  font-family: ${({ theme }) => theme.fonts.heading};
+  font-size: 2.25rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: ${({ theme }) => theme.colors.primary};
+  text-align: center;
+
+  @media (max-width: 768px) {
+    font-size: 1.75rem;
+  }
+`;
+
+const introGroup: Variants = {
+  hidden: {},
+  visible: { transition: { delayChildren: stagger(STAGGER.item) } },
+};
+
+const introItem: Variants = {
+  hidden: { opacity: 0, y: RISE.item },
+  visible: { opacity: 1, y: 0, transition: { duration: DUR.reveal, ease: EASE_OUT } },
+};
 
 const Title = styled(motion.h2)`
   font-family: ${({ theme }) => theme.fonts.heading};
@@ -38,7 +86,8 @@ const Title = styled(motion.h2)`
   margin-bottom: ${({ theme }) => theme.spacing.xl};
   letter-spacing: 0.05em;
   text-shadow: 0 2px 12px rgba(200, 159, 129, 0.2);
-  
+  line-height: 1.2;
+
   @media (max-width: 768px) {
     font-size: 2.5rem;
   }
@@ -276,16 +325,29 @@ export default function AboutSection() {
   return (
     <AboutWrapper id="about">
       <Container>
-        <Header>
-          <Title
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <GradientText>Meet The Team</GradientText>
+        <Intro
+          variants={introGroup}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '0px 0px -15% 0px' }}
+        >
+          <Eyebrow variants={introItem}>The Studio</Eyebrow>
+          <Title variants={introItem}>
+            <GradientText>Cultivating Digital Excellence.</GradientText>
           </Title>
-        </Header>
+          <IntroCopy variants={introItem}>
+            Like a bonsai, true craftsmanship requires patience, vision, and an unyielding attention to detail. We don&apos;t just build websites; we nurture digital ecosystems that grow with your business.
+          </IntroCopy>
+          <IntroCopy variants={introItem}>
+            Our boutique approach ensures that every project receives our full dedication, resulting in work that stands the test of time.
+          </IntroCopy>
+          <ProjectStat variants={introItem}>
+            <StatNumber>
+              <AnimatedCounter to={50} suffix="+" />
+            </StatNumber>
+            <StatLabel>Projects</StatLabel>
+          </ProjectStat>
+        </Intro>
 
         {/* Taller than the viewport, so reveal on a margin rather than viewport.amount */}
         <TeamContainer
@@ -294,6 +356,10 @@ export default function AboutSection() {
           viewport={{ once: true, margin: '0px 0px -15% 0px' }}
           transition={{ duration: DUR.reveal, ease: EASE_OUT }}
         >
+          <TeamTitle>
+            <GradientText>Meet The Team</GradientText>
+          </TeamTitle>
+
           {/* David Shapiro - Image Left, Bio Right */}
           <MemberSection>
             <PhotoContainer>

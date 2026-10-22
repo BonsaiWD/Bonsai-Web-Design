@@ -228,11 +228,10 @@ const MobileCta = styled(motion.a)`
 `;
 
 const navItems = [
-  { href: '#portfolio', label: 'Work', delay: 0.05 },
+  { href: '#portfolio', label: 'Projects', delay: 0.05 },
   { href: '#about', label: 'About', delay: 0.1 },
   { href: '#services', label: 'Services', delay: 0.15 },
   { href: '#pricing', label: 'Pricing', delay: 0.175 },
-  { href: '#studio', label: 'Studio', delay: 0.2 },
   { href: '#contact', label: 'Contact', delay: 0.25 },
 ];
 

@@ -9,7 +9,6 @@ import TestimonialsSection from '@/components/home/TestimonialsSection';
 import PricingSection from '@/components/home/PricingSection';
 
 import ServicesSection from '@/components/home/ServicesSection';
-import StudioSection from '@/components/home/StudioSection';
 
 export default function Home() {
   return (
@@ -19,7 +18,6 @@ export default function Home() {
       <AboutSection />
       <ServicesSection />
       <PricingSection />
-      <StudioSection />
       <TestimonialsSection />
       <ContactWizard />
     </Layout>

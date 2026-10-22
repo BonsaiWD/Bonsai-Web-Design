@@ -1,21 +1,15 @@
 'use client';
 
 import styled from 'styled-components';
-import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
-import { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Fragment } from 'react';
 import { Section, Container } from '../layout/Container';
 import GradientText from '../common/GradientText';
 import { FiArrowUpRight } from 'react-icons/fi';
 import { featured, projects } from '@/data/work';
-import { useReducedMotionSafe } from '@/lib/useMediaQuery';
 
 const displayDomain = (url: string) => new URL(url).hostname.replace(/^www\./, '');
 const pad = (n: number) => String(n).padStart(2, '0');
-
-// Preview plate dimensions (desktop hover)
-const PLATE_WIDTH = 320;
-const PLATE_HEIGHT = 220;
-const PLATE_OFFSET = 32;
 
 const PortfolioWrapper = styled(Section)`
   background: linear-gradient(
@@ -314,9 +308,9 @@ const Domain = styled.span`
   white-space: nowrap;
 `;
 
-/* ---------- Project index ---------- */
+/* ---------- Further work ---------- */
 
-const IndexHeading = styled.div`
+const MoreHeading = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.md};
@@ -334,83 +328,83 @@ const IndexHeading = styled.div`
   }
 `;
 
-const IndexList = styled.div`
-  position: relative;
+const WorkMeta = styled(MetaRow)`
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    letter-spacing: 0.18em;
+  }
+
+  span:not(:first-child) {
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
 `;
 
-const RowNumber = styled.span`
+const WorkTitle = styled.h3`
   font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 0.95rem;
-  color: ${({ theme }) => theme.colors.primary};
-  opacity: 0.6;
-`;
-
-const RowTitle = styled.span`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 2rem;
-  font-weight: 300;
+  font-size: 2.25rem;
+  font-weight: 400;
+  line-height: 1.1;
   color: ${({ theme }) => theme.colors.text};
-  letter-spacing: 0.01em;
-  transition: ${({ theme }) => theme.transitions.default};
+  transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 
   @media (max-width: 768px) {
-    font-size: 1.35rem;
+    font-size: 1.75rem;
   }
 `;
 
-const RowCategory = styled.span`
-  font-size: 0.72rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+const WorkIntro = styled.div`
+  grid-area: intro;
+  position: relative;
+  min-width: 0;
+`;
+
+const WorkBody = styled.div`
+  grid-area: body;
+  position: relative;
+  min-width: 0;
+`;
+
+const WorkDescription = styled.p`
+  max-width: 480px;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+`;
+
+const WorkFoot = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
   color: ${({ theme }) => theme.colors.textSecondary};
 
-  @media (max-width: 768px) {
-    display: none;
+  span:not(${MetaDot}) {
+    opacity: 0.8;
   }
 `;
 
-const RowDomain = styled.span`
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  opacity: 0.7;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  @media (max-width: 1024px) {
-    display: none;
-  }
-`;
-
-const RowMobileMeta = styled.span`
-  display: none;
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  margin-top: 6px;
-
-  @media (max-width: 768px) {
-    display: block;
-  }
-`;
-
-const RowArrow = styled.span`
+const WorkArrow = styled.span`
+  grid-area: arrow;
+  position: relative;
   display: inline-flex;
   justify-self: end;
   font-size: 1.4rem;
   color: ${({ theme }) => theme.colors.primary};
   opacity: 0.35;
-  transition: ${({ theme }) => theme.transitions.default};
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 `;
 
-const Row = styled(motion.a)<{ $dimmed: boolean }>`
+// One editorial row per project: intro left, description right, like the featured panel's split
+const WorkRow = styled(motion.a)`
   position: relative;
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 240px 260px 32px;
+  grid-template-columns: 5fr 6fr 32px;
+  grid-template-areas: 'intro body arrow';
   align-items: center;
-  gap: ${({ theme }) => theme.spacing.lg};
-  padding: 28px 16px;
+  gap: ${({ theme }) => theme.spacing.xxl};
+  padding: 40px 16px;
   text-decoration: none;
   border-bottom: 1px solid rgba(200, 159, 129, 0.14);
 
@@ -431,12 +425,12 @@ const Row = styled(motion.a)<{ $dimmed: boolean }>`
     transform: scaleX(1);
   }
 
-  &:hover ${RowTitle}, &:focus-visible ${RowTitle} {
+  &:hover ${WorkTitle}, &:focus-visible ${WorkTitle} {
     color: ${({ theme }) => theme.colors.primary};
     transform: translateX(12px);
   }
 
-  &:hover ${RowArrow}, &:focus-visible ${RowArrow} {
+  &:hover ${WorkArrow}, &:focus-visible ${WorkArrow} {
     opacity: 1;
     transform: translate(3px, -3px);
   }
@@ -446,102 +440,23 @@ const Row = styled(motion.a)<{ $dimmed: boolean }>`
     outline-offset: -1px;
   }
 
-  /* Dim the children, not the row: the reveal animation owns the row's opacity */
-  > * {
-    position: relative;
-    opacity: ${({ $dimmed }) => ($dimmed ? 0.4 : 1)};
-    transition: opacity 0.4s ease;
-  }
-
   @media (max-width: 1024px) {
-    grid-template-columns: 48px minmax(0, 1fr) 220px 32px;
+    grid-template-columns: minmax(0, 1fr) 32px;
+    grid-template-areas:
+      'intro arrow'
+      'body body';
+    gap: ${({ theme }) => theme.spacing.lg};
+    padding: 32px 16px;
   }
 
+  /* Labels get the full width on phones; the arrow drops beside the domain */
   @media (max-width: 768px) {
-    grid-template-columns: 36px minmax(0, 1fr) 24px;
-    gap: ${({ theme }) => theme.spacing.md};
-    padding: 22px 4px;
+    grid-template-areas:
+      'intro intro'
+      'body arrow';
+    align-items: end;
+    padding: 28px 4px;
   }
-`;
-
-const RowTitleBlock = styled.span`
-  min-width: 0;
-`;
-
-/* ---------- Floating preview plate (desktop only) ---------- */
-
-const Plate = styled(motion.div)`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: ${PLATE_WIDTH}px;
-  height: ${PLATE_HEIGHT}px;
-  pointer-events: none;
-  z-index: 5;
-
-  @media (hover: none), (pointer: coarse), (max-width: 1024px) {
-    display: none;
-  }
-`;
-
-const PlateInner = styled(motion.div)<{ $gradient: string }>`
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  overflow: hidden;
-  background: ${({ $gradient }) => $gradient};
-  border: 1px solid rgba(200, 159, 129, 0.28);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), 0 0 40px rgba(200, 159, 129, 0.08);
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-`;
-
-const PlateEnso = styled(Enso)`
-  position: absolute;
-  width: 240px;
-  height: 240px;
-  right: -70px;
-  top: -40px;
-  opacity: 0.55;
-`;
-
-const PlateSeed = styled.span`
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${({ theme }) => theme.colors.primary};
-  box-shadow: 0 0 18px rgba(200, 159, 129, 0.7);
-`;
-
-const PlateLabel = styled.span`
-  position: relative;
-  font-size: 0.66rem;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.primary};
-`;
-
-const PlateFooter = styled.div`
-  position: relative;
-`;
-
-const PlateDescription = styled.p`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-style: italic;
-  font-size: 1.15rem;
-  line-height: 1.35;
-  color: ${({ theme }) => theme.colors.text};
-  margin-bottom: 10px;
-`;
-
-const PlateDomain = styled.span`
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  color: ${({ theme }) => theme.colors.primary};
-  opacity: 0.85;
 `;
 
 const VisuallyHidden = styled.span`
@@ -563,43 +478,6 @@ const reveal = {
 };
 
 export default function PortfolioSection() {
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [canHover, setCanHover] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // Plate follows the pointer with a soft spring; under reduced motion it
-  // tracks the pointer directly, with no trailing inertia
-  const reduce = useReducedMotionSafe();
-  const plateX = useMotionValue(0);
-  const plateY = useMotionValue(0);
-  const springConfig = { damping: 28, stiffness: 220, mass: 0.6 };
-  const springX = useSpring(plateX, springConfig);
-  const springY = useSpring(plateY, springConfig);
-  const x = reduce ? plateX : springX;
-  const y = reduce ? plateY : springY;
-
-  useEffect(() => {
-    const query = window.matchMedia('(hover: hover) and (pointer: fine)');
-    const update = () => setCanHover(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!listRef.current) return;
-    const rect = listRef.current.getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-
-    // Sit to the right of the cursor, flipping left near the edge
-    const fitsRight = localX + PLATE_OFFSET + PLATE_WIDTH < rect.width;
-    plateX.set(fitsRight ? localX + PLATE_OFFSET : localX - PLATE_OFFSET - PLATE_WIDTH);
-    plateY.set(localY - PLATE_HEIGHT / 2);
-  };
-
-  const active = hovered !== null ? projects[hovered] : null;
-
   return (
     <PortfolioWrapper id="portfolio">
       <Container>
@@ -670,81 +548,51 @@ export default function PortfolioSection() {
           </Branch>
         </FeaturedPanel>
 
-        <IndexHeading>
-          <span>Index</span>
-          <MetaDot />
-          <span>{pad(projects.length)} Projects</span>
-        </IndexHeading>
+        <MoreHeading>
+          <span>More Work</span>
+        </MoreHeading>
 
-        <IndexList
-          ref={listRef}
-          onPointerMove={canHover ? handlePointerMove : undefined}
-          onPointerLeave={() => setHovered(null)}
-        >
-          {projects.map((project, index) => (
-            <Row
-              key={project.id}
-              href={project.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              $dimmed={canHover && hovered !== null && hovered !== index}
-              onPointerEnter={() => setHovered(index)}
-              custom={index}
-              variants={reveal}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-            >
-              <RowNumber>{pad(index + 1)}</RowNumber>
-              <RowTitleBlock>
-                <RowTitle>{project.title}</RowTitle>
-                <RowMobileMeta>{project.category}</RowMobileMeta>
-              </RowTitleBlock>
-              <RowCategory>{project.category}</RowCategory>
-              <RowDomain>{displayDomain(project.url)}</RowDomain>
-              <RowArrow>
-                <FiArrowUpRight />
-              </RowArrow>
-              <VisuallyHidden>(opens in a new tab)</VisuallyHidden>
-            </Row>
-          ))}
-
-          <AnimatePresence>
-            {canHover && active && (
-              <Plate
-                style={{ x, y }}
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.92 }}
-                transition={{ duration: 0.25 }}
-              >
-                <AnimatePresence initial={false}>
-                  <PlateInner
-                    key={active.id}
-                    $gradient={active.gradient}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <PlateEnso rotate={(hovered ?? 0) * 47} />
-                    <PlateSeed
-                      style={{
-                        right: `${48 + ((hovered ?? 0) % 3) * 22}px`,
-                        top: `${54 + ((hovered ?? 0) % 4) * 14}px`,
-                      }}
-                    />
-                    <PlateLabel>{active.category}</PlateLabel>
-                    <PlateFooter>
-                      <PlateDescription>{active.description}</PlateDescription>
-                      <PlateDomain>{displayDomain(active.url)} ↗</PlateDomain>
-                    </PlateFooter>
-                  </PlateInner>
-                </AnimatePresence>
-              </Plate>
-            )}
-          </AnimatePresence>
-        </IndexList>
+        {projects.map((project, index) => (
+          <WorkRow
+            key={project.url}
+            href={project.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            custom={index}
+            variants={reveal}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
+            <WorkIntro>
+              <WorkMeta>
+                {project.tags.map((tag, i) => (
+                  <Fragment key={tag}>
+                    {i > 0 && <MetaDot />}
+                    <span>{tag}</span>
+                  </Fragment>
+                ))}
+              </WorkMeta>
+              <WorkTitle>{project.title}</WorkTitle>
+            </WorkIntro>
+            <WorkBody>
+              <WorkDescription>{project.description}</WorkDescription>
+              <WorkFoot>
+                <span>{displayDomain(project.url)}</span>
+                {project.status && (
+                  <>
+                    <MetaDot />
+                    <span>{project.status}</span>
+                  </>
+                )}
+              </WorkFoot>
+            </WorkBody>
+            <WorkArrow>
+              <FiArrowUpRight />
+            </WorkArrow>
+            <VisuallyHidden>(opens in a new tab)</VisuallyHidden>
+          </WorkRow>
+        ))}
       </Container>
     </PortfolioWrapper>
   );
