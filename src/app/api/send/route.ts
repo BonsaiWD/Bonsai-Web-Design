@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { z } from 'zod';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // Server-side copy of the contact form's rules; the client schema alone is not a guarantee.
 const inquirySchema = z.object({
     name: z.string().trim().min(1).max(120),
@@ -28,6 +26,14 @@ function escapeHtml(value: string): string {
 const INVALID_INPUT = 'Please check the form fields and try again.';
 
 export async function POST(request: Request) {
+    // Read the key per request, so a missing key fails this route instead of the whole build
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        console.error('RESEND_API_KEY is not set');
+        return NextResponse.json({ error: 'Email is not configured.' }, { status: 503 });
+    }
+    const resend = new Resend(apiKey);
+
     try {
         let body: unknown;
         try {
@@ -46,6 +52,8 @@ export async function POST(request: Request) {
         const { data, error } = await resend.emails.send({
             from: 'Bonsai Web Design <contact@bonsaiwebdesign.com>',
             to: ['contact@bonsaiwebdesign.com'],
+            // Replying to the notification goes straight to the person who wrote in
+            replyTo: email,
             subject: `New Project Inquiry from ${name.replace(/[\r\n]+/g, ' ')}`,
             html: `
         <h1>New Project Inquiry</h1>
@@ -63,7 +71,7 @@ export async function POST(request: Request) {
 
         if (error) {
             console.error('Resend API Error:', error);
-            return NextResponse.json({ error }, { status: 500 });
+            return NextResponse.json({ error: 'Your message could not be sent.' }, { status: 502 });
         }
 
         return NextResponse.json(data);
