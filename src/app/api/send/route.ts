@@ -50,8 +50,8 @@ export async function POST(request: Request) {
         const { name, email, company, projectType, budget, description, timeline } = parsed.data;
 
         const { data, error } = await resend.emails.send({
-            from: 'Bonsai Web Design <contact@bonsaiwebdesign.com>',
-            to: ['contact@bonsaiwebdesign.com'],
+            from: 'Bonsai Web Design <admin@bonsaiwebdesign.com>',
+            to: ['admin@bonsaiwebdesign.com'],
             // Replying to the notification goes straight to the person who wrote in
             replyTo: email,
             subject: `New Project Inquiry from ${name.replace(/[\r\n]+/g, ' ')}`,

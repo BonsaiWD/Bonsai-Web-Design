@@ -95,8 +95,8 @@ export default function Footer() {
           </FooterColumn>
           <FooterColumn>
             <FooterTitle>Contact</FooterTitle>
-            <FooterLink href="mailto:contact@bonsaiwebdesign.com">
-              contact@bonsaiwebdesign.com
+            <FooterLink href="mailto:admin@bonsaiwebdesign.com">
+              admin@bonsaiwebdesign.com
             </FooterLink>
           </FooterColumn>
           <FooterColumn>
