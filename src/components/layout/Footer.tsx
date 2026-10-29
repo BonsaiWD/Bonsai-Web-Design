@@ -19,7 +19,7 @@ const FooterContent = styled.div`
   @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
     /* minmax(0, 1fr): a plain 1fr track will not shrink below its content, so the
        unwrappable payment-icon row pushed the page wider than 768–786px viewports */
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 `;
 
@@ -98,11 +98,6 @@ export default function Footer() {
             <FooterLink href="mailto:admin@bonsaiwebdesign.com">
               admin@bonsaiwebdesign.com
             </FooterLink>
-          </FooterColumn>
-          <FooterColumn>
-            <FooterTitle>Social</FooterTitle>
-            <FooterLink href="https://www.linkedin.com/in/davidshapiro7/" target="_blank" rel="noopener noreferrer">LinkedIn</FooterLink>
-            <FooterLink href="https://www.facebook.com/profile.php?id=61583882777025" target="_blank" rel="noopener noreferrer">Facebook</FooterLink>
           </FooterColumn>
           <FooterColumn>
             <FooterTitle>Accepted Payments</FooterTitle>
