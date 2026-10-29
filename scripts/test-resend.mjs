@@ -30,8 +30,8 @@ const resend = new Resend(apiKey);
     console.log('Attempting to send test email...');
     try {
         const { data, error } = await resend.emails.send({
-            from: 'onboarding@resend.dev',
-            to: 'contact@bonsaiwebdesign.com',
+            from: 'Bonsai Web Design <admin@bonsaiwebdesign.com>',
+            to: 'admin@bonsaiwebdesign.com',
             subject: 'Test Email from Script',
             html: '<p>This is a test email to verify the API key and domain settings.</p>'
         });
