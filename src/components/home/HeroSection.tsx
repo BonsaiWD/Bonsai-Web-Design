@@ -6,7 +6,6 @@ import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
-import { frostedGlass } from '@/styles/frosted';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
 import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE } from './bonsai/timeline';
@@ -327,26 +326,23 @@ const CTA_HEIGHT = 48;
 /** The hero's centred content, with the button lowered, in px (measured; the same at every desktop width). */
 const CONTENT_HEIGHT = 462;
 
-const { pot, crop } = BONSAI_SOURCE;
-/** How far the lit pot's centre sits from the tree's, in tree heights (negative is left). */
-const POT_ACROSS = ((pot.x[0] + pot.x[1]) / 2 - 0.5) * (crop.w / crop.h);
 const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
 
 /*
  * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
- * the price line left the hero), placed where it says what it does: planted in
- * the bonsai's pot.
+ * the price line left the hero), as a line of text on a bronze hairline,
+ * centred under the subtext. A box would show that the pot sits left of the
+ * page's centre; a hairline doesn't.
  *
- * Where the tree is drawn behind it and the hero isn't compact, the button
- * leaves the content's flow by a button's height and a gap (so the text sits
- * as if it were still there) and moves onto the lit middle of the pot's body.
- * Across, that is left of the page's centre, as the pot sits left of the
- * tree's own centre. Down, it is the pot body's place in the tree (centred
- * TREE.centre down the layer) less the button's place in the centred content
- * (half the content less half the button below the layer's middle). The tree
- * is a share of the pinned layer's height, as in BonsaiCanvas, so both follow
- * the window. The still fallback frames the whole photo, so it keeps the
- * button centred under the text, as do phones and short windows.
+ * Where the tree is drawn behind it and the hero isn't compact, it rests at
+ * the pot's rim: it leaves the content's flow by a button's height and a gap
+ * (so the text sits as if it were still there) and moves down to the rim's
+ * height. That is the rim's place in the tree (centred TREE.centre down the
+ * layer) less the button's place in the centred content (half the content
+ * less half the button below the layer's middle). The tree is a share of the
+ * pinned layer's height, as in BonsaiCanvas, so the move follows the window.
+ * The still fallback frames the whole photo, so it keeps the button in the
+ * flow under the text, as do phones and short windows.
  */
 const CtaRow = styled.div`
   display: flex;
@@ -355,10 +351,9 @@ const CtaRow = styled.div`
   @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
     ${HeroWrapper}:not([data-bonsai='still']) & {
       margin-top: ${({ theme }) => `calc(${CTA_HEIGHT}px + ${theme.spacing.md})`};
-      translate:
-        calc(${POT_ACROSS.toFixed(3)} * ${treeHeight})
+      translate: 0
         calc(
-          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(pot.body - 0.5).toFixed(2)} * ${treeHeight} -
+          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(BONSAI_SOURCE.rim - 0.5).toFixed(3)} * ${treeHeight} -
             ${(CONTENT_HEIGHT - CTA_HEIGHT) / 2}px
         );
     }
@@ -378,22 +373,28 @@ const PrimaryCta = styled.a`
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  border-radius: 0;
-  ${frostedGlass}
+  color: ${({ theme }) => theme.colors.text};
+  transition: color ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
 
-  /* Bronze hover halo (0.15), faded in on opacity rather than box-shadow */
+  /* The hairline it rests on, fading out at both ends; it reaches a little wider on hover */
   &::after {
     content: '';
     position: absolute;
-    inset: -4px;
-    border: 4px solid rgba(200, 159, 129, 0.15);
-    opacity: 0;
+    left: 0;
+    right: 0;
+    bottom: 8px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200, 159, 129, 0.6) 25% 75%, transparent);
     pointer-events: none;
-    transition: opacity ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
+    transition: transform ${DUR.state}s cubic-bezier(${EASE_OUT.join(', ')});
+  }
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
   }
 
   &:hover::after {
-    opacity: 1;
+    transform: scaleX(1.2);
   }
 
   ${focusRing}
