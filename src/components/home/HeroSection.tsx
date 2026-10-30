@@ -6,6 +6,7 @@ import { Container } from '../layout/Container';
 import { useRef } from 'react';
 import { useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
+import ReimagineStage from './ReimagineStage';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -17,10 +18,6 @@ const heroIn = keyframes`
   to { opacity: 1; transform: none; }
 `;
 
-const fadeIn = keyframes`
-  from { opacity: 0; }
-`;
-
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
     animation: ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) ${delayMs}ms both;
@@ -28,28 +25,22 @@ const entrance = (delayMs: number) => css`
 `;
 
 /*
- * Phones and short windows: the hero grows to fit its CTAs instead of clipping
- * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 444px tall and the cue 88px tall, 40px from the bottom, so the cue
- * clears the price line by at least 16px from 736px tall.
+ * The hero runs past the first screen: the copy sits near the top and the
+ * before-and-after frame rises from the bottom edge, which also does the old
+ * scroll cue's job of inviting the reader down.
  */
 const COMPACT = '(max-width: 767px), (max-height: 735px)';
 
 const HeroWrapper = styled.section`
-  height: 100vh;
-  height: 100svh;
+  min-height: 100vh;
+  min-height: 100svh;
   width: 100%;
   position: relative;
   overflow: clip;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: clamp(112px, 15svh, 168px) 0 ${({ theme }) => theme.spacing.xxxl};
   background-color: ${({ theme }) => theme.colors.background};
 
   @media ${COMPACT} {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100svh;
     padding: 104px 0 ${({ theme }) => theme.spacing.xxl};
   }
 `;
@@ -235,34 +226,6 @@ const PriceSeparator = styled.span`
   }
 `;
 
-const ScrollIndicator = styled.div`
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  opacity: 0.5;
-
-  /* Opacity only, so the centering transform is left alone */
-  @media (prefers-reduced-motion: no-preference) {
-    animation: ${fadeIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 400ms both;
-  }
-
-  /* Where the hero is compact the cue would sit on the price line */
-  @media ${COMPACT} {
-    display: none;
-  }
-`;
-
-const Line = styled.div`
-  width: 1px;
-  height: 60px;
-  background: ${({ theme }) => theme.colors.textSecondary};
-`;
-
 export default function HeroSection() {
   const ref = useRef(null);
   const reduce = useReducedMotionSafe();
@@ -299,12 +262,9 @@ export default function HeroSection() {
           <PriceSeparator>·</PriceSeparator>{' '}
           <PriceClause>Updates and care at $120/hr</PriceClause>
         </PriceLine>
-      </Content>
 
-      <ScrollIndicator>
-        <span style={{ fontSize: '0.8rem', letterSpacing: '0.1em' }}>SCROLL</span>
-        <Line />
-      </ScrollIndicator>
+        <ReimagineStage />
+      </Content>
     </HeroWrapper>
   );
 }

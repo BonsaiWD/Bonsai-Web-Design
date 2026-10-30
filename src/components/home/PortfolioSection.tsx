@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Fragment } from 'react';
 import { Section, Container } from '../layout/Container';
 import GradientText from '../common/GradientText';
+import Enso from '../common/Enso';
 import { FiArrowUpRight } from 'react-icons/fi';
 import { featured, projects } from '@/data/work';
 
@@ -53,32 +54,6 @@ const SectionTitle = styled(motion.h2)`
     font-size: 2.25rem;
   }
 `;
-
-/* ---------- Enso ring: the shared visual motif ---------- */
-
-const EnsoSvg = styled.svg`
-  display: block;
-  color: ${({ theme }) => theme.colors.primary};
-  overflow: visible;
-`;
-
-function Enso({ rotate = 0, className }: { rotate?: number; className?: string }) {
-  return (
-    <EnsoSvg viewBox="0 0 200 200" className={className} aria-hidden="true">
-      <circle
-        cx="100"
-        cy="100"
-        r="80"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        strokeDasharray="430 73"
-        transform={`rotate(${rotate} 100 100)`}
-      />
-    </EnsoSvg>
-  );
-}
 
 /* ---------- Featured client ---------- */
 
