@@ -1,15 +1,30 @@
 'use client';
 
-import styled from 'styled-components';
+import styled, { ThemeProvider, type DefaultTheme } from 'styled-components';
 import { motion } from 'framer-motion';
 import { Fragment } from 'react';
 import { Section, Container } from '../layout/Container';
 import GradientText from '../common/GradientText';
 import { FiArrowUpRight } from 'react-icons/fi';
 import { featured, projects } from '@/data/work';
+import { theme as siteTheme } from '@/styles/theme';
 
 const displayDomain = (url: string) => new URL(url).hostname.replace(/^www\./, '');
 const pad = (n: number) => String(n).padStart(2, '0');
+
+// The featured client sits behind a pane of glass, smoked with the forest green: the site's own
+// palette, bone ink and bronze details, so it stays clear and legible while the light behind it
+// shows through. The body text is a touch lighter than elsewhere, to hold up on the glass.
+const glass: DefaultTheme = {
+  ...siteTheme,
+  colors: {
+    ...siteTheme.colors,
+    textSecondary: '#AEB9AF',
+  },
+};
+
+// A theme colour at some strength, for hairlines and washes that follow whichever palette is in use
+const tint = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 
 const PortfolioWrapper = styled(Section)`
   background: linear-gradient(
@@ -82,19 +97,64 @@ function Enso({ rotate = 0, className }: { rotate?: number; className?: string }
 
 /* ---------- Featured client ---------- */
 
-const FeaturedPanel = styled(motion.div)`
+const FeaturedStage = styled(motion.div)`
+  position: relative;
+  margin-bottom: 96px;
+
+  @media (max-width: 768px) {
+    margin-bottom: ${({ theme }) => theme.spacing.xxl};
+  }
+`;
+
+// What the glass looks through: a soft sage light and a little bronze warmth. It stays still, so
+// the pane costs nothing extra to scroll past.
+const LightField = styled.div`
+  position: absolute;
+  inset: -60px -24px;
+  background:
+    radial-gradient(38% 46% at 24% 42%, rgba(174, 196, 168, 0.32), transparent 70%),
+    radial-gradient(34% 44% at 80% 66%, rgba(200, 159, 129, 0.24), transparent 72%);
+  pointer-events: none;
+`;
+
+const FeaturedPanel = styled.div`
   position: relative;
   display: grid;
   grid-template-columns: 5fr 7fr;
   gap: ${({ theme }) => theme.spacing.xxl};
   padding: 56px;
   border-radius: 28px;
-  border: 1px solid rgba(200, 159, 129, 0.18);
+  /* Smoked forest glass: a little light caught across its upper half, over a deep green tint */
   background:
-    radial-gradient(circle at 12% 18%, rgba(200, 159, 129, 0.1), transparent 55%),
-    linear-gradient(160deg, rgba(26, 38, 30, 0.85) 0%, rgba(15, 20, 16, 0.85) 100%);
+    linear-gradient(160deg, rgba(232, 240, 228, 0.1) 0%, rgba(232, 240, 228, 0.02) 42%, transparent 60%),
+    linear-gradient(160deg, rgba(34, 50, 40, 0.52) 0%, rgba(12, 18, 14, 0.62) 100%);
+  -webkit-backdrop-filter: blur(3px) saturate(160%);
+  backdrop-filter: blur(3px) saturate(160%);
+  /* The rim catching the light: brightest top-left, a fainter echo bottom-right, and the
+     faint glow inside a thick pane */
+  box-shadow:
+    inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.3),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 32px rgba(232, 240, 228, 0.07),
+    0 24px 60px -24px rgba(0, 0, 0, 0.7);
+  color: ${({ theme }) => theme.colors.text};
   overflow: hidden;
-  margin-bottom: 96px;
+
+  /* A soft sheen across the upper left, as on curved glass */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.09), transparent 55%);
+    pointer-events: none;
+  }
+
+  /* For visitors who ask for less transparency, a solid pane in the same greens */
+  @media (prefers-reduced-transparency: reduce) {
+    background: linear-gradient(160deg, #1d2b22 0%, #111813 100%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
@@ -105,7 +165,6 @@ const FeaturedPanel = styled(motion.div)`
   @media (max-width: 768px) {
     padding: 28px 20px;
     border-radius: 20px;
-    margin-bottom: ${({ theme }) => theme.spacing.xxl};
   }
 `;
 
@@ -159,12 +218,12 @@ const MetaDot = styled.span`
   opacity: 0.6;
 `;
 
+// Upright, as the site's other headings are: an italic display serif here read as a magazine
 const FeaturedTitle = styled.h3`
   font-family: ${({ theme }) => theme.fonts.heading};
-  font-style: italic;
   font-size: 3.25rem;
-  font-weight: 300;
-  line-height: 1.05;
+  font-weight: 400;
+  line-height: 1.08;
   color: ${({ theme }) => theme.colors.text};
   margin-bottom: ${({ theme }) => theme.spacing.lg};
 
@@ -173,13 +232,16 @@ const FeaturedTitle = styled.h3`
   }
 `;
 
+// In the ink, not the bronze, so it reads as the title's second voice rather than a third colour.
+// Set in Inter: at this size Playfair's hairlines thin out on the glass and the line gets hard to read.
 const Tagline = styled.p`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 1.15rem;
-  line-height: 1.5;
-  color: ${({ theme }) => theme.colors.primary};
+  font-family: ${({ theme }) => theme.fonts.main};
+  font-size: 1.2rem;
+  line-height: 1.6;
+  text-wrap: balance;
+  color: ${({ theme }) => theme.colors.text};
   padding-left: ${({ theme }) => theme.spacing.md};
-  border-left: 1px solid rgba(200, 159, 129, 0.4);
+  border-left: 1px solid ${({ theme }) => tint(theme.colors.primary, 40)};
   margin-bottom: ${({ theme }) => theme.spacing.lg};
 `;
 
@@ -206,8 +268,8 @@ const Branch = styled.ul`
     width: 1px;
     background: linear-gradient(
       180deg,
-      rgba(200, 159, 129, 0.6) 0%,
-      rgba(200, 159, 129, 0.25) 100%
+      ${({ theme }) => tint(theme.colors.primary, 60)} 0%,
+      ${({ theme }) => tint(theme.colors.primary, 25)} 100%
     );
   }
 `;
@@ -231,18 +293,15 @@ const BranchArrow = styled.span`
   transition: ${({ theme }) => theme.transitions.default};
 `;
 
+// In Inter, like the tagline, for the same reason: Playfair's hairlines thin out on the glass.
 const BranchTitle = styled.span`
   display: block;
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 1.45rem;
-  font-weight: 300;
+  font-family: ${({ theme }) => theme.fonts.main};
+  font-size: 1.2rem;
+  font-weight: 400;
   color: ${({ theme }) => theme.colors.text};
-  line-height: 1.25;
+  line-height: 1.3;
   transition: ${({ theme }) => theme.transitions.default};
-
-  @media (max-width: 768px) {
-    font-size: 1.2rem;
-  }
 `;
 
 const BranchLink = styled(motion.a)`
@@ -252,7 +311,7 @@ const BranchLink = styled(motion.a)`
   gap: ${({ theme }) => theme.spacing.lg};
   padding: 18px 0;
   text-decoration: none;
-  border-bottom: 1px solid rgba(200, 159, 129, 0.1);
+  border-bottom: 1px solid ${({ theme }) => tint(theme.colors.primary, 18)};
 
   li:last-child & {
     border-bottom: none;
@@ -260,7 +319,7 @@ const BranchLink = styled(motion.a)`
 
   &:hover ${BranchNode}, &:focus-visible ${BranchNode} {
     background: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 5px rgba(200, 159, 129, 0.15);
+    box-shadow: 0 0 0 5px ${({ theme }) => tint(theme.colors.primary, 15)};
   }
 
   &:hover ${BranchArrow}, &:focus-visible ${BranchArrow} {
@@ -293,7 +352,6 @@ const Kind = styled.span`
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-  opacity: 0.75;
   margin-bottom: 4px;
 `;
 
@@ -301,7 +359,6 @@ const Domain = styled.span`
   display: block;
   font-size: 0.82rem;
   color: ${({ theme }) => theme.colors.textSecondary};
-  opacity: 0.75;
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -500,53 +557,58 @@ export default function PortfolioSection() {
           </SectionTitle>
         </Header>
 
-        <FeaturedPanel
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <FeaturedEnso rotate={-35} />
+        <ThemeProvider theme={glass}>
+          <FeaturedStage
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <LightField aria-hidden="true" />
+            <FeaturedPanel>
+              <FeaturedEnso rotate={-35} />
 
-          <FeaturedIntro>
-            <MetaRow>
-              <span>Featured Client</span>
-              <MetaDot />
-              <span>{pad(featured.properties.length)} Properties</span>
-            </MetaRow>
-            <FeaturedTitle>{featured.name}</FeaturedTitle>
-            <Tagline>{featured.tagline}</Tagline>
-            <Summary>{featured.summary}</Summary>
-          </FeaturedIntro>
+              <FeaturedIntro>
+                <MetaRow>
+                  <span>Featured Client</span>
+                  <MetaDot />
+                  <span>{pad(featured.properties.length)} Properties</span>
+                </MetaRow>
+                <FeaturedTitle>{featured.name}</FeaturedTitle>
+                <Tagline>{featured.tagline}</Tagline>
+                <Summary>{featured.summary}</Summary>
+              </FeaturedIntro>
 
-          <Branch>
-            {featured.properties.map((property, i) => (
-              <li key={property.url}>
-                <BranchLink
-                  href={property.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  custom={i}
-                  variants={reveal}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                >
-                  <BranchNode />
-                  <BranchText>
-                    <Kind>{property.kind}</Kind>
-                    <BranchTitle>{property.title}</BranchTitle>
-                    <Domain>{displayDomain(property.url)}</Domain>
-                  </BranchText>
-                  <BranchArrow>
-                    <FiArrowUpRight />
-                  </BranchArrow>
-                  <VisuallyHidden>(opens in a new tab)</VisuallyHidden>
-                </BranchLink>
-              </li>
-            ))}
-          </Branch>
-        </FeaturedPanel>
+              <Branch>
+                {featured.properties.map((property, i) => (
+                  <li key={property.url}>
+                    <BranchLink
+                      href={property.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      custom={i}
+                      variants={reveal}
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={{ once: true }}
+                    >
+                      <BranchNode />
+                      <BranchText>
+                        <Kind>{property.kind}</Kind>
+                        <BranchTitle>{property.title}</BranchTitle>
+                        <Domain>{displayDomain(property.url)}</Domain>
+                      </BranchText>
+                      <BranchArrow>
+                        <FiArrowUpRight />
+                      </BranchArrow>
+                      <VisuallyHidden>(opens in a new tab)</VisuallyHidden>
+                    </BranchLink>
+                  </li>
+                ))}
+              </Branch>
+            </FeaturedPanel>
+          </FeaturedStage>
+        </ThemeProvider>
 
         <MoreHeading>
           <span>More Work</span>
