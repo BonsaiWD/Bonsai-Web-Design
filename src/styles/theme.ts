@@ -13,7 +13,7 @@ export const theme = {
         success: '#03DAC6',
     },
     fonts: {
-        main: "var(--font-inter), 'Inter', sans-serif",
+        main: "var(--font-instrument-sans), 'Instrument Sans', sans-serif",
         heading: "var(--font-playfair), 'Playfair Display', serif",
     },
     breakpoints: {

@@ -108,14 +108,21 @@ const Tagline = styled.h1`
   }
 `;
 
+// Bone at 75% reads crisper on the dark ground than the sage grey, and still sits behind the headline
 const SubText = styled.p`
-  font-size: 1.1rem;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 1.2rem;
+  color: ${({ theme }) => `color-mix(in srgb, ${theme.colors.text} 75%, transparent)`};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
-  max-width: 500px;
-  line-height: 1.8;
-  font-weight: 300;
+  max-width: 540px;
+  line-height: 1.6;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  text-wrap: balance;
   ${entrance(100)}
+
+  @media (max-width: 767px) {
+    font-size: 1.1rem;
+  }
 `;
 
 const focusRing = css`
