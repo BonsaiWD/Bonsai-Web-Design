@@ -1,7 +1,7 @@
 'use client';
 
 import styled, { css, keyframes } from 'styled-components';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
 import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
@@ -357,13 +357,26 @@ export default function HeroSection() {
   const [fallback, setFallback] = useState(false);
   const showStill = useCallback(() => setFallback(true), []);
   const auto = useAutoDissolve();
+  const pinRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end start"]
   });
 
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  // The backdrop drifts and fades only as the hero leaves. While the hero is
+  // held on its runway it stays put; moving it there would slide it off the
+  // top and uncover the bare ground under the header.
+  const leaving = useMotionValue(0);
+  useMotionValueEvent(scrollYProgress, 'change', (p) => {
+    const hero = ref.current;
+    const pin = pinRef.current;
+    if (!hero || !pin) return;
+    const total = hero.offsetHeight;
+    const runway = Math.max(0, total - pin.offsetHeight);
+    leaving.set(Math.min(1, Math.max(0, (p * total - runway) / (total - runway || 1))));
+  });
+  const y = useTransform(leaving, [0, 1], ["0%", "30%"]);
+  const opacity = useTransform(leaving, [0, 0.5], [1, 0]);
 
   return (
     <HeroWrapper
@@ -372,7 +385,7 @@ export default function HeroSection() {
       data-bonsai={fallback ? 'still' : undefined}
       data-dissolve={auto ? 'auto' : undefined}
     >
-      <Pin>
+      <Pin ref={pinRef}>
         <BackgroundImage style={{ y: reduce ? 0 : y, opacity: reduce ? 1 : opacity }} />
         <BonsaiStill imgRef={stillRef} />
         {intro && !fallback && (
