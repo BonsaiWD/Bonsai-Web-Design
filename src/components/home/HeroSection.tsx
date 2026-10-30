@@ -40,12 +40,13 @@ const SETTLE_S = INTRO.textSettle / 1000;
 /*
  * "timeless" catches the light once as it lands (owner's request,
  * 2026-10-30): a bone-white glint with a bronze halo travels through the word
- * from left to right, like the light through the tree, and leaves the word
- * lit: a warmer fill and a soft, steady halo (owner, the same day). The
- * glint is the word's own fill, a gradient clipped to the text; the halo is a
- * copy of the word drawn only as its text-shadow, masked to the same band.
- * Both share one box, so they move together. The lit word is the resting
- * state, so reduced motion shows it too, without the sweep.
+ * from left to right, like the light through the tree, and leaves a soft
+ * glow behind the solid bronze letters (owner, the same day). The glint is
+ * the word's own fill, a gradient clipped to the text; the halo is a copy of
+ * the word drawn only as its text-shadow, masked to the same band, and the
+ * glow it leaves is another copy beneath the letters, so it never veils
+ * them. All three share one box, so they move together. The glowing word is
+ * the resting state, so reduced motion shows it too, without the sweep.
  */
 const glint = keyframes`
   from { background-position: 100% 0; mask-position: 100% 0; }
@@ -217,7 +218,7 @@ const Tagline = styled.h1`
    * negative margin takes it back out of the line. The band sits in a gradient
    * 2.4 times the box's width, so moving it from 100% to 0% sweeps it from just
    * before the first letter to just past the last. Everything left of the band
-   * is the lit word, so 0% (where it rests) is lit all through.
+   * keeps the glow, so 0% (where it rests) glows all through.
    */
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     em {
@@ -227,7 +228,7 @@ const Tagline = styled.h1`
       margin: -0.5em -0.6em;
       background: linear-gradient(
           100deg,
-          ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 78%, ${theme.colors.text})`} 0 41%,
+          ${({ theme }) => theme.colors.primary} 0 41%,
           ${({ theme }) => theme.colors.text} 48% 52%,
           ${({ theme }) => theme.colors.primary} 59% 100%
         )
@@ -237,20 +238,34 @@ const Tagline = styled.h1`
       -webkit-text-fill-color: transparent;
     }
 
+    em::before,
     em::after {
       content: attr(data-glow) / '';
       position: absolute;
       inset: 0;
       padding: inherit;
       white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      animation: inherit;
+    }
+
+    /* The glow the band leaves, beneath the letters */
+    em::before {
+      z-index: -1;
+      text-shadow:
+        0 0 0.18em ${({ theme }) => theme.colors.primary},
+        0 0 0.5em ${({ theme }) => theme.colors.primary};
+      mask: linear-gradient(100deg, rgb(0 0 0 / 0.5) 0 44%, transparent 52%) 0 0 / 240% 100% no-repeat;
+    }
+
+    /* The band's halo, over the letters */
+    em::after {
       text-shadow:
         0 0 0.06em ${({ theme }) => theme.colors.text},
         0 0 0.18em ${({ theme }) => theme.colors.primary},
         0 0 0.5em ${({ theme }) => theme.colors.primary};
-      mask: linear-gradient(100deg, rgb(0 0 0 / 0.35) 0 41%, #000 48% 52%, transparent 59%) 0 0 / 240% 100% no-repeat;
-      pointer-events: none;
-      user-select: none;
-      animation: inherit;
+      mask: linear-gradient(100deg, transparent 0 41%, #000 48% 52%, transparent 59%) 0 0 / 240% 100% no-repeat;
     }
 
     @media (prefers-reduced-motion: no-preference) {
