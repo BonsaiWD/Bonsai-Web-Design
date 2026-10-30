@@ -3,6 +3,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useMotionValueEvent, useScroll } from 'framer-motion';
+import { buildCircuit } from './bonsaiCircuit';
 import { buildBonsaiField } from './bonsaiField';
 import { createBonsaiRenderer, type BonsaiRenderer } from './bonsaiRenderer';
 import { buildRoots } from './bonsaiRoots';
@@ -177,6 +178,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
         renderer.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
         renderer.layout([x, y, tw, th], [w / 2, h]);
         renderer.roots(buildRoots([x + bx * tw, y + by * th], [w / 2, h], tw * 0.17));
+        renderer.circuit(buildCircuit([x, y, tw, th], [w / 2, h]));
         requestDraw.current();
       };
       ro = new ResizeObserver(layout);
