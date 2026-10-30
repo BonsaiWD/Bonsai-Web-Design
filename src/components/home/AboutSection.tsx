@@ -5,7 +5,6 @@ import { Section, Container } from '../layout/Container';
 import { motion, stagger, type Variants } from 'framer-motion';
 import Image from 'next/image';
 import GradientText from '../common/GradientText';
-import AnimatedCounter from '../common/AnimatedCounter';
 import { DUR, EASE_OUT, RISE, STAGGER } from '@/lib/motion';
 
 // Headshots render at up to 350px: full container width on small phones, and
@@ -49,10 +48,6 @@ const IntroCopy = styled(motion.p)`
   font-size: 1.15rem;
   line-height: 1.8;
   color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-const ProjectStat = styled(motion.div)`
-  margin-top: ${({ theme }) => theme.spacing.xl};
 `;
 
 const TeamTitle = styled.h3`
@@ -341,12 +336,6 @@ export default function AboutSection() {
           <IntroCopy variants={introItem}>
             Our boutique approach ensures that every project receives our full dedication, resulting in work that stands the test of time.
           </IntroCopy>
-          <ProjectStat variants={introItem}>
-            <StatNumber>
-              <AnimatedCounter to={50} suffix="+" />
-            </StatNumber>
-            <StatLabel>Projects</StatLabel>
-          </ProjectStat>
         </Intro>
 
         {/* Taller than the viewport, so reveal on a margin rather than viewport.amount */}
