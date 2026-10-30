@@ -1,6 +1,6 @@
 'use client';
 
-import styled, { ThemeProvider, type DefaultTheme } from 'styled-components';
+import styled, { css, ThemeProvider, type DefaultTheme } from 'styled-components';
 import { motion } from 'framer-motion';
 import { Fragment } from 'react';
 import { Section, Container } from '../layout/Container';
@@ -12,9 +12,9 @@ import { theme as siteTheme } from '@/styles/theme';
 const displayDomain = (url: string) => new URL(url).hostname.replace(/^www\./, '');
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// The featured client sits behind a pane of glass, smoked with the forest green: the site's own
-// palette, bone ink and bronze details, so it stays clear and legible while the light behind it
-// shows through. The body text is a touch lighter than elsewhere, to hold up on the glass.
+// The featured client and the further work each sit behind a pane of glass, smoked with the forest
+// green: the site's own palette, bone ink and bronze details, so they stay clear and legible while
+// the light behind shows through. The body text is a touch lighter than elsewhere, to hold up on the glass.
 const glass: DefaultTheme = {
   ...siteTheme,
   colors: {
@@ -69,41 +69,11 @@ const SectionTitle = styled(motion.h2)`
   }
 `;
 
-/* ---------- Enso ring: the shared visual motif ---------- */
+/* ---------- The glass ---------- */
 
-const EnsoSvg = styled.svg`
-  display: block;
-  color: ${({ theme }) => theme.colors.primary};
-  overflow: visible;
-`;
-
-function Enso({ rotate = 0, className }: { rotate?: number; className?: string }) {
-  return (
-    <EnsoSvg viewBox="0 0 200 200" className={className} aria-hidden="true">
-      <circle
-        cx="100"
-        cy="100"
-        r="80"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        strokeDasharray="430 73"
-        transform={`rotate(${rotate} 100 100)`}
-      />
-    </EnsoSvg>
-  );
-}
-
-/* ---------- Featured client ---------- */
-
-const FeaturedStage = styled(motion.div)`
+// A pane of glass and the light it looks through, revealed together
+const GlassStage = styled(motion.div)`
   position: relative;
-  margin-bottom: 96px;
-
-  @media (max-width: 768px) {
-    margin-bottom: ${({ theme }) => theme.spacing.xxl};
-  }
 `;
 
 // What the glass looks through: a soft sage light and a little bronze warmth. It stays still, so
@@ -117,12 +87,9 @@ const LightField = styled.div`
   pointer-events: none;
 `;
 
-const FeaturedPanel = styled.div`
+// The pane itself, shared by the featured client and the additional projects
+const glassPane = css`
   position: relative;
-  display: grid;
-  grid-template-columns: 5fr 7fr;
-  gap: ${({ theme }) => theme.spacing.xxl};
-  padding: 56px;
   border-radius: 28px;
   /* Smoked forest glass: a little light caught across its upper half, over a deep green tint */
   background:
@@ -156,6 +123,28 @@ const FeaturedPanel = styled.div`
     backdrop-filter: none;
   }
 
+  @media (max-width: 768px) {
+    border-radius: 20px;
+  }
+`;
+
+/* ---------- Featured client ---------- */
+
+const FeaturedStage = styled(GlassStage)`
+  margin-bottom: 96px;
+
+  @media (max-width: 768px) {
+    margin-bottom: ${({ theme }) => theme.spacing.xxl};
+  }
+`;
+
+const FeaturedPanel = styled.div`
+  ${glassPane}
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: ${({ theme }) => theme.spacing.xxl};
+  padding: 56px;
+
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
     gap: ${({ theme }) => theme.spacing.xl};
@@ -164,27 +153,6 @@ const FeaturedPanel = styled.div`
 
   @media (max-width: 768px) {
     padding: 28px 20px;
-    border-radius: 20px;
-  }
-`;
-
-const FeaturedEnso = styled(Enso)`
-  position: absolute;
-  width: 460px;
-  height: 460px;
-  left: -40px;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0.1;
-  pointer-events: none;
-
-  @media (max-width: 1024px) {
-    width: 360px;
-    height: 360px;
-    left: auto;
-    right: -160px;
-    top: -140px;
-    transform: none;
   }
 `;
 
@@ -367,15 +335,44 @@ const Domain = styled.span`
 
 /* ---------- Further work ---------- */
 
+// Behind the additional projects the light is mirrored, warmth on the left and sage on the right, so the two
+// panes read as one light falling across the section rather than a repeat
+const MoreLightField = styled(LightField)`
+  background:
+    radial-gradient(30% 34% at 20% 28%, rgba(200, 159, 129, 0.2), transparent 72%),
+    radial-gradient(40% 40% at 78% 66%, rgba(174, 196, 168, 0.28), transparent 70%);
+`;
+
+// The rows' own padding brings their text in line with the featured client's
+const MorePanel = styled.div`
+  ${glassPane}
+  padding: 48px 40px 8px;
+
+  @media (max-width: 1024px) {
+    padding: 40px 24px 8px;
+  }
+
+  @media (max-width: 768px) {
+    padding: 28px 16px 4px;
+  }
+`;
+
+// Positioned so it sits above the glass's sheen, and padded in line with the rows' text
 const MoreHeading = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.md};
+  padding: 0 16px;
   font-size: 0.72rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
   margin-bottom: ${({ theme }) => theme.spacing.md};
+
+  @media (max-width: 768px) {
+    padding: 0 4px;
+  }
 
   &::after {
     content: '';
@@ -440,6 +437,17 @@ const WorkFoot = styled.div`
   span:not(${MetaDot}) {
     opacity: 0.8;
   }
+
+  /* On phones, inside the pane, the domain and the status stack so neither breaks mid-word */
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+
+    ${MetaDot} {
+      display: none;
+    }
+  }
 `;
 
 const WorkArrow = styled.span`
@@ -464,6 +472,10 @@ const WorkRow = styled(motion.a)`
   padding: 40px 16px;
   text-decoration: none;
   border-bottom: 1px solid rgba(200, 159, 129, 0.14);
+
+  &:last-child {
+    border-bottom: none;
+  }
 
   /* Bronze wash that sweeps in from the left */
   &::before {
@@ -525,6 +537,14 @@ const VisuallyHidden = styled.span`
   white-space: nowrap;
 `;
 
+// Each pane of glass rises into place as it comes into view
+const paneReveal = {
+  initial: { opacity: 0, y: 40 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: '-80px' },
+  transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+} as const;
+
 const reveal = {
   hidden: { opacity: 0, y: 24 },
   visible: (i: number) => ({
@@ -558,16 +578,9 @@ export default function PortfolioSection() {
         </Header>
 
         <ThemeProvider theme={glass}>
-          <FeaturedStage
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-          >
+          <FeaturedStage {...paneReveal}>
             <LightField aria-hidden="true" />
             <FeaturedPanel>
-              <FeaturedEnso rotate={-35} />
-
               <FeaturedIntro>
                 <MetaRow>
                   <span>Featured Client</span>
@@ -608,53 +621,58 @@ export default function PortfolioSection() {
               </Branch>
             </FeaturedPanel>
           </FeaturedStage>
+
+          <GlassStage {...paneReveal}>
+            <MoreLightField aria-hidden="true" />
+            <MorePanel>
+              <MoreHeading>
+                <span>Additional Projects</span>
+              </MoreHeading>
+
+              {projects.map((project, index) => (
+                <WorkRow
+                  key={project.url}
+                  href={project.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  custom={index}
+                  variants={reveal}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                >
+                  <WorkIntro>
+                    <WorkMeta>
+                      {project.tags.map((tag, i) => (
+                        <Fragment key={tag}>
+                          {i > 0 && <MetaDot />}
+                          <span>{tag}</span>
+                        </Fragment>
+                      ))}
+                    </WorkMeta>
+                    <WorkTitle>{project.title}</WorkTitle>
+                  </WorkIntro>
+                  <WorkBody>
+                    <WorkDescription>{project.description}</WorkDescription>
+                    <WorkFoot>
+                      <span>{displayDomain(project.url)}</span>
+                      {project.status && (
+                        <>
+                          <MetaDot />
+                          <span>{project.status}</span>
+                        </>
+                      )}
+                    </WorkFoot>
+                  </WorkBody>
+                  <WorkArrow>
+                    <FiArrowUpRight />
+                  </WorkArrow>
+                  <VisuallyHidden>(opens in a new tab)</VisuallyHidden>
+                </WorkRow>
+              ))}
+            </MorePanel>
+          </GlassStage>
         </ThemeProvider>
-
-        <MoreHeading>
-          <span>More Work</span>
-        </MoreHeading>
-
-        {projects.map((project, index) => (
-          <WorkRow
-            key={project.url}
-            href={project.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            custom={index}
-            variants={reveal}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-          >
-            <WorkIntro>
-              <WorkMeta>
-                {project.tags.map((tag, i) => (
-                  <Fragment key={tag}>
-                    {i > 0 && <MetaDot />}
-                    <span>{tag}</span>
-                  </Fragment>
-                ))}
-              </WorkMeta>
-              <WorkTitle>{project.title}</WorkTitle>
-            </WorkIntro>
-            <WorkBody>
-              <WorkDescription>{project.description}</WorkDescription>
-              <WorkFoot>
-                <span>{displayDomain(project.url)}</span>
-                {project.status && (
-                  <>
-                    <MetaDot />
-                    <span>{project.status}</span>
-                  </>
-                )}
-              </WorkFoot>
-            </WorkBody>
-            <WorkArrow>
-              <FiArrowUpRight />
-            </WorkArrow>
-            <VisuallyHidden>(opens in a new tab)</VisuallyHidden>
-          </WorkRow>
-        ))}
       </Container>
     </PortfolioWrapper>
   );
