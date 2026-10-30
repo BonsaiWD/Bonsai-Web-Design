@@ -259,13 +259,15 @@ const PreTitle = styled.span`
 `;
 
 /*
- * Set like the BONSAI wordmark (owner, 2026-10-30): Playfair capitals, lightly
- * tracked, over the statements in widely tracked Jost capitals.
+ * Capitals tracked like the BONSAI wordmark, in Marcellus, lighter and with
+ * subtler serifs than its Playfair (owner, 2026-10-30), over the statements
+ * in widely tracked Jost capitals.
  */
 const Tagline = styled.h1`
+  font-family: ${({ theme }) => theme.fonts.display};
   font-size: 2.25rem;
   line-height: 1.1;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.text};
   margin-bottom: ${({ theme }) => `calc(${theme.spacing.xl} + ${theme.spacing.md})`};
