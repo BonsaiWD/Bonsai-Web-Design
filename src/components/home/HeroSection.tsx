@@ -84,17 +84,20 @@ const polishedBronze = css`
 /*
  * The same polish for the subtext's capitals, one line box (1.8em) tall: in
  * Jost the capitals run from 0.55em to the baseline at 1.25em. Brighter than
- * the headline's (owner, 2026-10-30): its darkest stop is plain bronze.
+ * the headline's, with a little glisten at rest (owner, 2026-10-30): the light
+ * on the tops of the capitals and bouncing up near the baseline is close to
+ * bone, falling quickly to the dark band between; its darkest stop is plain
+ * bronze.
  */
 const bronzeCaps = css`
   linear-gradient(
     180deg,
-    ${lit(60)} 0.55em,
-    ${lit(30)} 0.77em,
-    ${lit(5)} 0.87em,
-    ${lit(20)} 0.93em,
-    ${lit(45)} 1.17em,
-    ${lit(15)} 1.26em
+    ${lit(80)} 0.55em,
+    ${lit(45)} 0.72em,
+    ${lit(5)} 0.86em,
+    ${lit(25)} 0.92em,
+    ${lit(65)} 1.15em,
+    ${lit(20)} 1.26em
   )
 `;
 
