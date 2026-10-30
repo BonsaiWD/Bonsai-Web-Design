@@ -18,9 +18,9 @@ import { mulberry32 } from './bonsaiField';
 type P = [number, number];
 
 /** Traces on each side of the drain. */
-const PER_SIDE = 6;
+const PER_SIDE = 4;
 /** Spacing of the lanes where the traces run down together, in px. */
-const PITCH = 7;
+const PITCH = 8;
 /** The 45° corners, in px. */
 const CHAMFER = 9;
 /** Mote spacing along a trace, in px. */
@@ -86,8 +86,8 @@ export function buildCircuit(rect: [number, number, number, number], drain: P): 
         [lane, fanIn],
         [cx, bottom],
       ];
-      lay(pts, 0, 1, 0.9, 0.95);
-      ring(start, 3.2, 0, 1);
+      lay(pts, 0, 1, 0.6, 0.85);
+      ring(start, 3.2, 0, 0.75);
 
       // Now and then a stub off the drop, outwards, ending in a small pad.
       const drop = turnAt - CHAMFER - start[1];
@@ -95,8 +95,8 @@ export function buildCircuit(rect: [number, number, number, number], drain: P): 
         const at: P = [start[0], start[1] + drop * (0.35 + 0.4 * rand())];
         const end: P = [at[0] - inward * 16, at[1] + 7];
         const t = (at[1] - start[1]) / (bottom - start[1] + Math.abs(lane - start[0]));
-        lay([at, [at[0] - inward * 9, at[1]], end], t, t + 0.06, 0.8, 0.9);
-        ring(end, 2.2, t + 0.06, 0.9);
+        lay([at, [at[0] - inward * 9, at[1]], end], t, t + 0.06, 0.5, 0.8);
+        ring(end, 2.2, t + 0.06, 0.65);
       }
     }
   }

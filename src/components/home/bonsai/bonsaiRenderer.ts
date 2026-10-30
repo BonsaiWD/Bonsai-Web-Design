@@ -141,7 +141,10 @@ void main() {
   vec2 side = normalize(vec2(-toDrain.y, toDrain.x) + 1e-4);
   vec2 drained = mix(p, uDrain + vec2((s - 0.5) * 4.0, 0.0), k) + side * sin(k * 3.14159) * (s - 0.5) * 70.0;
   p = mix(drained, p, scatter);
-  float drain = mix((1.0 + 1.1 * sin(k * 3.14159)) * (1.0 - smoothstep(0.82, 1.0, le)),
+  // Kept light (owner, 2026-10-30): half the draining motes fade on the way,
+  // so the stream into the root stays thin.
+  float thin = step(fract(s * 7.13), 0.5);
+  float drain = mix((1.0 + 0.4 * sin(k * 3.14159)) * (1.0 - smoothstep(0.82, 1.0, le)) * (1.0 - thin * smoothstep(0.1, 0.5, le)),
                     1.0 - smoothstep(0.1, 0.6, uExit), scatter);
 
   // About one mote in twenty-five is a glint: larger, hotter, longer-lived.
@@ -159,7 +162,8 @@ const ROOT_VS = `#version 300 es
 in vec2 aPos;
 in vec4 aData;
 uniform vec2 uRes;
-uniform float uDpr, uReach, uFade, uTime;
+uniform vec2 uDrain;
+uniform float uDpr, uReach, uFade, uPull, uTime;
 out float vI;
 out float vHot;
 float sq(float x) { return x * x; }
@@ -171,10 +175,20 @@ void main() {
   float shown = smoothstep(0.0, 0.05, d);
   float front = exp(-sq((d - 0.025) / 0.035)) * smoothstep(0.0, 0.02, uReach) * (1.0 - smoothstep(1.0, 1.08, uReach));
   float twinkle = 0.75 + 0.25 * sin(uTime * (0.6 + 1.2 * fract(s * 31.7)) + s * 60.0);
-  float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * uFade;
+
+  // As uPull runs 0..1 the motes drain to the root with the tree, tips
+  // first, each on a slight arc, dimming as they go and gone on arrival.
+  float le = clamp((uPull - (1.0 - t) * 0.25 - fract(s * 3.3) * 0.12) / 0.45, 0.0, 1.0);
+  float k = le * le * (3.0 - 2.0 * le);
+  vec2 toDrain = uDrain - aPos;
+  vec2 side = normalize(vec2(-toDrain.y, toDrain.x) + 1e-4);
+  vec2 p = mix(aPos, uDrain, k) + side * sin(k * 3.14159) * (s - 0.5) * 50.0;
+  float drained = (1.0 - 0.45 * k) * (1.0 - smoothstep(0.8, 1.0, le));
+
+  float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * uFade * drained;
   vI = I;
   vHot = clamp(front, 0.0, 1.0);
-  vec2 c = aPos / uRes * 2.0 - 1.0;
+  vec2 c = p / uRes * 2.0 - 1.0;
   gl_Position = I < 0.004 ? vec4(2.0, 2.0, 2.0, 1.0) : vec4(c.x, -c.y, 0.0, 1.0);
   gl_PointSize = clamp(size * (1.0 + 0.8 * front) * 2.2 * uDpr, 1.0, 24.0);
 }`;
@@ -252,7 +266,7 @@ export function createBonsaiRenderer(
 
   const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uDim', 'uTint', 'uHot']);
   const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uEdgeMotes', 'uTint', 'uHot']);
-  const ru = uniforms(gl, rootPoints, ['uRes', 'uDpr', 'uReach', 'uFade', 'uTime', 'uTint', 'uHot']);
+  const ru = uniforms(gl, rootPoints, ['uRes', 'uDrain', 'uDpr', 'uReach', 'uFade', 'uPull', 'uTime', 'uTint', 'uHot']);
   const tint = hexToRgb(colors.tint);
   const hot = hexToRgb(colors.hot);
 
@@ -398,21 +412,25 @@ export function createBonsaiRenderer(
 
       gl.useProgram(rootPoints);
       gl.uniform2fv(ru.uRes, res);
+      gl.uniform2fv(ru.uDrain, drain);
       gl.uniform1f(ru.uDpr, dpr);
       gl.uniform1f(ru.uTime, f.time);
       gl.uniform3fv(ru.uTint, tint);
       gl.uniform3fv(ru.uHot, hot);
       const motes = [
-        // The roots light up as the tree turns to light, and stay a little
-        // longer than the tree as the hero leaves, so it drains into them.
-        { set: rootSet, reach: clamp01((f.dissolve - 0.08) / 0.6) * 1.08, fade: 1 - smoothstep(0.25, 0.85, f.exit) },
-        // The circuit lights up as the tree drains, down to where it drains.
-        { set: circuitSet, reach: clamp01((f.exit - 0.03) / 0.5) * 1.08, fade: 1 - smoothstep(0.7, 1, f.exit) },
+        // The roots light up as the tree turns to light, and drain to the
+        // root with it as the hero leaves (owner, 2026-10-30), so none are
+        // left behind.
+        { set: rootSet, reach: clamp01((f.dissolve - 0.08) / 0.6) * 1.08, fade: 1, pull: f.exit },
+        // The circuit lights up as the tree drains, down to where it drains,
+        // and stays put: it is the path.
+        { set: circuitSet, reach: clamp01((f.exit - 0.03) / 0.5) * 1.08, fade: 1 - smoothstep(0.7, 1, f.exit), pull: 0 },
       ];
-      for (const { set, reach, fade } of motes) {
-        if (!set.count || reach <= 0 || fade <= 0) continue;
+      for (const { set, reach, fade, pull } of motes) {
+        if (!set.count || reach <= 0 || fade <= 0 || pull >= 1) continue;
         gl.uniform1f(ru.uReach, reach);
         gl.uniform1f(ru.uFade, fade);
+        gl.uniform1f(ru.uPull, pull);
         gl.bindVertexArray(set.vao);
         gl.drawArrays(gl.POINTS, 0, set.count);
       }
