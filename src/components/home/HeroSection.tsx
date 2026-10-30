@@ -82,19 +82,19 @@ const polishedBronze = css`
 `;
 
 /*
- * The same polish for the subtext's capitals, one line box (1.8em) tall: the
- * capitals run from 0.53em to the baseline at 1.26em. Brighter than the
- * headline's (owner, 2026-10-30): its darkest stop is plain bronze.
+ * The same polish for the subtext's capitals, one line box (1.8em) tall: in
+ * Jost the capitals run from 0.55em to the baseline at 1.25em. Brighter than
+ * the headline's (owner, 2026-10-30): its darkest stop is plain bronze.
  */
 const bronzeCaps = css`
   linear-gradient(
     180deg,
-    ${lit(60)} 0.53em,
-    ${lit(30)} 0.76em,
-    ${lit(5)} 0.86em,
+    ${lit(60)} 0.55em,
+    ${lit(30)} 0.77em,
+    ${lit(5)} 0.87em,
     ${lit(20)} 0.93em,
-    ${lit(45)} 1.18em,
-    ${lit(15)} 1.27em
+    ${lit(45)} 1.17em,
+    ${lit(15)} 1.26em
   )
 `;
 
@@ -351,6 +351,7 @@ const GENTLE_S = { quick: DUR.hero * 2, intro: SETTLE_S * 1.5 };
  * polished bronze at once.
  */
 const SubText = styled.p`
+  font-family: ${({ theme }) => theme.fonts.subtext};
   font-size: 1.1rem;
   color: ${({ theme }) => theme.colors.primary};
   margin-bottom: ${({ theme }) => theme.spacing.xl};

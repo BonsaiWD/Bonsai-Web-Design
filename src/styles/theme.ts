@@ -15,6 +15,8 @@ export const theme = {
     fonts: {
         main: "var(--font-inter), 'Inter', sans-serif",
         heading: "var(--font-playfair), 'Playfair Display', serif",
+        // The hero subtext's bronze capitals only (owner's choice, 2026-10-30)
+        subtext: "var(--font-jost), 'Jost', sans-serif",
     },
     breakpoints: {
         mobile: '375px',
