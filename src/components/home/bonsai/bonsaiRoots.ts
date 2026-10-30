@@ -1,104 +1,132 @@
 /*
- * Particle roots for the resting bonsai: a few strands leave the base of the
- * pot and spiral down around each other, narrowing into a single taproot at
- * the bottom centre of the hero, where the scroll-drawn root (RootStage)
- * carries on into the next section. Each strand is a soft band of motes,
- * brighter where it passes in front, so the twist reads in depth. Laid out
- * in CSS pixels of the hero, so it is rebuilt on resize.
+ * Particle roots for the resting bonsai, grown rather than drawn: each root
+ * is a seeded random walk that wanders, sinks under gravity, tapers and
+ * forks into finer roots, laid down as a soft cloud of motes (dense at the
+ * core, thinning at the edges) so it reads as a root, not a thread. A
+ * taproot steers to the bottom centre of the hero, where the scroll-drawn
+ * root (RootStage) carries on into the next section; lateral roots splay
+ * out from the base of the pot and fade into the dark. Laid out in CSS
+ * pixels of the hero, so it is rebuilt on resize.
  */
 
 import { mulberry32 } from './bonsaiField';
 
-/** Stride 6: x, y (CSS px), t (0 at the pot, 1 at the taproot), brightness, seed, size. */
+/** Stride 6: x, y (CSS px), t (0 at the pot, 1 at the farthest tip), brightness, seed, size. */
 export const ROOT_STRIDE = 6;
 
 type P = [number, number];
 
-const STRANDS = 5;
-const TURNS = 1.3;
+interface Root {
+  x: number;
+  y: number;
+  angle: number;
+  width: number;
+  /** How far it may grow, in px. */
+  length: number;
+  /** Distance along the roots from the pot, where this one starts. */
+  from: number;
+  depth: number;
+  /** The taproot steers here. */
+  target?: P;
+}
 
-const cubic = (a: P, b: P, c: P, d: P, t: number): P => {
-  const u = 1 - t;
-  return [
-    u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0],
-    u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1],
-  ];
-};
+const DOWN = Math.PI / 2;
+const STEP = 2.2;
 
 /**
- * @param base  centre of the pot's base, where the strands start
- * @param tap   bottom centre of the hero, where they gather into the taproot
- * @param spread  starting radius of the spiral, about half the pot's width
+ * @param base  centre of the pot's base, where the roots start
+ * @param tap   bottom centre of the hero, where the taproot ends
+ * @param spread  about half the pot's width
  */
 export function buildRoots(base: P, tap: P, spread: number): Float32Array {
-  const rand = mulberry32(7);
-  const out: number[] = [];
+  const rand = mulberry32(11);
+  // Roughly normal, in about -1..1.
+  const gauss = () => (rand() + rand() + rand() - 1.5) / 1.5;
+  const floor = tap[1] - 3;
 
-  // The spiral's axis: straight down out of the pot, easing over to the tap.
-  const drop = tap[1] - base[1];
-  const c1: P = [base[0], base[1] + drop * 0.45];
-  const c2: P = [tap[0], tap[1] - drop * 0.4];
+  const roots: Root[] = [{ x: base[0], y: base[1], angle: DOWN, width: 11, length: Infinity, from: 0, depth: 0, target: tap }];
+  const reach = Math.hypot(tap[0] - base[0], tap[1] - base[1]);
+  for (const side of [-1, 1, -1, 1, -1, 1, 1]) {
+    roots.push({
+      x: base[0] + side * spread * (0.15 + 0.65 * rand()),
+      y: base[1] - 6 * rand(),
+      angle: DOWN - side * (0.5 + 0.6 * rand()),
+      width: 3 + 4 * rand(),
+      length: 110 + 120 * rand(),
+      from: 0,
+      depth: 1,
+    });
+  }
 
-  for (let k = 0; k < STRANDS; k++) {
-    const phase = (k / STRANDS) * Math.PI * 2 + (rand() - 0.5) * 0.4;
-    const reach = 0.9 + 0.2 * rand();
-    let prev: P | null = null;
-    let travelled = 0;
-    let next = 0;
+  const motes: number[] = [];
+  let farthest = 1;
 
-    for (let i = 0; i <= 600; i++) {
-      const u = i / 600;
-      const [ax, ay] = cubic(base, c1, c2, tap, u);
-      // Wide at the pot, gathering to a thread at the taproot.
-      const radius = spread * reach * Math.pow(1 - u, 1.4) + 2;
-      const angle = phase + u * TURNS * Math.PI * 2;
-      // A helix seen from the front: sideways swing, a slight vertical
-      // ellipse, and depth (cos) for brightness.
-      const x = ax + radius * Math.sin(angle);
-      const y = ay + radius * Math.cos(angle) * 0.16;
-      const depth = (Math.cos(angle) + 1) / 2;
+  while (roots.length) {
+    const r = roots.pop()!;
+    let { x, y, angle, width } = r;
+    let turn = 0;
+    let grown = 0;
+    const taper = r.target ? 0 : (width - 0.5) / r.length;
 
-      if (prev) travelled += Math.hypot(x - prev[0], y - prev[1]);
-      prev = [x, y];
-      if (travelled < next) continue;
-      next = travelled + 1.6 + 1.4 * u;
+    while (width > 0.5 && grown < r.length) {
+      if (r.target) {
+        // The taproot wanders a little but always arrives, thinning to the
+        // width of the page's trace.
+        // It meanders near the pot and steadies as it nears the page's trace.
+        const left = Math.hypot(r.target[0] - x, r.target[1] - y);
+        if (left < STEP) break;
+        const near = 1 - Math.min(1, left / reach);
+        const want = Math.atan2(r.target[1] - y, r.target[0] - x);
+        turn = turn * 0.8 + gauss() * 0.05 * (1 - near);
+        angle += turn + (want - angle) * (0.02 + 0.12 * near);
+        width = Math.min(r.width, 1.5 + left * 0.05);
+      } else {
+        // Lateral roots wander with some momentum and slowly sink.
+        turn = turn * 0.82 + gauss() * 0.06;
+        angle += turn + (DOWN - angle) * 0.015;
+        width -= taper * STEP;
+      }
+      x += Math.cos(angle) * STEP;
+      y += Math.sin(angle) * STEP;
+      grown += STEP;
+      if (y > floor) break;
 
-      // A soft band, thicker near the pot, so a strand never reads as a thread.
-      const band = 1.2 + 3 * (1 - u);
-      for (let m = 0; m < 2; m++) {
-        out.push(
-          x + (rand() - 0.5) * band,
-          y + (rand() - 0.5) * band,
-          u,
-          (0.45 + 0.55 * depth) * (0.75 + 0.25 * rand()) * (1 - 0.35 * u),
+      // A soft cross-section: more motes, and brighter, at the core.
+      const dist = r.from + grown;
+      const n = Math.max(1, Math.round(width * 1.5));
+      for (let i = 0; i < n; i++) {
+        const across = gauss() * width * 0.6;
+        const along = (rand() - 0.5) * STEP;
+        const core = 1 - Math.min(1, Math.abs(across) / (width * 0.5 + 0.01));
+        motes.push(
+          x - Math.sin(angle) * across + Math.cos(angle) * along,
+          y + Math.cos(angle) * across + Math.sin(angle) * along,
+          dist,
+          (0.55 + 0.45 * core) * (0.5 + 0.5 * Math.min(1, width / 6)) * (0.8 + 0.2 * rand()),
           rand(),
-          (0.6 + 0.6 * rand()) * (0.75 + 0.5 * depth)
+          (0.6 + 0.6 * rand()) * (0.7 + 0.3 * Math.min(1, width / 6))
         );
       }
-    }
+      farthest = Math.max(farthest, dist);
 
-    // A few fine root hairs where the strand is still wide.
-    for (const at of [0.12, 0.3]) {
-      const u0 = at + 0.04 * rand();
-      const [ax, ay] = cubic(base, c1, c2, tap, u0);
-      const radius = spread * reach * Math.pow(1 - u0, 1.4) + 2;
-      const angle = phase + u0 * TURNS * Math.PI * 2;
-      const sx = ax + radius * Math.sin(angle);
-      const sy = ay + radius * Math.cos(angle) * 0.16;
-      const side = Math.sign(Math.sin(angle)) || 1;
-      const len = 18 + 22 * rand();
-      for (let d = 0; d < len; d += 2.2) {
-        const f = d / len;
-        out.push(
-          sx + side * d * 0.8,
-          sy + d * 0.55 + f * f * 6,
-          u0 + 0.1 * f,
-          0.5 * (1 - f),
-          rand(),
-          0.5 + 0.3 * rand()
-        );
+      // Fork into finer roots now and then.
+      const forks = r.target ? width > 3 && rand() < 0.02 : width > 1 && rand() < 0.035;
+      if (forks && r.depth < 4) {
+        const side = rand() < 0.5 ? -1 : 1;
+        roots.push({
+          x,
+          y,
+          angle: angle + side * (0.45 + 0.55 * rand()),
+          width: width * 0.55,
+          length: (r.target ? 110 : r.length - grown) * (0.45 + 0.5 * rand()),
+          from: dist,
+          depth: r.depth + 1,
+        });
       }
     }
   }
-  return new Float32Array(out);
+
+  // Light runs out from the pot: t is distance along the roots, 0..1.
+  for (let i = 2; i < motes.length; i += 6) motes[i] /= farthest;
+  return new Float32Array(motes);
 }

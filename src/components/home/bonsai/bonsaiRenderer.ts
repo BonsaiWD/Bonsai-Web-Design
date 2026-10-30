@@ -8,9 +8,9 @@
  *      as the tree dissolves and settle into a dim constellation that keeps
  *      the tree's shape. A quarter of them drift out and settle evenly across
  *      the hero. As the hero scrolls away the rest drain to the root;
- *   3. the roots: motes laid along strands that spiral down from the pot
- *      into the taproot at the bottom of the hero, lit by a light that runs
- *      down them as the tree dissolves (bonsaiRoots.ts).
+ *   3. the roots: motes laid along roots grown down from the pot, with a
+ *      taproot to the bottom of the hero, lit by a light that runs out
+ *      along them as the tree dissolves (bonsaiRoots.ts).
  * Every frame is a pure function of the uniforms in BonsaiFrame, so the
  * caller decides when to draw and nothing animates on its own.
  */
@@ -112,8 +112,9 @@ void main() {
   // Dissolve: tips first, trunk last; sparkle, then settle dim and still.
   float order = 0.75 * (1.0 - t) + 0.25 * s;
   float l = clamp((uDissolve - order * 0.45) / 0.55, 0.0, 1.0);
-  float spark = smoothstep(0.0, 0.16, l) * (1.0 - smoothstep(0.16, 0.85, l));
-  float twinkle = 0.55 + 0.45 * sin(uTime * (2.0 + 4.5 * fract(s * 31.7)) + s * 60.0);
+  // Each mote brightens and fades slowly, with a gentle shimmer.
+  float spark = smoothstep(0.0, 0.35, l) * (1.0 - smoothstep(0.35, 1.0, l));
+  float twinkle = 0.7 + 0.3 * sin(uTime * (0.8 + 1.6 * fract(s * 31.7)) + s * 60.0);
   // A quarter of the motes leave the tree and settle evenly across the hero
   // (an R2 low-discrepancy sequence); the rest barely drift, so the
   // constellation keeps a clear bonsai shape.
@@ -165,7 +166,7 @@ void main() {
   float d = reach - t;
   float shown = smoothstep(0.0, 0.05, d);
   float front = exp(-sq((d - 0.025) / 0.035)) * smoothstep(0.0, 0.02, reach) * (1.0 - smoothstep(1.0, 1.08, reach));
-  float twinkle = 0.7 + 0.3 * sin(uTime * (1.5 + 3.0 * fract(s * 31.7)) + s * 60.0);
+  float twinkle = 0.75 + 0.25 * sin(uTime * (0.6 + 1.2 * fract(s * 31.7)) + s * 60.0);
   float fade = 1.0 - smoothstep(0.25, 0.85, uExit);
   float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * fade;
   vI = I;
