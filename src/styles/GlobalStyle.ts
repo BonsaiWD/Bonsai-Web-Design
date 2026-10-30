@@ -92,12 +92,22 @@ export const GlobalStyle = createGlobalStyle`
     background: ${theme.colors.background};
   }
 
+  /* A softly glowing bronze thumb, so the scroll bar reads on the dark page */
   ::-webkit-scrollbar-thumb {
-    background: ${theme.colors.secondary};
+    background: rgba(200, 159, 129, 0.45);
+    box-shadow: inset 0 0 3px rgba(200, 159, 129, 0.6);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: ${theme.colors.gold};
+    background: ${theme.colors.primary};
+  }
+
+  /* Firefox has no ::-webkit-scrollbar (and Chrome ignores it when scrollbar-color is set) */
+  @supports not selector(::-webkit-scrollbar) {
+    html {
+      scrollbar-color: rgba(200, 159, 129, 0.5) ${theme.colors.background};
+      scrollbar-width: thin;
+    }
   }
 `;
