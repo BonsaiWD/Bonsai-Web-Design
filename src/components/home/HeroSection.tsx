@@ -96,7 +96,7 @@ const entrance = (delayMs: number) => css`
 /*
  * Phones and short windows: the hero grows to fit its CTAs instead of clipping
  * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 400px tall and the cue 88px tall, 40px from the bottom, so the cue
+ * about 415px tall and the cue 88px tall, 40px from the bottom, so the cue
  * clears the button by at least 16px from 736px tall.
  */
 const COMPACT_HEIGHT = 735;
@@ -229,7 +229,7 @@ const Tagline = styled.h1`
   font-size: 3.5rem;
   line-height: 1.1;
   color: ${({ theme }) => theme.colors.text};
-  margin-bottom: ${({ theme }) => theme.spacing.xl};
+  margin-bottom: ${({ theme }) => `calc(${theme.spacing.xl} + ${theme.spacing.md})`};
   max-width: 900px;
   font-weight: 400;
   ${entrance(0)}
@@ -342,8 +342,8 @@ const CTA_REST = BONSAI_SOURCE.rim - 0.075;
  * page's centre; a hairline doesn't.
  *
  * Where the tree is drawn behind it and the hero isn't compact, it rests above
- * the pot's rim: it leaves the content's flow by a button's height and
- * a gap (so the text sits as if it were still there) and moves down to
+ * the pot's rim: it leaves the content's flow by a button's height (so
+ * the text sits as if it were still there) and moves down to
  * CTA_REST. That is its place in the tree (centred TREE.centre down the
  * layer) less the button's place in the centred content (half the content
  * less half the button below the layer's middle). The tree is a share of the
@@ -357,7 +357,7 @@ const CtaRow = styled.div`
 
   @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
     ${HeroWrapper}:not([data-bonsai='still']) & {
-      margin-top: ${({ theme }) => `calc(${CTA_HEIGHT}px + ${theme.spacing.md})`};
+      margin-top: ${CTA_HEIGHT}px;
       translate: 0
         calc(
           ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(CTA_REST - 0.5).toFixed(3)} * ${treeHeight} -
