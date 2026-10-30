@@ -174,7 +174,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
         const [bx, by] = BONSAI_SOURCE.rootBase;
         renderer.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
         renderer.layout([x, y, tw, th], [w / 2, h]);
-        renderer.roots(buildRoots(w, h, [x + bx * tw, y + by * th], [w / 2, h]));
+        renderer.roots(buildRoots([x + bx * tw, y + by * th], [w / 2, h], tw * 0.17));
         requestDraw.current();
       };
       ro = new ResizeObserver(layout);

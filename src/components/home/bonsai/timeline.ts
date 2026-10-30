@@ -60,5 +60,5 @@ export const BONSAI_SOURCE: BonsaiSource = {
   seed: { x0: 0.24, x1: 0.4, y: 0.765 },
   rim: 0.775,
   fadeBottom: [0.83, 0.97],
-  rootBase: [0.33, 0.9],
+  rootBase: [0.33, 0.86],
 };
