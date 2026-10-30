@@ -3,27 +3,48 @@
 import styled, { css, keyframes } from 'styled-components';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Container } from '../layout/Container';
-import { useRef } from 'react';
-import { useReducedMotionSafe } from '@/lib/useMediaQuery';
+import { useCallback, useRef, useState } from 'react';
+import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
+import BonsaiCanvas from './bonsai/BonsaiCanvas';
+import BonsaiStill from './bonsai/BonsaiStill';
+import { BONSAI_INTRO_QUERY, INTRO } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
- * headline, subtext and CTAs are visible in the server HTML before hydration.
- * The H1 is never delayed; supporting elements follow in 100ms steps.
+ * headline, subtext and CTAs are in the server HTML and appear without
+ * waiting for hydration. Supporting elements follow in 100ms steps.
+ *
+ * Where the bonsai intro plays, the text waits for the tree instead: it
+ * settles in front of it as the growth nears its final form (INTRO.text).
+ * It is still plain CSS, so it never depends on JavaScript, the image or
+ * WebGL; the canvas follows the text's clock, not the other way round.
  */
 const heroIn = keyframes`
   from { opacity: 0; transform: translateY(${RISE.item}px); }
   to { opacity: 1; transform: none; }
 `;
 
+const heroSettle = keyframes`
+  from { opacity: 0; transform: translateY(${RISE.max}px); filter: blur(2px); }
+  to { opacity: 1; transform: none; filter: none; }
+`;
+
 const fadeIn = keyframes`
   from { opacity: 0; }
 `;
 
+const SETTLE_S = 1.2;
+
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
     animation: ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) ${delayMs}ms both;
+  }
+
+  @media ${BONSAI_INTRO_QUERY} {
+    animation-name: ${heroSettle};
+    animation-duration: ${SETTLE_S}s;
+    animation-delay: ${INTRO.text + delayMs}ms;
   }
 `;
 
@@ -75,6 +96,26 @@ const BackgroundImage = styled(motion.div)`
     /* Base gradient for depth with deep greens */
     linear-gradient(180deg, rgba(20, 40, 30, 0.6) 0%, transparent 50%, rgba(16, 32, 24, 0.8) 100%);
   z-index: 1;
+`;
+
+/*
+ * A soft pool of the page ground behind the text, so the tree never fights
+ * the headline. It arrives with the text.
+ */
+const TextScrim = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 46% 34% at 50% 50%,
+    ${({ theme }) => `color-mix(in srgb, ${theme.colors.background} 70%, transparent)`},
+    transparent
+  );
+
+  @media ${BONSAI_INTRO_QUERY} {
+    animation: ${fadeIn} ${SETTLE_S}s cubic-bezier(${EASE_OUT.join(', ')}) ${INTRO.text}ms both;
+  }
 `;
 
 const Content = styled(Container)`
@@ -251,6 +292,10 @@ const ScrollIndicator = styled.div`
     animation: ${fadeIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 400ms both;
   }
 
+  @media ${BONSAI_INTRO_QUERY} {
+    animation-delay: ${INTRO.text + 400}ms;
+  }
+
   /* Where the hero is compact the cue would sit on the price line */
   @media ${COMPACT} {
     display: none;
@@ -264,8 +309,13 @@ const Line = styled.div`
 `;
 
 export default function HeroSection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
+  const headlineRef = useRef<HTMLHeadingElement>(null);
+  const stillRef = useRef<HTMLImageElement>(null);
   const reduce = useReducedMotionSafe();
+  const intro = useMediaQuery(BONSAI_INTRO_QUERY);
+  const [fallback, setFallback] = useState(false);
+  const showStill = useCallback(() => setFallback(true), []);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end start"]
@@ -275,13 +325,18 @@ export default function HeroSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   return (
-    <HeroWrapper id="hero" ref={ref}>
+    <HeroWrapper id="hero" ref={ref} data-bonsai={fallback ? 'still' : undefined}>
       <BackgroundImage style={{ y: reduce ? 0 : y, opacity: reduce ? 1 : opacity }} />
+      <BonsaiStill imgRef={stillRef} />
+      {intro && !fallback && (
+        <BonsaiCanvas heroRef={ref} imageRef={stillRef} clockRef={headlineRef} onFallback={showStill} />
+      )}
+      <TextScrim />
 
       <Content>
         <PreTitle>Est. 2022</PreTitle>
 
-        <Tagline>
+        <Tagline ref={headlineRef}>
           Crafting <em>timeless</em> digital legacies.
         </Tagline>
 
