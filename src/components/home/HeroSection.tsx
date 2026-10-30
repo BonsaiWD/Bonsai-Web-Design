@@ -98,7 +98,7 @@ const bronzeCaps = css`
     ${shade(12)} 1.27em
   )
 `;
-/** The subtext appears more slowly than "timeless" glints: it has further to go. */
+/** The glint crosses the subtext more slowly than "timeless": it has further to go. */
 const GLISTEN_S = 5;
 
 const entrance = (delayMs: number) => css`
@@ -326,14 +326,13 @@ const Tagline = styled.h1`
 
 /*
  * The subtext in bronze capitals, tracked like the header's links (owner,
- * 2026-10-30). It appears slowly from left to right behind a soft edge, with
- * a bone-white glint riding just behind the edge as in "timeless", and
- * settles to polished bronze. The bronze is the text's own fill, clipped to
- * it and repeated once per line; the band is a second layer and the edge a
- * mask, both 3 times the box's width, so they start clear of the first letter
- * and end clear of the last. These replace the usual entrance, which stays
- * for browsers that can't clip a background to text. Reduced motion shows
- * the polished bronze at once.
+ * 2026-10-30). All of it arrives at once with the usual entrance; then, as
+ * in "timeless", a bone-white glint travels through it from left to right
+ * and leaves it polished bronze. The bronze is the text's own fill, clipped
+ * to it and repeated once per line; the band is a second layer 3 times the
+ * box's width, so it starts clear of the first letter and ends clear of the
+ * last on any number of lines. Reduced motion shows the polished bronze at
+ * once.
  */
 const SubText = styled.p`
   font-size: 1.1rem;
@@ -362,12 +361,18 @@ const SubText = styled.p`
     -webkit-text-fill-color: transparent;
 
     @media (prefers-reduced-motion: no-preference) {
-      mask: linear-gradient(100deg, #000 0 42%, transparent 58%) 0 0 / 300% 100% no-repeat;
-      animation: ${glint} ${GLISTEN_S}s ${GLINT_EASE} 300ms both;
+      animation:
+        ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 100ms both,
+        ${glint} ${GLISTEN_S}s ${GLINT_EASE} 700ms both;
     }
 
+    /* Where the bonsai plays, it settles with the headline and catches the light just after "timeless" */
     @media ${BONSAI_INTRO_QUERY} {
-      animation-delay: ${INTRO.text + INTRO.textStep}ms;
+      animation-name: ${heroSettle}, ${glint};
+      animation-duration: ${SETTLE_S}s, ${GLISTEN_S}s;
+      animation-delay:
+        ${INTRO.text + INTRO.textStep}ms,
+        ${Math.round(INTRO.text + INTRO.textSettle * 0.4) + INTRO.textStep}ms;
     }
   }
 `;
