@@ -333,7 +333,7 @@ const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
  * the pot's rim, over the trunk, so it sits closer to the subtext (owner,
  * 2026-10-30).
  */
-const CTA_REST = BONSAI_SOURCE.rim - 0.1;
+const CTA_REST = BONSAI_SOURCE.rim - 0.075;
 
 /*
  * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
