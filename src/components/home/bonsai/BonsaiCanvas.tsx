@@ -73,23 +73,43 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       return INTRO.end;
     };
 
+    /*
+     * Prototype switch (?dissolve=scroll): the tree holds, dimmed behind the
+     * text, until the first scroll, then dissolves at its usual pace.
+     * Otherwise it dissolves on its own as the text arrives.
+     */
+    const onScroll = new URLSearchParams(window.location.search).get('dissolve') === 'scroll';
+    const dissolveLength = INTRO.dissolveEnd - INTRO.dissolveStart;
+    const holdEnd = Math.max(INTRO.growEnd, INTRO.text + INTRO.textSettle) + 120;
+    const introEnd = onScroll ? holdEnd : INTRO.end;
+    let released = false;
+    let dissolveClock = 0;
+
     const frame = (now: number) => {
       raf = 0;
       if (!renderer) return;
-      clock += last ? (now - last) * rate : 0;
+      const dt = last ? now - last : 0;
+      clock += dt * rate;
       last = now;
+      // The dissolve always plays at its own pace, even if the growth was hurried.
+      if (onScroll && released && clock >= INTRO.dissolveStart) dissolveClock += dt;
+      const dissolve = onScroll
+        ? clamp01(dissolveClock / dissolveLength)
+        : clamp01((clock - INTRO.dissolveStart) / dissolveLength);
       const e = exit.current;
       renderer.draw({
         intro: easeOut(clamp01(clock / INTRO.fadeIn)),
         grow: easeInOut(clamp01((clock - INTRO.growStart) / (INTRO.growEnd - INTRO.growStart))) * 1.06,
-        dissolve: clamp01((clock - INTRO.dissolveStart) / (INTRO.dissolveEnd - INTRO.dissolveStart)),
+        dissolve,
+        dim: onScroll ? 0.4 * clamp01((clock - INTRO.text) / INTRO.textSettle) : 0,
         exit: e,
         time: clock / 1000,
       });
+      const busy = clock < introEnd || (onScroll && released && dissolve < 1);
       // Offscreen mid-intro, the loop pauses but keeps `last`, so the clock
       // catches up with the text when the hero comes back.
-      if (clock < INTRO.end && e < 1) raf = requestAnimationFrame(frame);
-      else if (clock >= INTRO.end) last = 0;
+      if (busy && e < 1) raf = requestAnimationFrame(frame);
+      else if (!busy) last = 0;
     };
 
     requestDraw.current = () => {
@@ -97,9 +117,17 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
     };
 
     const hurry = () => {
-      if (clock >= INTRO.end || rate !== 1) return;
+      if (clock >= introEnd || rate !== 1) return;
       rate = HURRY;
       for (const a of heroAnimations()) a.updatePlaybackRate(HURRY);
+    };
+
+    const scrolled = () => {
+      hurry();
+      if (onScroll && !released) {
+        released = true;
+        requestDraw.current();
+      }
     };
 
     const start = async () => {
@@ -145,10 +173,17 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
 
       clock = readClock();
       if (process.env.NODE_ENV !== 'production') {
-        // Review aid: __bonsaiSeek(ms) freezes the intro, text included, at ms.
-        (window as unknown as { __bonsaiSeek: (ms: number) => void }).__bonsaiSeek = (ms) => {
+        // Review aid: __bonsaiSeek(ms) freezes the intro, text included, at
+        // ms. With ?dissolve=scroll, a second argument is the time since the
+        // first scroll.
+        (window as unknown as { __bonsaiSeek: (ms: number, sinceScroll?: number) => void }).__bonsaiSeek = (
+          ms,
+          sinceScroll = 0
+        ) => {
           rate = 0;
           clock = ms;
+          released = sinceScroll > 0;
+          dissolveClock = sinceScroll;
           for (const a of heroAnimations()) {
             a.pause();
             a.currentTime = ms;
@@ -158,10 +193,10 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       }
       // Any input plays the rest of the intro quickly: it now runs longer
       // than 5 s, and WCAG 2.2.2 asks that moving content can be cut short.
-      window.addEventListener('scroll', hurry, { passive: true });
+      window.addEventListener('scroll', scrolled, { passive: true });
       window.addEventListener('keydown', hurry);
       window.addEventListener('pointerdown', hurry);
-      if (window.scrollY > 0) hurry();
+      if (window.scrollY > 0) scrolled();
       layout();
     };
 
@@ -171,7 +206,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       cancelled = true;
       cancelAnimationFrame(raf);
       ro?.disconnect();
-      window.removeEventListener('scroll', hurry);
+      window.removeEventListener('scroll', scrolled);
       window.removeEventListener('keydown', hurry);
       window.removeEventListener('pointerdown', hurry);
       requestDraw.current = () => {};

@@ -25,6 +25,8 @@ export interface BonsaiFrame {
   grow: number;
   /** 0..1: the dissolve from tips to trunk. */
   dissolve: number;
+  /** 0..1: how far the photo is dimmed while it holds behind the text. */
+  dim: number;
   /** 0..1: the hero scrolling away; particles drain to the root. */
   exit: number;
   /** Seconds, for the sparkle while dissolving. */
@@ -57,7 +59,7 @@ precision highp float;
 in vec2 vUv;
 uniform sampler2D uPhoto;
 uniform sampler2D uField;
-uniform float uIntro, uGrow, uDissolve, uExit;
+uniform float uIntro, uGrow, uDissolve, uExit, uDim;
 uniform vec3 uTint, uHot;
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -74,7 +76,7 @@ void main() {
   vec3 c = texture(uPhoto, vUv).rgb;
   float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(luma), c, 0.82);
-  float a = m * grown * keep * uIntro * (1.0 - uExit);
+  float a = m * grown * keep * uIntro * (1.0 - uExit) * (1.0 - uDim);
   // The travelling light: a soft halo, a bright core and a wake behind it.
   // Not on the pot (t = 0), which is there from the start.
   float d = uGrow - 0.015 - t;
@@ -235,7 +237,7 @@ export function createBonsaiRenderer(
     return null;
   }
 
-  const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTint', 'uHot']);
+  const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uDim', 'uTint', 'uHot']);
   const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
   const ru = uniforms(gl, rootPoints, ['uRes', 'uDpr', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
   const tint = hexToRgb(colors.tint);
@@ -342,6 +344,7 @@ export function createBonsaiRenderer(
         gl.uniform1f(pu.uGrow, f.grow);
         gl.uniform1f(pu.uDissolve, f.dissolve);
         gl.uniform1f(pu.uExit, f.exit);
+        gl.uniform1f(pu.uDim, f.dim);
         gl.uniform3fv(pu.uTint, tint);
         gl.uniform3fv(pu.uHot, hot);
         gl.bindVertexArray(quadVao);
