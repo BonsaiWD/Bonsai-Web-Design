@@ -45,6 +45,12 @@ export const INTRO = {
   end: dissolveEnd + 120,
 } as const;
 
+/**
+ * The scroll version (?dissolve=scroll) holds the hero in place for this much
+ * scroll, as a fraction of the viewport height, while the tree turns to light.
+ */
+export const DISSOLVE_RUNWAY = 0.8;
+
 /** Stand-in until the growth footage arrives: the juniper already on the site. */
 export const BONSAI_SOURCE: BonsaiSource = {
   src: '/images/bonsai-divider-4.png',

@@ -27,6 +27,8 @@ export interface BonsaiFrame {
   dissolve: number;
   /** 0..1: how far the photo is dimmed while it holds behind the text. */
   dim: number;
+  /** 0 or 1: motes flaring where the growing light passes. */
+  edgeMotes: number;
   /** 0..1: the hero scrolling away; particles drain to the root. */
   exit: number;
   /** Seconds, for the sparkle while dissolving. */
@@ -94,7 +96,7 @@ in vec4 aData;
 uniform vec4 uRect;
 uniform vec2 uRes;
 uniform vec2 uDrain;
-uniform float uDpr, uIntro, uGrow, uDissolve, uExit, uTime;
+uniform float uDpr, uIntro, uGrow, uDissolve, uExit, uTime, uEdgeMotes;
 out float vI;
 out float vHot;
 float easeOut(float x) { float r = 1.0 - x; return 1.0 - r * r * r; }
@@ -105,7 +107,7 @@ void main() {
 
   // Motes flare where the travelling light passes.
   float front = exp(-sq((uGrow - 0.02 - t) / 0.025)) * step(0.006, t)
-    * (1.0 - smoothstep(1.0, 1.05, uGrow)) * uIntro;
+    * (1.0 - smoothstep(1.0, 1.05, uGrow)) * uIntro * uEdgeMotes;
 
   // Dissolve: tips first, trunk last; sparkle, then settle dim and still.
   float order = 0.75 * (1.0 - t) + 0.25 * s;
@@ -161,7 +163,7 @@ void main() {
   float reach = clamp((uDissolve - 0.08) / 0.6, 0.0, 1.0) * 1.08;
   float d = reach - t;
   float shown = smoothstep(0.0, 0.05, d);
-  float front = exp(-sq((d - 0.025) / 0.035)) * (1.0 - smoothstep(1.0, 1.08, reach));
+  float front = exp(-sq((d - 0.025) / 0.035)) * smoothstep(0.0, 0.02, reach) * (1.0 - smoothstep(1.0, 1.08, reach));
   float twinkle = 0.7 + 0.3 * sin(uTime * (1.5 + 3.0 * fract(s * 31.7)) + s * 60.0);
   float fade = 1.0 - smoothstep(0.1, 0.6, uExit);
   float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * fade;
@@ -238,7 +240,7 @@ export function createBonsaiRenderer(
   }
 
   const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uDim', 'uTint', 'uHot']);
-  const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
+  const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uEdgeMotes', 'uTint', 'uHot']);
   const ru = uniforms(gl, rootPoints, ['uRes', 'uDpr', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
   const tint = hexToRgb(colors.tint);
   const hot = hexToRgb(colors.hot);
@@ -362,6 +364,7 @@ export function createBonsaiRenderer(
       gl.uniform1f(qu.uDissolve, f.dissolve);
       gl.uniform1f(qu.uExit, f.exit);
       gl.uniform1f(qu.uTime, f.time);
+      gl.uniform1f(qu.uEdgeMotes, f.edgeMotes);
       gl.uniform3fv(qu.uTint, tint);
       gl.uniform3fv(qu.uHot, hot);
       gl.bindVertexArray(pointVao);

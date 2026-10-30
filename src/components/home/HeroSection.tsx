@@ -3,12 +3,12 @@
 import styled, { css, keyframes } from 'styled-components';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Container } from '../layout/Container';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, INTRO } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -56,24 +56,54 @@ const entrance = (delayMs: number) => css`
  */
 const COMPACT = '(max-width: 767px), (max-height: 735px)';
 
+/*
+ * The section is a stage around a pinned layer that holds everything. It is
+ * normally exactly as tall as the layer, so nothing pins. The scroll version
+ * (?dissolve=scroll) adds a runway, so the hero holds still while the tree
+ * turns to light, then scrolls away as usual.
+ */
 const HeroWrapper = styled.section`
+  position: relative;
+  width: 100%;
+  background-color: ${({ theme }) => theme.colors.background};
+
+  &[data-runway='true'] {
+    height: ${(1 + DISSOLVE_RUNWAY) * 100}svh;
+
+    @media ${COMPACT} {
+      height: auto;
+    }
+  }
+`;
+
+const Pin = styled.div`
+  position: sticky;
+  top: 0;
   height: 100vh;
   height: 100svh;
   width: 100%;
-  position: relative;
   overflow: clip;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${({ theme }) => theme.colors.background};
 
   @media ${COMPACT} {
+    position: relative;
     height: auto;
     min-height: 100vh;
     min-height: 100svh;
     padding: 104px 0 ${({ theme }) => theme.spacing.xxl};
   }
 `;
+
+const noSubscribe = () => () => {};
+/** Prototype switch: ?dissolve=scroll. False on the server and during hydration. */
+const useScrollDissolve = () =>
+  useSyncExternalStore(
+    noSubscribe,
+    () => new URLSearchParams(window.location.search).get('dissolve') === 'scroll',
+    () => false
+  );
 
 const BackgroundImage = styled(motion.div)`
   position: absolute;
@@ -317,6 +347,7 @@ export default function HeroSection() {
   const intro = useMediaQuery(BONSAI_INTRO_QUERY);
   const [fallback, setFallback] = useState(false);
   const showStill = useCallback(() => setFallback(true), []);
+  const onScroll = useScrollDissolve() && intro && !fallback;
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end start"]
@@ -326,41 +357,49 @@ export default function HeroSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   return (
-    <HeroWrapper id="hero" ref={ref} data-bonsai={fallback ? 'still' : undefined}>
-      <BackgroundImage style={{ y: reduce ? 0 : y, opacity: reduce ? 1 : opacity }} />
-      <BonsaiStill imgRef={stillRef} />
-      {intro && !fallback && (
-        <BonsaiCanvas heroRef={ref} imageRef={stillRef} clockRef={headlineRef} onFallback={showStill} />
-      )}
-      <TextScrim />
+    <HeroWrapper id="hero" ref={ref} data-bonsai={fallback ? 'still' : undefined} data-runway={onScroll || undefined}>
+      <Pin>
+        <BackgroundImage style={{ y: reduce ? 0 : y, opacity: reduce ? 1 : opacity }} />
+        <BonsaiStill imgRef={stillRef} />
+        {intro && !fallback && (
+          <BonsaiCanvas
+            heroRef={ref}
+            imageRef={stillRef}
+            clockRef={headlineRef}
+            dissolveOnScroll={onScroll}
+            onFallback={showStill}
+          />
+        )}
+        <TextScrim />
 
-      <Content>
-        <PreTitle>Est. 2022</PreTitle>
+        <Content>
+          <PreTitle>Est. 2022</PreTitle>
 
-        <Tagline ref={headlineRef}>
-          Crafting <em>timeless</em> digital legacies.
-        </Tagline>
+          <Tagline ref={headlineRef}>
+            Crafting <em>timeless</em> digital legacies.
+          </Tagline>
 
-        <SubText>
-          We craft tailored web experiences for brands that refuse to compromise on elegance.
-        </SubText>
+          <SubText>
+            We craft tailored web experiences for brands that refuse to compromise on elegance.
+          </SubText>
 
-        <CtaRow>
-          <PrimaryCta href="#contact">Start a project</PrimaryCta>
-          <SecondaryCta href="#portfolio">See the work</SecondaryCta>
-        </CtaRow>
+          <CtaRow>
+            <PrimaryCta href="#contact">Start a project</PrimaryCta>
+            <SecondaryCta href="#portfolio">See the work</SecondaryCta>
+          </CtaRow>
 
-        <PriceLine>
-          <PriceClause>Custom sites from $1500 per page</PriceClause>{' '}
-          <PriceSeparator>·</PriceSeparator>{' '}
-          <PriceClause>Updates and care at $120/hr</PriceClause>
-        </PriceLine>
-      </Content>
+          <PriceLine>
+            <PriceClause>Custom sites from $1500 per page</PriceClause>{' '}
+            <PriceSeparator>·</PriceSeparator>{' '}
+            <PriceClause>Updates and care at $120/hr</PriceClause>
+          </PriceLine>
+        </Content>
 
-      <ScrollIndicator>
-        <span style={{ fontSize: '0.8rem', letterSpacing: '0.1em' }}>SCROLL</span>
-        <Line />
-      </ScrollIndicator>
+        <ScrollIndicator>
+          <span style={{ fontSize: '0.8rem', letterSpacing: '0.1em' }}>SCROLL</span>
+          <Line />
+        </ScrollIndicator>
+      </Pin>
     </HeroWrapper>
   );
 }

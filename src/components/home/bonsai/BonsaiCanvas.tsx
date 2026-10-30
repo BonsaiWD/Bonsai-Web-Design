@@ -29,6 +29,12 @@ interface Props {
   imageRef: RefObject<HTMLImageElement | null>;
   /** The H1, whose CSS entrance is the intro's clock. */
   clockRef: RefObject<HTMLElement | null>;
+  /**
+   * The scroll version (?dissolve=scroll): no particles until the visitor
+   * scrolls, then the photo turns to light with the scroll, while the hero
+   * holds still on its runway. Otherwise it dissolves on its own.
+   */
+  dissolveOnScroll: boolean;
   onFallback: () => void;
 }
 
@@ -36,15 +42,26 @@ interface Props {
  * The growing bonsai. Runs one finite timeline (grow, dissolve, rest), then
  * stops its frame loop and redraws only when the hero scrolls or resizes.
  */
-export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }: Props) {
+export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnScroll, onFallback }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
   const exit = useRef(0);
+  const scrolledDissolve = useRef(0);
   const requestDraw = useRef<() => void>(() => {});
 
+  // Scroll through the hero: first its runway (the scroll version's
+  // dissolve), then its exit (the drain to the root). Without a runway the
+  // whole scroll is exit.
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
-  useMotionValueEvent(scrollYProgress, 'change', (v) => {
-    exit.current = v;
+  useMotionValueEvent(scrollYProgress, 'change', (p) => {
+    const hero = heroRef.current;
+    const canvas = canvasRef.current;
+    if (!hero || !canvas) return;
+    const pinned = canvas.clientHeight || 1;
+    const runway = Math.max(0, hero.offsetHeight - pinned);
+    const scrolled = p * hero.offsetHeight;
+    scrolledDissolve.current = runway > 0 ? clamp01(scrolled / runway) : 0;
+    exit.current = clamp01((scrolled - runway) / pinned);
     requestDraw.current();
   });
 
@@ -75,27 +92,22 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
 
     /*
      * Two dissolves, both kept by the owner (2026-10-29). By default the tree
-     * dissolves on its own as the text arrives. With ?dissolve=scroll it
-     * holds, dimmed behind the text, until the first scroll, then dissolves
-     * at its usual pace.
+     * dissolves on its own as the text arrives. In the scroll version it
+     * holds, dimmed behind the text, and turns to light as the visitor
+     * scrolls (scrolledDissolve).
      */
-    const onScroll = new URLSearchParams(window.location.search).get('dissolve') === 'scroll';
+    const onScroll = dissolveOnScroll;
     const dissolveLength = INTRO.dissolveEnd - INTRO.dissolveStart;
     const holdEnd = Math.max(INTRO.growEnd, INTRO.text + INTRO.textSettle) + 120;
     const introEnd = onScroll ? holdEnd : INTRO.end;
-    let released = false;
-    let dissolveClock = 0;
 
     const frame = (now: number) => {
       raf = 0;
       if (!renderer) return;
-      const dt = last ? now - last : 0;
-      clock += dt * rate;
+      clock += last ? (now - last) * rate : 0;
       last = now;
-      // The dissolve always plays at its own pace, even if the growth was hurried.
-      if (onScroll && released && clock >= INTRO.dissolveStart) dissolveClock += dt;
       const dissolve = onScroll
-        ? clamp01(dissolveClock / dissolveLength)
+        ? scrolledDissolve.current
         : clamp01((clock - INTRO.dissolveStart) / dissolveLength);
       const e = exit.current;
       renderer.draw({
@@ -103,10 +115,11 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
         grow: easeInOut(clamp01((clock - INTRO.growStart) / (INTRO.growEnd - INTRO.growStart))) * 1.06,
         dissolve,
         dim: onScroll ? 0.4 * clamp01((clock - INTRO.text) / INTRO.textSettle) : 0,
+        edgeMotes: onScroll ? 0 : 1,
         exit: e,
         time: clock / 1000,
       });
-      const busy = clock < introEnd || (onScroll && released && dissolve < 1);
+      const busy = clock < introEnd;
       // Offscreen mid-intro, the loop pauses but keeps `last`, so the clock
       // catches up with the text when the hero comes back.
       if (busy && e < 1) raf = requestAnimationFrame(frame);
@@ -123,13 +136,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       for (const a of heroAnimations()) a.updatePlaybackRate(HURRY);
     };
 
-    const scrolled = () => {
-      hurry();
-      if (onScroll && !released) {
-        released = true;
-        requestDraw.current();
-      }
-    };
+
 
     const start = async () => {
       // Same URL as the hidden still, so it comes from the HTTP cache. A plain
@@ -146,7 +153,8 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       }
       if (cancelled) return;
 
-      const treeHeight = () => Math.min(hero.clientHeight * 0.8, 780);
+      // The canvas fills the hero's pinned layer.
+      const treeHeight = () => Math.min(canvas.clientHeight * 0.8, 780);
       const count = Math.round(16000 * Math.min(1.2, Math.max(0.6, treeHeight() / 760)));
       const field = buildBonsaiField(img, BONSAI_SOURCE, count);
       renderer = createBonsaiRenderer(canvas, field, { tint: theme.colors.primary, hot: theme.colors.text });
@@ -157,8 +165,8 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
 
       const layout = () => {
         if (!renderer) return;
-        const w = hero.clientWidth;
-        const h = hero.clientHeight;
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
         const th = treeHeight();
         const tw = th * field.aspect;
         const x = (w - tw) / 2;
@@ -170,21 +178,14 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
         requestDraw.current();
       };
       ro = new ResizeObserver(layout);
-      ro.observe(hero);
+      ro.observe(canvas);
 
       clock = readClock();
       if (process.env.NODE_ENV !== 'production') {
-        // Review aid: __bonsaiSeek(ms) freezes the intro, text included, at
-        // ms. With ?dissolve=scroll, a second argument is the time since the
-        // first scroll.
-        (window as unknown as { __bonsaiSeek: (ms: number, sinceScroll?: number) => void }).__bonsaiSeek = (
-          ms,
-          sinceScroll = 0
-        ) => {
+        // Review aid: __bonsaiSeek(ms) freezes the intro, text included, at ms.
+        (window as unknown as { __bonsaiSeek: (ms: number) => void }).__bonsaiSeek = (ms) => {
           rate = 0;
           clock = ms;
-          released = sinceScroll > 0;
-          dissolveClock = sinceScroll;
           for (const a of heroAnimations()) {
             a.pause();
             a.currentTime = ms;
@@ -194,10 +195,10 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       }
       // Any input plays the rest of the intro quickly: it now runs longer
       // than 5 s, and WCAG 2.2.2 asks that moving content can be cut short.
-      window.addEventListener('scroll', scrolled, { passive: true });
+      window.addEventListener('scroll', hurry, { passive: true });
       window.addEventListener('keydown', hurry);
       window.addEventListener('pointerdown', hurry);
-      if (window.scrollY > 0) scrolled();
+      if (window.scrollY > 0) hurry();
       layout();
     };
 
@@ -207,14 +208,14 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       cancelled = true;
       cancelAnimationFrame(raf);
       ro?.disconnect();
-      window.removeEventListener('scroll', scrolled);
+      window.removeEventListener('scroll', hurry);
       window.removeEventListener('keydown', hurry);
       window.removeEventListener('pointerdown', hurry);
       requestDraw.current = () => {};
       renderer?.dispose();
       renderer = null;
     };
-  }, [heroRef, imageRef, clockRef, onFallback, theme.colors.primary, theme.colors.text]);
+  }, [heroRef, imageRef, clockRef, dissolveOnScroll, onFallback, theme.colors.primary, theme.colors.text]);
 
   return <Canvas ref={canvasRef} aria-hidden="true" />;
 }
