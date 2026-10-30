@@ -41,11 +41,11 @@ const SETTLE_S = INTRO.textSettle / 1000;
  * "timeless" catches the light once as it lands (owner's request,
  * 2026-10-30): a bone-white glint with a bronze halo travels through the word
  * from left to right, like the light through the tree, and leaves the word
- * lit: a warmer fill and a steady halo (owner, the same day). The glint is the
- * word's own fill, a gradient clipped to the text; the halo is a copy of the
- * word drawn only as its text-shadow, masked to the same band. Both share one
- * box, so they move together. The lit word is the resting state, so reduced
- * motion shows it too, without the sweep.
+ * lit: a warmer fill and a soft, steady halo (owner, the same day). The
+ * glint is the word's own fill, a gradient clipped to the text; the halo is a
+ * copy of the word drawn only as its text-shadow, masked to the same band.
+ * Both share one box, so they move together. The lit word is the resting
+ * state, so reduced motion shows it too, without the sweep.
  */
 const glint = keyframes`
   from { background-position: 100% 0; mask-position: 100% 0; }
@@ -247,7 +247,7 @@ const Tagline = styled.h1`
         0 0 0.06em ${({ theme }) => theme.colors.text},
         0 0 0.18em ${({ theme }) => theme.colors.primary},
         0 0 0.5em ${({ theme }) => theme.colors.primary};
-      mask: linear-gradient(100deg, rgb(0 0 0 / 0.6) 0 41%, #000 48% 52%, transparent 59%) 0 0 / 240% 100% no-repeat;
+      mask: linear-gradient(100deg, rgb(0 0 0 / 0.35) 0 41%, #000 48% 52%, transparent 59%) 0 0 / 240% 100% no-repeat;
       pointer-events: none;
       user-select: none;
       animation: inherit;
