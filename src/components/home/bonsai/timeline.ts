@@ -61,4 +61,9 @@ export const BONSAI_SOURCE: BonsaiSource = {
   rim: 0.775,
   fadeBottom: [0.83, 0.97],
   rootBase: [0.33, 0.86],
+  // Its right side falls into shadow, so the lit rim ends well short of the lip.
+  pot: [0.08, 0.55],
 };
+
+/** The tree's height in the pinned hero: this share of the layer's height, capped. */
+export const TREE_HEIGHT = { share: 0.8, max: 780 } as const;

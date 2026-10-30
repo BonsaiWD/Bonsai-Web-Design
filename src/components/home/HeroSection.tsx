@@ -9,7 +9,7 @@ import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import { frostedGlass } from '@/styles/frosted';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE_HEIGHT } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -321,6 +321,10 @@ const focusRing = css`
   }
 `;
 
+/** How far the lit pot's centre sits from the tree's, in tree heights (negative is left). */
+const POT_SHIFT =
+  ((BONSAI_SOURCE.pot[0] + BONSAI_SOURCE.pot[1]) / 2 - 0.5) * (BONSAI_SOURCE.crop.w / BONSAI_SOURCE.crop.h);
+
 const CtaRow = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -332,6 +336,31 @@ const CtaRow = styled.div`
   @media (max-width: 767px) {
     column-gap: ${({ theme }) => theme.spacing.lg};
   }
+
+  /*
+   * Where the tree is drawn behind it and the hero isn't compact,
+   * "Plant your project" floats in the pot (owner, 2026-10-30). The grid
+   * centres the button on the page, with "See the work" to its right, and the
+   * row shifts left to the lit part of the pot, which sits left of the tree's
+   * centre. The tree is a share of the pinned layer's height (as in
+   * BonsaiCanvas), so the shift is too. The still fallback frames the photo
+   * differently and keeps the centred row.
+   */
+  @media ${BONSAI_INTRO_QUERY} and (min-height: 736px) {
+    ${HeroWrapper}:not([data-bonsai='still']) & {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      translate: calc(${POT_SHIFT.toFixed(3)} * min(${TREE_HEIGHT.share * 100}svh, ${TREE_HEIGHT.max}px)) 0;
+
+      & > :first-child {
+        grid-column: 2;
+      }
+
+      & > :last-child {
+        justify-self: start;
+      }
+    }
+  }
 `;
 
 const PrimaryCta = styled.a`
@@ -340,7 +369,8 @@ const PrimaryCta = styled.a`
   align-items: center;
   justify-content: center;
   min-height: 48px;
-  padding: 0 ${({ theme }) => theme.spacing.xl};
+  /* Letter-spacing trails the last letter, so the right padding gives it back and the label sits centred */
+  padding: 0 ${({ theme }) => `calc(${theme.spacing.lg} - 0.15em) 0 ${theme.spacing.lg}`};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.85rem;
   font-weight: 600;
@@ -348,10 +378,6 @@ const PrimaryCta = styled.a`
   text-transform: uppercase;
   border-radius: 0;
   ${frostedGlass}
-
-  @media (max-width: 767px) {
-    padding: 0 ${({ theme }) => theme.spacing.lg};
-  }
 
   /* Bronze hover halo (0.15), faded in on opacity rather than box-shadow */
   &::after {
