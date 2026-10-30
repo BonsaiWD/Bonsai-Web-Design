@@ -581,7 +581,7 @@ export default function HeroSection() {
           </Tagline>
 
           <SubText>
-            We craft tailored web experiences for brands that refuse to compromise on elegance.
+            We design websites that make a lasting impression without compromising polish for performance.
           </SubText>
 
           <CtaRow>
