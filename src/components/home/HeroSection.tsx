@@ -1,9 +1,9 @@
 'use client';
 
 import styled, { css, keyframes, type DefaultTheme } from 'styled-components';
-import { motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
+import { motion, useInView, useMotionValue, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
 import { Container } from '../layout/Container';
-import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type AnimationEvent } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
@@ -12,8 +12,8 @@ import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE } from 
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
- * headline, subtext and CTAs are in the server HTML and appear without
- * waiting for hydration. Supporting elements follow in 100ms steps.
+ * headline and CTA are in the server HTML and appear without waiting for
+ * hydration. Supporting elements follow in 100ms steps.
  *
  * Where the bonsai intro plays, the text waits for the tree instead: it
  * settles in front of it as the growth nears its final form (INTRO.text).
@@ -37,15 +37,14 @@ const fadeIn = keyframes`
 const SETTLE_S = INTRO.textSettle / 1000;
 
 /*
- * "timeless" catches the light once as it lands (owner's request,
- * 2026-10-30): a bone-white glint with a bronze halo travels through the word
- * from left to right, like the light through the tree, and leaves it
- * polished bronze (owner, the same day; a resting glow and a bevel were tried
- * and dropped). The glint and the polish are the word's own fill, gradients
- * clipped to the text; the halo is a copy of the word drawn only as its
- * text-shadow, masked to the same band. They share one box, so they move
- * together. The polished word is the resting state, so reduced motion shows
- * it too, without the sweep.
+ * Each of the headline's statements catches the light as it lands (owner's
+ * request, 2026-10-30, first made for "timeless"): a bone-white glint with a
+ * bronze halo travels through the words from left to right, like the light
+ * through the tree, and leaves them polished bronze. The glint and the polish
+ * are the words' own fill, gradients clipped to the text; the halo is a copy
+ * of the words drawn only as their text-shadow, masked to the same band. They
+ * share one box, so they move together. The polished words are the resting
+ * state, so reduced motion shows them too, without the sweep.
  */
 const glint = keyframes`
   from { background-position: 100% 0; mask-position: 100% 0; }
@@ -82,32 +81,32 @@ const polishedBronze = css`
 `;
 
 /*
- * The same polish for the subtext's capitals, one line box (1.8em) tall: in
- * Jost the capitals run from 0.55em to the baseline at 1.25em. Brighter than
- * the headline's, with a little glisten at rest (owner, 2026-10-30): the light
- * on the tops of the capitals and bouncing up near the baseline is close to
- * bone, falling quickly to the dark band between; its darkest stop is plain
- * bronze.
+ * The first statement catches the light after the headline's quick entrance
+ * or, where the bonsai plays, as the headline lands; each one after it a
+ * moment after it starts to fade in.
  */
-const bronzeCaps = css`
-  linear-gradient(
-    180deg,
-    ${lit(80)} 0.55em,
-    ${lit(45)} 0.72em,
-    ${lit(5)} 0.86em,
-    ${lit(25)} 0.92em,
-    ${lit(65)} 1.15em,
-    ${lit(20)} 1.26em
-  )
-`;
+const GLINT_AT = { quick: 600, intro: Math.round(INTRO.text + INTRO.textSettle * 0.4), next: 300 };
 
 /*
- * "timeless" and the subtext catch the light together (owner, 2026-10-30):
- * their glints share a band, a duration and a start, after the text's quick
- * entrance or, where the bonsai plays, as the headline lands. Each band
- * enters its own text at the same moment and leaves it at the same moment.
+ * What the websites do, completing "Bespoke websites that…" (owner,
+ * 2026-10-30). They take turns on the headline's second line in a loop (the
+ * owner's choice), which waits while the pointer rests on the headline or the
+ * hero is out of view, and stops with the pause button (WCAG 2.2.2). Reduced
+ * motion keeps the first.
  */
-const GLINT_AT = { quick: 600, intro: Math.round(INTRO.text + INTRO.textSettle * 0.4) };
+const STATEMENTS = [
+  'make a lasting impression',
+  'turn visitors into clients',
+  'set you apart',
+  'earn trust at first glance',
+  'look sharp and load fast',
+  'grow with your business',
+] as const;
+/** For screen readers and search, the whole sentence at once. */
+const SPOKEN = `${STATEMENTS.slice(0, -1).join(', ')}, and ${STATEMENTS[STATEMENTS.length - 1]}.`;
+/** In ms: how long a statement rests, polished, after its glint, and how long two take to cross. */
+const ROTATE = { hold: 2400, cross: 1200 };
+
 const glintBand = css`
   linear-gradient(
       100deg,
@@ -133,7 +132,7 @@ const entrance = (delayMs: number) => css`
 /*
  * Phones and short windows: the hero grows to fit its CTAs instead of clipping
  * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 415px tall and the cue 88px tall, 40px from the bottom, so the cue
+ * about 320px tall and the cue 88px tall, 40px from the bottom, so the cue
  * clears the button by at least 16px from 736px tall.
  */
 const COMPACT_HEIGHT = 735;
@@ -269,17 +268,20 @@ const Tagline = styled.h1`
   margin-bottom: ${({ theme }) => `calc(${theme.spacing.xl} + ${theme.spacing.md})`};
   max-width: 900px;
   font-weight: 400;
+  text-wrap: balance;
   ${entrance(0)}
 
+  /* The statements in Jost (owner, 2026-10-30), light, against the Playfair */
   em {
-    font-family: ${({ theme }) => theme.fonts.heading};
-    font-style: italic;
+    font-family: ${({ theme }) => theme.fonts.caps};
+    font-style: normal;
+    font-weight: 300;
     color: ${({ theme }) => theme.colors.primary};
   }
 
   /*
-   * The padding gives the halo room (and the italic its overhang); the
-   * negative margin takes it back out of the line. The band sits in a gradient
+   * The padding gives the halo room; the negative margin takes it back out of
+   * the line. The band sits in a gradient
    * 2.4 times the box's width, so moving it from 100% to 0% sweeps it from just
    * before the first letter to just past the last. Ahead of the band the word
    * is flat bronze; behind it the band's layer is clear and the polished
@@ -299,13 +301,12 @@ const Tagline = styled.h1`
       -webkit-text-fill-color: transparent;
     }
 
-    /* The band's halo, over the letters */
+    /* The band's halo, over the letters, wrapping as they do on phones */
     em::after {
       content: attr(data-glow) / '';
       position: absolute;
       inset: 0;
       padding: inherit;
-      white-space: nowrap;
       text-shadow:
         0 0 0.06em ${({ theme }) => theme.colors.text},
         0 0 0.18em ${({ theme }) => theme.colors.primary},
@@ -317,16 +318,21 @@ const Tagline = styled.h1`
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      em {
+      em[data-active] {
         animation: ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
       }
     }
 
-    /* Where the bonsai plays, the glint runs as the headline lands, with the tree's last growth */
+    /* Where the bonsai plays, the first glint runs as the headline lands, with the tree's last growth */
     @media ${BONSAI_INTRO_QUERY} {
-      em {
+      em[data-active] {
         animation-delay: ${GLINT_AT.intro}ms;
       }
+    }
+
+    /* The statements after it glint as they arrive */
+    em[data-active][data-next] {
+      animation-delay: ${GLINT_AT.next}ms;
     }
   }
 
@@ -336,77 +342,40 @@ const Tagline = styled.h1`
 `;
 
 /*
- * The subtext fades in more gently than the other lines (owner, 2026-10-30):
- * half as long again, on an even curve, with a smaller rise and no blur.
+ * The statements share one place on the headline's second line, so the
+ * headline is as big as the longest and nothing moves as they turn. The one
+ * leaving fades as the next arrives, slowly, on an even curve.
  */
-const gentleIn = keyframes`
-  from { opacity: 0; transform: translateY(${RISE.word}px); }
-  to { opacity: 1; transform: none; }
+const Statements = styled.span`
+  display: grid;
+  justify-items: center;
+
+  em {
+    grid-area: 1 / 1;
+    text-wrap: balance;
+    opacity: 0;
+    transform: translateY(0.12em);
+    filter: blur(2px);
+    transition:
+      opacity ${ROTATE.cross}ms ${GLINT_EASE},
+      transform ${ROTATE.cross}ms ${GLINT_EASE},
+      filter ${ROTATE.cross}ms ${GLINT_EASE};
+  }
+
+  em[data-active] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 `;
-const GENTLE_S = { quick: DUR.hero * 2, intro: SETTLE_S * 1.5 };
 
-/*
- * The subtext in bronze capitals, tracked like the header's links (owner,
- * 2026-10-30). All of it arrives at once, gently; then, together with
- * "timeless" and in the same way, a bone-white glint travels through it from
- * left to right and leaves it polished bronze. The bronze is the text's own
- * fill, clipped to it and repeated once per line. Reduced motion shows the
- * polished bronze at once.
- */
-const SubText = styled.p`
-  font-family: ${({ theme }) => theme.fonts.caps};
-  font-size: 1.1rem;
-  color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: ${({ theme }) => theme.spacing.xl};
-  max-width: 560px;
-  line-height: 1.8;
-  font-weight: 300;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-wrap: balance;
-
-  /*
-   * Where the button rests in the tree (CtaRow), the content keeps the height
-   * CONTENT_HEIGHT was measured at, with a two-line subtext: the one line
-   * (owner, 2026-10-30) sits centred where the two were, so the headline and
-   * button stay where they were set.
-   */
-  @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
-    ${HeroWrapper}:not([data-bonsai='still']) & {
-      margin-top: 0.9em;
-      margin-bottom: calc(${({ theme }) => theme.spacing.xl} + 0.9em);
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    animation: ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both;
-  }
-
-  @media ${BONSAI_INTRO_QUERY} {
-    animation-duration: ${GENTLE_S.intro}s;
-    animation-delay: ${INTRO.text + INTRO.textStep}ms;
-  }
-
-  @supports (background-clip: text) or (-webkit-background-clip: text) {
-    background:
-      ${glintBand},
-      ${bronzeCaps} 0 0 / 100% 1.8em repeat-y;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-
-    @media (prefers-reduced-motion: no-preference) {
-      animation:
-        ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both,
-        ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
-    }
-
-    /* Where the bonsai plays, it arrives with the headline and catches the light with "timeless" */
-    @media ${BONSAI_INTRO_QUERY} {
-      animation-duration: ${GENTLE_S.intro}s, ${GLINT_S}s;
-      animation-delay: ${INTRO.text + INTRO.textStep}ms, ${GLINT_AT.intro}ms;
-    }
-  }
+const VisuallyHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 `;
 
 const focusRing = css`
@@ -419,13 +388,13 @@ const focusRing = css`
 const CTA_HEIGHT = 48;
 
 /** The hero's centred content, with the button lowered, in px (measured; the same at every desktop width). */
-const CONTENT_HEIGHT = 462;
+const CONTENT_HEIGHT = 367;
 
 const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
 
 /**
  * Where the button's middle rests, as a fraction of the tree's height: above
- * the pot's rim, over the trunk, so it sits closer to the subtext (owner,
+ * the pot's rim, over the trunk, so it sits closer to the text (owner,
  * 2026-10-30).
  */
 const CTA_REST = BONSAI_SOURCE.rim - 0.075;
@@ -433,7 +402,7 @@ const CTA_REST = BONSAI_SOURCE.rim - 0.075;
 /*
  * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
  * the price line left the hero), as a line of text on a bronze hairline,
- * centred under the subtext. A box would show that the pot sits left of the
+ * centred under the headline. A box would show that the pot sits left of the
  * page's centre; a hairline doesn't.
  *
  * Where the tree is drawn behind it and the hero isn't compact, it rests above
@@ -502,6 +471,47 @@ const PrimaryCta = styled.a`
   ${focusRing}
 `;
 
+/*
+ * The statements loop, so they can be stopped (WCAG 2.2.2): a quiet control
+ * in the hero's corner that arrives after the text. Without motion there is
+ * nothing to stop.
+ */
+const PauseButton = styled.button`
+  position: absolute;
+  right: ${({ theme }) => theme.spacing.md};
+  bottom: ${({ theme }) => theme.spacing.md};
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: ${({ theme }) => theme.colors.primary};
+  opacity: 0.75;
+  transition: opacity ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
+
+  &:hover {
+    opacity: 1;
+  }
+
+  ${focusRing}
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ${fadeIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 400ms both;
+  }
+
+  @media ${BONSAI_INTRO_QUERY} {
+    animation-duration: ${SETTLE_S}s;
+    animation-delay: ${INTRO.text + 3 * INTRO.textStep}ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    display: none;
+  }
+`;
+
 const ScrollIndicator = styled.div`
   position: absolute;
   bottom: 40px;
@@ -565,6 +575,26 @@ export default function HeroSection() {
   const y = useTransform(leaving, [0, 1], ["0%", "30%"]);
   const opacity = useTransform(leaving, [0, 0.5], [1, 0]);
 
+  // The statements turn once the one showing has caught the light and rested.
+  const [statement, setStatement] = useState(0);
+  const [turned, setTurned] = useState(false);
+  const [glinted, setGlinted] = useState(false);
+  const [held, setHeld] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const inView = useInView(ref);
+  useEffect(() => {
+    if (!glinted || held || paused || !inView) return;
+    const timer = window.setTimeout(() => {
+      setStatement((i) => (i + 1) % STATEMENTS.length);
+      setTurned(true);
+      setGlinted(false);
+    }, ROTATE.hold);
+    return () => window.clearTimeout(timer);
+  }, [glinted, held, paused, inView]);
+  const onGlintEnd = (e: AnimationEvent<HTMLElement>) => {
+    if (e.target === e.currentTarget && !e.pseudoElement && e.animationName === glint.getName()) setGlinted(true);
+  };
+
   return (
     <HeroWrapper
       id="hero"
@@ -589,18 +619,48 @@ export default function HeroSection() {
         <Content>
           <PreTitle>Est. 2022</PreTitle>
 
-          <Tagline ref={headlineRef}>
-            Crafting <em data-glow="timeless">timeless</em> digital legacies.
+          <Tagline
+            ref={headlineRef}
+            onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
+            onPointerLeave={() => setHeld(false)}
+          >
+            Bespoke websites that <VisuallyHidden>{SPOKEN}</VisuallyHidden>
+            <Statements aria-hidden="true">
+              {STATEMENTS.map((words, i) => (
+                <em
+                  key={words}
+                  data-glow={words}
+                  data-active={i === statement ? '' : undefined}
+                  data-next={i === statement && turned ? '' : undefined}
+                  onAnimationEnd={onGlintEnd}
+                >
+                  {words}
+                </em>
+              ))}
+            </Statements>
           </Tagline>
-
-          <SubText>
-            Bespoke websites that make a lasting impression.
-          </SubText>
 
           <CtaRow>
             <PrimaryCta href="#contact">Plant your project</PrimaryCta>
           </CtaRow>
         </Content>
+
+        <PauseButton
+          type="button"
+          aria-label={paused ? 'Play the headline' : 'Pause the headline'}
+          onClick={() => setPaused((p) => !p)}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor">
+            {paused ? (
+              <path d="M2.5 1 10.5 6 2.5 11Z" />
+            ) : (
+              <>
+                <rect x="2" y="1" width="2" height="10" />
+                <rect x="8" y="1" width="2" height="10" />
+              </>
+            )}
+          </svg>
+        </PauseButton>
 
         <ScrollIndicator>
           <span style={{ fontSize: '0.8rem', letterSpacing: '0.1em' }}>SCROLL</span>
