@@ -328,16 +328,23 @@ const CONTENT_HEIGHT = 462;
 
 const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
 
+/**
+ * Where the button's middle rests, as a fraction of the tree's height: a
+ * little above the pot's rim, over the trunk's base with its hairline on the
+ * soil, so it sits closer to the subtext (owner, 2026-10-30).
+ */
+const CTA_REST = BONSAI_SOURCE.rim - 0.05;
+
 /*
  * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
  * the price line left the hero), as a line of text on a bronze hairline,
  * centred under the subtext. A box would show that the pot sits left of the
  * page's centre; a hairline doesn't.
  *
- * Where the tree is drawn behind it and the hero isn't compact, it rests at
- * the pot's rim: it leaves the content's flow by a button's height and a gap
- * (so the text sits as if it were still there) and moves down to the rim's
- * height. That is the rim's place in the tree (centred TREE.centre down the
+ * Where the tree is drawn behind it and the hero isn't compact, it rests just
+ * above the pot's rim: it leaves the content's flow by a button's height and
+ * a gap (so the text sits as if it were still there) and moves down to
+ * CTA_REST. That is its place in the tree (centred TREE.centre down the
  * layer) less the button's place in the centred content (half the content
  * less half the button below the layer's middle). The tree is a share of the
  * pinned layer's height, as in BonsaiCanvas, so the move follows the window.
@@ -353,7 +360,7 @@ const CtaRow = styled.div`
       margin-top: ${({ theme }) => `calc(${CTA_HEIGHT}px + ${theme.spacing.md})`};
       translate: 0
         calc(
-          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(BONSAI_SOURCE.rim - 0.5).toFixed(3)} * ${treeHeight} -
+          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(CTA_REST - 0.5).toFixed(3)} * ${treeHeight} -
             ${(CONTENT_HEIGHT - CTA_HEIGHT) / 2}px
         );
     }
