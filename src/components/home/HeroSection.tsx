@@ -8,7 +8,7 @@ import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, INTRO } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, INTRO, INTRO_PACE } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -34,7 +34,7 @@ const fadeIn = keyframes`
   from { opacity: 0; }
 `;
 
-const SETTLE_S = 1.2;
+const SETTLE_S = 1.2 * INTRO_PACE;
 
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {

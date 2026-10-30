@@ -8,21 +8,24 @@ import type { BonsaiSource } from './bonsaiField';
 export const BONSAI_INTRO_QUERY =
   '(prefers-reduced-motion: no-preference) and (min-width: 768px) and (hover: hover)';
 
+/** Owner asked for the whole intro 20% slower (2026-10-29). */
+export const INTRO_PACE = 1.2;
+
 /*
  * One clock for the whole intro, in ms. Zero is when the H1's CSS animation
  * starts (first paint), so the text never waits on JavaScript or the image:
  * if the canvas is late, it joins the timeline wherever the text already is.
  */
 export const INTRO = {
-  fadeIn: 700,
-  growStart: 350,
-  growEnd: 3900,
+  fadeIn: 700 * INTRO_PACE,
+  growStart: 350 * INTRO_PACE,
+  growEnd: 3900 * INTRO_PACE,
   /** The hero text starts to settle as the tree nears its final form. */
-  text: 3000,
-  dissolveStart: 3500,
-  dissolveEnd: 5700,
+  text: 3000 * INTRO_PACE,
+  dissolveStart: 3500 * INTRO_PACE,
+  dissolveEnd: 5700 * INTRO_PACE,
   /** After this the canvas rests and only redraws on scroll or resize. */
-  end: 5800,
+  end: 5800 * INTRO_PACE,
 } as const;
 
 /** Stand-in until the growth footage arrives: the juniper already on the site. */
