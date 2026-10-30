@@ -53,30 +53,27 @@ const glint = keyframes`
 const GLINT_S = 3.6;
 const GLINT_EASE = 'cubic-bezier(0.37, 0, 0.63, 1)';
 
-/** Bronze lit toward bone, or shaded toward the page's own dark, which polished metal reflects. */
+/** Bronze lit toward bone, as polished metal reflects the light. */
 const lit = (pct: number) => ({ theme }: { theme: DefaultTheme }) =>
   `color-mix(in srgb, ${theme.colors.primary}, ${theme.colors.text} ${pct}%)`;
-const shade = (pct: number) => ({ theme }: { theme: DefaultTheme }) =>
-  `color-mix(in srgb, ${theme.colors.primary}, ${theme.colors.background} ${pct}%)`;
 
 /*
- * Polished bronze lit from above: bright where the light meets the tops of
- * the letters, a dark horizon across the lowercase, and light bouncing up
- * near the baseline. The stops are in em down the word's box (0.5em padding,
- * then a 1.1 line): the ascenders reach up to 0.66em, the lowercase runs from
- * 0.93em to the baseline at 1.46em.
+ * Polished bronze for the statements' capitals, lit from above, with a little
+ * glisten at rest (owner, 2026-10-30): close to bone on the tops of the
+ * capitals and again near the baseline, falling quickly to a band between
+ * whose darkest stop is plain bronze. The stops are in em down the box (0.5em
+ * padding, then a 1.1 line): in Jost the capitals run from 0.7em to the
+ * baseline at 1.4em.
  */
-const polishedBronze = css`
+const bronzeCaps = css`
   linear-gradient(
     180deg,
-    ${shade(40)} 0.66em,
-    ${lit(45)} 0.8em,
-    ${lit(60)} 0.93em,
-    ${lit(10)} 1.1em,
-    ${shade(28)} 1.17em,
-    ${shade(12)} 1.22em,
-    ${lit(25)} 1.4em,
-    ${shade(15)} 1.48em
+    ${lit(80)} 0.7em,
+    ${lit(45)} 0.87em,
+    ${lit(5)} 1.01em,
+    ${lit(25)} 1.07em,
+    ${lit(65)} 1.3em,
+    ${lit(20)} 1.41em
   )
 `;
 
@@ -132,7 +129,7 @@ const entrance = (delayMs: number) => css`
 /*
  * Phones and short windows: the hero grows to fit its CTAs instead of clipping
  * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 320px tall and the cue 88px tall, 40px from the bottom, so the cue
+ * about 265px tall and the cue 88px tall, 40px from the bottom, so the cue
  * clears the button by at least 16px from 736px tall.
  */
 const COMPACT_HEIGHT = 735;
@@ -261,9 +258,15 @@ const PreTitle = styled.span`
   ${entrance(0)}
 `;
 
+/*
+ * Set like the BONSAI wordmark (owner, 2026-10-30): Playfair capitals, lightly
+ * tracked, over the statements in widely tracked Jost capitals.
+ */
 const Tagline = styled.h1`
-  font-size: 3.5rem;
+  font-size: 2.25rem;
   line-height: 1.1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: ${({ theme }) => theme.colors.text};
   margin-bottom: ${({ theme }) => `calc(${theme.spacing.xl} + ${theme.spacing.md})`};
   max-width: 900px;
@@ -271,17 +274,20 @@ const Tagline = styled.h1`
   text-wrap: balance;
   ${entrance(0)}
 
-  /* The statements in Jost (owner, 2026-10-30), light, against the Playfair */
+  /* On phones a touch smaller, so the longest statement still fits one line */
   em {
     font-family: ${({ theme }) => theme.fonts.caps};
+    font-size: 0.46em;
     font-style: normal;
-    font-weight: 300;
+    font-weight: 400;
+    letter-spacing: 0.2em;
     color: ${({ theme }) => theme.colors.primary};
   }
 
   /*
    * The padding gives the halo room; the negative margin takes it back out of
-   * the line. The band sits in a gradient
+   * the line, and the extra on the left balances the tracking after the last
+   * letter, so the words sit centred. The band sits in a gradient
    * 2.4 times the box's width, so moving it from 100% to 0% sweeps it from just
    * before the first letter to just past the last. Ahead of the band the word
    * is flat bronze; behind it the band's layer is clear and the polished
@@ -291,11 +297,11 @@ const Tagline = styled.h1`
     em {
       position: relative;
       display: inline-block;
-      padding: 0.5em 0.6em;
+      padding: 0.5em 0.6em 0.5em 0.8em;
       margin: -0.5em -0.6em;
       background:
         ${glintBand},
-        ${polishedBronze};
+        ${bronzeCaps};
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -337,7 +343,11 @@ const Tagline = styled.h1`
   }
 
   @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
-    font-size: 5rem;
+    font-size: 3.75rem;
+
+    em {
+      font-size: 0.5em;
+    }
   }
 `;
 
@@ -348,7 +358,8 @@ const Tagline = styled.h1`
  */
 const Statements = styled.span`
   display: grid;
-  justify-items: center;
+  place-items: center;
+  margin-top: 0.35em;
 
   em {
     grid-area: 1 / 1;
@@ -388,7 +399,7 @@ const focusRing = css`
 const CTA_HEIGHT = 48;
 
 /** The hero's centred content, with the button lowered, in px (measured; the same at every desktop width). */
-const CONTENT_HEIGHT = 367;
+const CONTENT_HEIGHT = 311;
 
 const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
 
