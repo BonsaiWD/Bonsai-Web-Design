@@ -329,11 +329,11 @@ const CONTENT_HEIGHT = 462;
 const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
 
 /**
- * Where the button's middle rests, as a fraction of the tree's height: a
- * little above the pot's rim, over the trunk's base with its hairline on the
- * soil, so it sits closer to the subtext (owner, 2026-10-30).
+ * Where the button's middle rests, as a fraction of the tree's height: above
+ * the pot's rim, over the trunk, so it sits closer to the subtext (owner,
+ * 2026-10-30).
  */
-const CTA_REST = BONSAI_SOURCE.rim - 0.05;
+const CTA_REST = BONSAI_SOURCE.rim - 0.1;
 
 /*
  * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
@@ -341,8 +341,8 @@ const CTA_REST = BONSAI_SOURCE.rim - 0.05;
  * centred under the subtext. A box would show that the pot sits left of the
  * page's centre; a hairline doesn't.
  *
- * Where the tree is drawn behind it and the hero isn't compact, it rests just
- * above the pot's rim: it leaves the content's flow by a button's height and
+ * Where the tree is drawn behind it and the hero isn't compact, it rests above
+ * the pot's rim: it leaves the content's flow by a button's height and
  * a gap (so the text sits as if it were still there) and moves down to
  * CTA_REST. That is its place in the tree (centred TREE.centre down the
  * layer) less the button's place in the centred content (half the content
