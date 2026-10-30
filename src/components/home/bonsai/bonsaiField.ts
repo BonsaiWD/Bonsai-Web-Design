@@ -22,6 +22,10 @@ export interface BonsaiSource {
   seed: { x0: number; x1: number; y: number };
   /** Top of the pot, as a fraction of the crop height. Everything below is present from the start. */
   rim: number;
+  /** The photo fades out between these heights (fractions of the crop), so the pot sinks into the page. */
+  fadeBottom: [number, number];
+  /** Where the particle roots leave the tree, as fractions of the crop. */
+  rootBase: [number, number];
 }
 
 export interface BonsaiField {
@@ -48,7 +52,7 @@ const smoothstep = (a: number, b: number, x: number) => {
 };
 
 /** Deterministic random numbers, so the tree dissolves the same way on every visit. */
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   let a = seed;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
@@ -205,6 +209,12 @@ export function buildBonsaiField(img: HTMLImageElement, source: BonsaiSource, pa
   reach.sort((a, b) => a - b);
   const span = reach[Math.floor(reach.length * 0.98)] || 1;
 
+  // Soft edges, so no trace of the photo's frame shows: the sides and top
+  // fade a little, and the pot sinks into the page from fadeBottom down.
+  const [fadeFrom, fadeTo] = source.fadeBottom;
+  const edge = (u: number, v: number) =>
+    smoothstep(0, 0.07, u) * (1 - smoothstep(0.93, 1, u)) * smoothstep(0, 0.04, v) * (1 - smoothstep(fadeFrom, fadeTo, v));
+
   const rand = mulberry32(2022);
   const growth = new Float32Array(fieldW * fieldH);
   const field = new Uint8Array(fieldW * fieldH * 2);
@@ -215,18 +225,23 @@ export function buildBonsaiField(img: HTMLImageElement, source: BonsaiSource, pa
     if (row <= rimRow) t = Math.min(1, Math.max(0, t + (rand() - 0.5) * 0.02));
     growth[i] = t;
     field[i * 2] = Math.round(t * 255);
-    field[i * 2 + 1] = Math.round(matte[i] * 255);
+    field[i * 2 + 1] = Math.round(matte[i] * edge(((i % fieldW) + 0.5) / fieldW, (row + 0.5) / fieldH) * 255);
   }
 
-  // Particles: brighter, more solid parts of the tree get more of them.
+  // Particles: brighter, more solid parts of the tree get more of them. The
+  // pot gets fewer, so the resting tree is not bottom-heavy.
   const weights = new Float32Array(crop.w * crop.h);
+  const rimY = source.rim * crop.h;
   let total = 0;
   for (let i = 0; i < weights.length; i++) {
     const r = full[i * 4];
     const g = full[i * 4 + 1];
     const b = full[i * 4 + 2];
     const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    const w = matteOf(r, g, b, bg) * (0.3 + lum);
+    const x = i % crop.w;
+    const y = (i - x) / crop.w;
+    const w =
+      matteOf(r, g, b, bg) * (0.3 + lum) * edge((x + 0.5) / crop.w, (y + 0.5) / crop.h) * (y > rimY ? 0.45 : 1);
     weights[i] = w;
     total += w;
   }

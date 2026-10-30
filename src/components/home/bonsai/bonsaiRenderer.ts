@@ -5,13 +5,18 @@
  *      bone-white core and a fading wake, travels up the trunk and out along
  *      the branches at the growing edge;
  *   2. the particles: additive points that flash at the growing edge, sparkle
- *      as the tree dissolves, settle into a dim constellation and, as the
- *      hero scrolls away, drain to the root at the bottom of the hero.
+ *      as the tree dissolves and settle into a dim constellation that keeps
+ *      the tree's shape. A quarter of them drift out and settle evenly across
+ *      the hero. As the hero scrolls away the rest drain to the root;
+ *   3. the roots: motes laid along roots that spread from the base across
+ *      the hero, lit by a light that runs out along them as the tree
+ *      dissolves (bonsaiRoots.ts).
  * Every frame is a pure function of the uniforms in BonsaiFrame, so the
  * caller decides when to draw and nothing animates on its own.
  */
 
 import { PARTICLE_STRIDE, type BonsaiField } from './bonsaiField';
+import { ROOT_STRIDE } from './bonsaiRoots';
 
 export interface BonsaiFrame {
   /** 0..1: the pot and soil fading in. */
@@ -30,6 +35,8 @@ export interface BonsaiRenderer {
   resize(cssW: number, cssH: number, dpr: number): void;
   /** Tree rectangle and drain point, in CSS pixels of the canvas. */
   layout(rect: [number, number, number, number], drain: [number, number]): void;
+  /** Root motes from buildRoots, in CSS pixels of the canvas. */
+  roots(data: Float32Array): void;
   draw(frame: BonsaiFrame): void;
   dispose(): void;
 }
@@ -103,18 +110,29 @@ void main() {
   float l = clamp((uDissolve - order * 0.45) / 0.55, 0.0, 1.0);
   float spark = smoothstep(0.0, 0.16, l) * (1.0 - smoothstep(0.16, 0.85, l));
   float twinkle = 0.55 + 0.45 * sin(uTime * (2.0 + 4.5 * fract(s * 31.7)) + s * 60.0);
-  float rest = smoothstep(0.1, 0.9, l) * (0.22 + 0.5 * lum);
+  // A quarter of the motes leave the tree and settle evenly across the hero
+  // (an R2 low-discrepancy sequence); the rest barely drift, so the
+  // constellation keeps a clear bonsai shape.
+  float scatter = gl_VertexID % 4 == 0 ? 1.0 : 0.0;
+  float idx = float(gl_VertexID / 4);
+  vec2 spot = vec2(0.03 + 0.94 * fract(0.5 + idx * 0.7548776662),
+                   0.05 + 0.9 * fract(0.5 + idx * 0.5698402910)) * uRes;
+  float rest = smoothstep(0.1, 0.9, l) * (0.22 + 0.5 * lum) * (1.0 - 0.45 * scatter);
   float ang = s * 43.98;
-  p += vec2(cos(ang), sin(ang)) * (3.0 + 12.0 * fract(s * 13.37)) * easeOut(l);
-  p.y -= (3.0 + 9.0 * fract(s * 7.13)) * easeOut(l);
+  vec2 drift = vec2(cos(ang), sin(ang)) * (1.5 + 5.0 * fract(s * 13.37)) * easeOut(l);
+  drift.y -= (1.0 + 3.0 * fract(s * 7.13)) * easeOut(l);
+  p = mix(p + drift, spot, l * l * (3.0 - 2.0 * l) * scatter);
 
   // Scroll exit: the lower tree drains first, each mote on a slight arc.
   float le = clamp((uExit - (1.0 - aHome.y) * 0.35 - fract(s * 3.3) * 0.12) / 0.5, 0.0, 1.0);
   float k = le * le * (3.0 - 2.0 * le);
+  // Scattered motes don't drain; they fade as the hero leaves.
   vec2 toDrain = uDrain - p;
   vec2 side = normalize(vec2(-toDrain.y, toDrain.x) + 1e-4);
-  p = mix(p, uDrain + vec2((s - 0.5) * 4.0, 0.0), k) + side * sin(k * 3.14159) * (s - 0.5) * 70.0;
-  float drain = (1.0 + 1.1 * sin(k * 3.14159)) * (1.0 - smoothstep(0.82, 1.0, le));
+  vec2 drained = mix(p, uDrain + vec2((s - 0.5) * 4.0, 0.0), k) + side * sin(k * 3.14159) * (s - 0.5) * 70.0;
+  p = mix(drained, p, scatter);
+  float drain = mix((1.0 + 1.1 * sin(k * 3.14159)) * (1.0 - smoothstep(0.82, 1.0, le)),
+                    1.0 - smoothstep(0.1, 0.6, uExit), scatter);
 
   // About one mote in twenty-five is a glint: larger, hotter, longer-lived.
   float glint = step(0.96, fract(s * 91.7));
@@ -124,7 +142,32 @@ void main() {
   vHot = clamp((spark * twinkle + front) * (1.0 + glint), 0.0, 1.0);
   vec2 c = p / uRes * 2.0 - 1.0;
   gl_Position = I < 0.004 ? vec4(2.0, 2.0, 2.0, 1.0) : vec4(c.x, -c.y, 0.0, 1.0);
-  gl_PointSize = clamp(size * (1.0 + 0.8 * spark + 0.9 * front) * (1.0 + 1.4 * glint) * 2.2 * uDpr, 1.0, 32.0);
+  gl_PointSize = clamp(size * (1.0 + 0.8 * spark + 0.9 * front) * (1.0 + 1.4 * glint) * (1.0 - 0.25 * scatter) * 2.2 * uDpr, 1.0, 32.0);
+}`;
+
+const ROOT_VS = `#version 300 es
+in vec2 aPos;
+in vec4 aData;
+uniform vec2 uRes;
+uniform float uDpr, uDissolve, uExit, uTime;
+out float vI;
+out float vHot;
+float sq(float x) { return x * x; }
+void main() {
+  float t = aData.x, b = aData.y, s = aData.z, size = aData.w;
+  // A light runs out along the roots as the tree turns to light.
+  float reach = clamp((uDissolve - 0.08) / 0.6, 0.0, 1.0) * 1.08;
+  float d = reach - t;
+  float shown = smoothstep(0.0, 0.05, d);
+  float front = exp(-sq((d - 0.025) / 0.035)) * (1.0 - smoothstep(1.0, 1.08, reach));
+  float twinkle = 0.7 + 0.3 * sin(uTime * (1.5 + 3.0 * fract(s * 31.7)) + s * 60.0);
+  float fade = 1.0 - smoothstep(0.1, 0.6, uExit);
+  float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * fade;
+  vI = I;
+  vHot = clamp(front, 0.0, 1.0);
+  vec2 c = aPos / uRes * 2.0 - 1.0;
+  gl_Position = I < 0.004 ? vec4(2.0, 2.0, 2.0, 1.0) : vec4(c.x, -c.y, 0.0, 1.0);
+  gl_PointSize = clamp(size * (1.0 + 0.8 * front) * 2.2 * uDpr, 1.0, 24.0);
 }`;
 
 const POINT_FS = `#version 300 es
@@ -183,15 +226,18 @@ export function createBonsaiRenderer(
 
   let plate: WebGLProgram;
   let points: WebGLProgram;
+  let rootPoints: WebGLProgram;
   try {
     plate = compile(gl, PLATE_VS, PLATE_FS);
     points = compile(gl, POINT_VS, POINT_FS);
+    rootPoints = compile(gl, ROOT_VS, POINT_FS);
   } catch {
     return null;
   }
 
   const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTint', 'uHot']);
   const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
+  const ru = uniforms(gl, rootPoints, ['uRes', 'uDpr', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
   const tint = hexToRgb(colors.tint);
   const hot = hexToRgb(colors.hot);
 
@@ -218,6 +264,20 @@ export function createBonsaiRenderer(
   gl.vertexAttribPointer(aHome, 2, gl.FLOAT, false, stride, 0);
   gl.enableVertexAttribArray(aData);
   gl.vertexAttribPointer(aData, 4, gl.FLOAT, false, stride, 8);
+
+  // Roots, filled in by roots() once the layout is known.
+  const rootVao = gl.createVertexArray()!;
+  const rootBuf = gl.createBuffer()!;
+  let rootCount = 0;
+  gl.bindVertexArray(rootVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, rootBuf);
+  const rootStride = ROOT_STRIDE * 4;
+  const rPos = gl.getAttribLocation(rootPoints, 'aPos');
+  const rData = gl.getAttribLocation(rootPoints, 'aData');
+  gl.enableVertexAttribArray(rPos);
+  gl.vertexAttribPointer(rPos, 2, gl.FLOAT, false, rootStride, 0);
+  gl.enableVertexAttribArray(rData);
+  gl.vertexAttribPointer(rData, 4, gl.FLOAT, false, rootStride, 8);
   gl.bindVertexArray(null);
 
   // Textures.
@@ -255,6 +315,11 @@ export function createBonsaiRenderer(
     layout(r, d) {
       rect = r;
       drain = d;
+    },
+    roots(data) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, rootBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      rootCount = data.length / ROOT_STRIDE;
     },
     draw(f) {
       gl.viewport(0, 0, canvas.width, canvas.height);
@@ -298,11 +363,27 @@ export function createBonsaiRenderer(
       gl.uniform3fv(qu.uHot, hot);
       gl.bindVertexArray(pointVao);
       gl.drawArrays(gl.POINTS, 0, data.count);
+
+      if (rootCount) {
+        gl.useProgram(rootPoints);
+        gl.uniform2fv(ru.uRes, res);
+        gl.uniform1f(ru.uDpr, dpr);
+        gl.uniform1f(ru.uDissolve, f.dissolve);
+        gl.uniform1f(ru.uExit, f.exit);
+        gl.uniform1f(ru.uTime, f.time);
+        gl.uniform3fv(ru.uTint, tint);
+        gl.uniform3fv(ru.uHot, hot);
+        gl.bindVertexArray(rootVao);
+        gl.drawArrays(gl.POINTS, 0, rootCount);
+      }
       gl.bindVertexArray(null);
     },
     dispose() {
       gl.deleteBuffer(quadBuf);
       gl.deleteBuffer(pointBuf);
+      gl.deleteBuffer(rootBuf);
+      gl.deleteVertexArray(rootVao);
+      gl.deleteProgram(rootPoints);
       gl.deleteVertexArray(quadVao);
       gl.deleteVertexArray(pointVao);
       gl.deleteTexture(photoTex);

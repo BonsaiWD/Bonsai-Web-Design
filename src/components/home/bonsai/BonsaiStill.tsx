@@ -22,7 +22,10 @@ const Frame = styled.div`
   z-index: 1;
   pointer-events: none;
   opacity: 0.3;
-  mask-image: radial-gradient(closest-side, black 72%, transparent);
+  /* Soft sides, and the pot sinks into the page as on desktop */
+  mask-image: radial-gradient(closest-side, black 72%, transparent),
+    linear-gradient(to bottom, black 78%, transparent 96%);
+  mask-composite: intersect;
 
   img {
     object-fit: cover;

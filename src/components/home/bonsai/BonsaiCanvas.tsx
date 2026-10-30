@@ -5,6 +5,7 @@ import styled, { useTheme } from 'styled-components';
 import { useMotionValueEvent, useScroll } from 'framer-motion';
 import { buildBonsaiField } from './bonsaiField';
 import { createBonsaiRenderer, type BonsaiRenderer } from './bonsaiRenderer';
+import { buildRoots } from './bonsaiRoots';
 import { BONSAI_SOURCE, INTRO } from './timeline';
 
 const Canvas = styled.canvas`
@@ -131,8 +132,12 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
         const h = hero.clientHeight;
         const th = treeHeight();
         const tw = th * field.aspect;
+        const x = (w - tw) / 2;
+        const y = h * 0.47 - th / 2;
+        const [bx, by] = BONSAI_SOURCE.rootBase;
         renderer.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
-        renderer.layout([(w - tw) / 2, h * 0.47 - th / 2, tw, th], [w / 2, h]);
+        renderer.layout([x, y, tw, th], [w / 2, h]);
+        renderer.roots(buildRoots(w, h, [x + bx * tw, y + by * th], [w / 2, h]));
         requestDraw.current();
       };
       ro = new ResizeObserver(layout);
@@ -151,7 +156,11 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
           requestDraw.current();
         };
       }
+      // Any input plays the rest of the intro quickly: it now runs longer
+      // than 5 s, and WCAG 2.2.2 asks that moving content can be cut short.
       window.addEventListener('scroll', hurry, { passive: true });
+      window.addEventListener('keydown', hurry);
+      window.addEventListener('pointerdown', hurry);
       if (window.scrollY > 0) hurry();
       layout();
     };
@@ -163,6 +172,8 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
       cancelAnimationFrame(raf);
       ro?.disconnect();
       window.removeEventListener('scroll', hurry);
+      window.removeEventListener('keydown', hurry);
+      window.removeEventListener('pointerdown', hurry);
       requestDraw.current = () => {};
       renderer?.dispose();
       renderer = null;

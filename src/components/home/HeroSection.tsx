@@ -292,8 +292,9 @@ const ScrollIndicator = styled.div`
     animation: ${fadeIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 400ms both;
   }
 
+  /* Where the bonsai plays, its glowing taproot leads the eye down instead */
   @media ${BONSAI_INTRO_QUERY} {
-    animation-delay: ${INTRO.text + 4 * INTRO.textStep}ms;
+    display: none;
   }
 
   /* Where the hero is compact the cue would sit on the price line */
