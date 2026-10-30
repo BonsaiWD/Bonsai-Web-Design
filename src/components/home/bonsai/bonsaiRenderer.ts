@@ -178,11 +178,11 @@ void main() {
 
   // As uPull runs 0..1 the motes drain to the root with the tree, tips
   // first, each on a slight arc, dimming as they go and gone on arrival.
-  float le = clamp((uPull - (1.0 - t) * 0.25 - fract(s * 3.3) * 0.12) / 0.45, 0.0, 1.0);
+  float le = clamp((uPull - (1.0 - t) * 0.2 - fract(s * 3.3) * 0.1) / 0.4, 0.0, 1.0);
   float k = le * le * (3.0 - 2.0 * le);
   vec2 toDrain = uDrain - aPos;
   vec2 side = normalize(vec2(-toDrain.y, toDrain.x) + 1e-4);
-  vec2 p = mix(aPos, uDrain, k) + side * sin(k * 3.14159) * (s - 0.5) * 50.0;
+  vec2 p = mix(aPos, uDrain, k) + side * sin(k * 3.14159) * (s - 0.5) * 30.0;
   float drained = (1.0 - 0.45 * k) * (1.0 - smoothstep(0.8, 1.0, le));
 
   float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * uFade * drained;
@@ -419,9 +419,9 @@ export function createBonsaiRenderer(
       gl.uniform3fv(ru.uHot, hot);
       const motes = [
         // The roots light up as the tree turns to light, and drain to the
-        // root with it as the hero leaves (owner, 2026-10-30), so none are
-        // left behind.
-        { set: rootSet, reach: clamp01((f.dissolve - 0.08) / 0.6) * 1.08, fade: 1, pull: f.exit },
+        // root ahead of it as the hero leaves (owner, 2026-10-30): gone by
+        // a third of the way out, so they don't hang in the air.
+        { set: rootSet, reach: clamp01((f.dissolve - 0.08) / 0.6) * 1.08, fade: 1, pull: Math.min(1, f.exit * 2) },
         // The circuit lights up as the tree drains, down to where it drains,
         // and stays put: it is the path.
         { set: circuitSet, reach: clamp01((f.exit - 0.03) / 0.5) * 1.08, fade: 1 - smoothstep(0.7, 1, f.exit), pull: 0 },
