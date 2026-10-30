@@ -85,9 +85,9 @@ const bronzeCaps = css`
 const GLINT_AT = { quick: 600, intro: Math.round(INTRO.text + INTRO.textSettle * 0.4), next: 300 };
 
 /*
- * What the websites do, completing "Bespoke websites that…" (owner,
- * 2026-10-30). They take turns on the headline's second line in a loop (the
- * owner's choice), which waits while the pointer rests on the headline or the
+ * What the websites do, completing "Bespoke websites…" (owner, 2026-10-30),
+ * each led by "that" on the headline's second line, where they take turns in
+ * a loop (the owner's choice), which waits while the pointer rests on the headline or the
  * hero is out of view, and stops with the pause button (WCAG 2.2.2). Reduced
  * motion keeps the first.
  */
@@ -100,7 +100,7 @@ const STATEMENTS = [
   'grow with your business',
 ] as const;
 /** For screen readers and search, the whole sentence at once. */
-const SPOKEN = `${STATEMENTS.slice(0, -1).join(', ')}, and ${STATEMENTS[STATEMENTS.length - 1]}.`;
+const SPOKEN = `that ${STATEMENTS.slice(0, -1).join(', ')}, and ${STATEMENTS[STATEMENTS.length - 1]}.`;
 /** In ms: how long a statement rests, polished, after its glint, and how long two take to cross. */
 const ROTATE = { hold: 2400, cross: 1200 };
 
@@ -274,10 +274,10 @@ const Tagline = styled.h1`
   text-wrap: balance;
   ${entrance(0)}
 
-  /* On phones a touch smaller, so the longest statement still fits one line */
+  /* On phones smaller, so the longest statement still fits one line */
   em {
     font-family: ${({ theme }) => theme.fonts.caps};
-    font-size: 0.46em;
+    font-size: 0.4em;
     font-style: normal;
     font-weight: 400;
     letter-spacing: 0.2em;
@@ -635,17 +635,17 @@ export default function HeroSection() {
             onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
             onPointerLeave={() => setHeld(false)}
           >
-            Bespoke websites that <VisuallyHidden>{SPOKEN}</VisuallyHidden>
+            Bespoke websites <VisuallyHidden>{SPOKEN}</VisuallyHidden>
             <Statements aria-hidden="true">
               {STATEMENTS.map((words, i) => (
                 <em
                   key={words}
-                  data-glow={words}
+                  data-glow={`that ${words}`}
                   data-active={i === statement ? '' : undefined}
                   data-next={i === statement && turned ? '' : undefined}
                   onAnimationEnd={onGlintEnd}
                 >
-                  {words}
+                  that {words}
                 </em>
               ))}
             </Statements>
