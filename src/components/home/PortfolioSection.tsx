@@ -34,6 +34,8 @@ const Header = styled.div`
 `;
 
 const Eyebrow = styled(motion.p)`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.75rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -112,6 +114,8 @@ const FeaturedIntro = styled.div`
 `;
 
 const MetaRow = styled.div`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -263,6 +267,8 @@ const BranchText = styled.span`
 `;
 
 const Kind = styled.span`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   display: block;
   font-size: 0.68rem;
   letter-spacing: 0.22em;
@@ -286,6 +292,8 @@ const Domain = styled.span`
 /* ---------- Further work ---------- */
 
 const MoreHeading = styled.div`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.md};

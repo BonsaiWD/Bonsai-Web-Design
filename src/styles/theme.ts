@@ -13,8 +13,10 @@ export const theme = {
         success: '#03DAC6',
     },
     fonts: {
-        main: "var(--font-body), sans-serif",
+        main: "var(--font-body), Georgia, serif",
         heading: "var(--font-playfair), 'Playfair Display', serif",
+        // Small uppercase labels, buttons and navigation, set wide (font-stretch: 112%)
+        label: "var(--font-archivo), 'Archivo', sans-serif",
     },
     breakpoints: {
         mobile: '375px',

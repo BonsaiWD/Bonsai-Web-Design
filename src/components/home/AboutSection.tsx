@@ -36,6 +36,8 @@ const Intro = styled(motion.div)`
 `;
 
 const Eyebrow = styled(motion.p)`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.75rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -205,7 +207,8 @@ const NameLabel = styled(motion.div)`
 `;
 
 const RoleLabel = styled(motion.div)`
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 1rem;
   font-weight: 400;
   text-align: center;
@@ -303,6 +306,8 @@ const StatNumber = styled.div`
 `;
 
 const StatLabel = styled.div`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.9rem;
   color: ${({ theme }) => theme.colors.textSecondary};
   text-transform: uppercase;

@@ -54,6 +54,8 @@ const Message = styled.p`
 `;
 
 const Button = styled.button`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   background: ${({ theme }) => theme.colors.gold};
   color: ${({ theme }) => theme.colors.background};
   border: none;

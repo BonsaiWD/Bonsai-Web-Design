@@ -11,18 +11,24 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
  */
 
 const FONTS = [
-  { id: 'inter', label: 'Inter', note: 'Live site', variable: '--font-inter' },
-  { id: 'instrument', label: 'Instrument Sans', variable: '--font-instrument-sans' },
-  { id: 'geist', label: 'Geist', variable: '--font-geist' },
-  { id: 'archivo', label: 'Archivo Expanded', variable: '--font-archivo', stretch: '112%' },
-  { id: 'hanken', label: 'Hanken Grotesk', variable: '--font-hanken' },
-  { id: 'schibsted', label: 'Schibsted Grotesk', variable: '--font-schibsted' },
+  { id: 'newsreader', group: 'Serif', label: 'Newsreader', variable: '--font-newsreader' },
+  { id: 'source-serif', group: 'Serif', label: 'Source Serif 4', variable: '--font-source-serif' },
+  { id: 'spectral', group: 'Serif', label: 'Spectral', variable: '--font-spectral' },
+  { id: 'garamond', group: 'Serif', label: 'EB Garamond', variable: '--font-eb-garamond' },
+  { id: 'inter', group: 'Sans', label: 'Inter', note: 'Live site', variable: '--font-inter' },
+  { id: 'instrument', group: 'Sans', label: 'Instrument Sans', variable: '--font-instrument-sans' },
+  { id: 'geist', group: 'Sans', label: 'Geist', variable: '--font-geist' },
+  { id: 'archivo', group: 'Sans', label: 'Archivo Expanded', variable: '--font-archivo', stretch: '112%' },
+  { id: 'hanken', group: 'Sans', label: 'Hanken Grotesk', variable: '--font-hanken' },
+  { id: 'schibsted', group: 'Sans', label: 'Schibsted Grotesk', variable: '--font-schibsted' },
 ] as const;
 
 type FontId = (typeof FONTS)[number]['id'];
+const GROUPS = ['Serif', 'Sans'] as const;
 
-const DEFAULT_FONT: FontId = 'geist';
-const STORAGE_KEY = 'bonsai-font-lab';
+const DEFAULT_FONT: FontId = 'newsreader';
+// A new key, so the serif default shows first even where a sans was chosen before
+const STORAGE_KEY = 'bonsai-font-lab-v2';
 const ENABLED = process.env.NEXT_PUBLIC_VERCEL_ENV !== 'production';
 
 const Panel = styled.div`
@@ -35,6 +41,7 @@ const Panel = styled.div`
   background: ${({ theme }) => theme.colors.surface};
   border: 1px solid rgba(200, 159, 129, 0.42);
   color: ${({ theme }) => theme.colors.text};
+  font-family: ${({ theme }) => theme.fonts.label};
 `;
 
 const Head = styled.div`
@@ -64,6 +71,15 @@ const Toggle = styled.button`
     outline: 1px solid ${({ theme }) => theme.colors.primary};
     outline-offset: 3px;
   }
+`;
+
+const GroupLabel = styled.span`
+  display: block;
+  margin: ${({ theme }) => theme.spacing.sm} 0 6px;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
 const List = styled.div`
@@ -158,23 +174,27 @@ export default function FontLab() {
           {open ? 'Hide' : 'Show'}
         </Toggle>
       </Head>
-      {open && (
-        <List>
-          {FONTS.map((f) => (
-            <Option
-              key={f.id}
-              type="button"
-              $active={current === f.id}
-              aria-pressed={current === f.id}
-              onClick={() => choose(f.id)}
-              style={{ fontFamily: `var(${f.variable})`, fontStretch: 'stretch' in f ? f.stretch : undefined }}
-            >
-              {f.label}
-              {'note' in f && <small>{f.note}</small>}
-            </Option>
-          ))}
-        </List>
-      )}
+      {open &&
+        GROUPS.map((group) => (
+          <div key={group}>
+            <GroupLabel>{group}</GroupLabel>
+            <List>
+              {FONTS.filter((f) => f.group === group).map((f) => (
+                <Option
+                  key={f.id}
+                  type="button"
+                  $active={current === f.id}
+                  aria-pressed={current === f.id}
+                  onClick={() => choose(f.id)}
+                  style={{ fontFamily: `var(${f.variable})`, fontStretch: 'stretch' in f ? f.stretch : '100%' }}
+                >
+                  {f.label}
+                  {'note' in f && <small>{f.note}</small>}
+                </Option>
+              ))}
+            </List>
+          </div>
+        ))}
     </Panel>
   );
 }

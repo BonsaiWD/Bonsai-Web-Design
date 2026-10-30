@@ -78,7 +78,8 @@ const Content = styled(Container)`
 `;
 
 const PreTitle = styled.span`
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.9rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -154,7 +155,8 @@ const PrimaryCta = styled.a`
   padding: 0 ${({ theme }) => theme.spacing.xl};
   background-color: ${({ theme }) => theme.colors.primary};
   color: ${({ theme }) => theme.colors.background};
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.15em;
@@ -189,7 +191,8 @@ const SecondaryCta = styled.a`
   display: inline-flex;
   align-items: center;
   min-height: 48px;
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.85rem;
   font-weight: 400;
   letter-spacing: 0.15em;

@@ -103,6 +103,8 @@ const Name = styled.h4`
 `;
 
 const Role = styled.p`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.9rem;
   color: ${({ theme }) => theme.colors.textSecondary};
   text-transform: uppercase;

@@ -79,7 +79,8 @@ const NavLinks = styled.div`
 `;
 
 const NavLink = styled(Link)<{ $wideOnly?: boolean }>`
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.9rem;
   font-weight: 300;
   letter-spacing: 0.1em;
@@ -133,7 +134,8 @@ const HeaderCta = styled.a`
   border-radius: 0;
   background-color: transparent;
   color: ${({ theme }) => theme.colors.primary};
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.15em;
@@ -210,7 +212,8 @@ const MobileCta = styled(motion.a)`
   border: 1px solid ${({ theme }) => theme.colors.primary};
   border-radius: 0;
   color: ${({ theme }) => theme.colors.primary};
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.15em;

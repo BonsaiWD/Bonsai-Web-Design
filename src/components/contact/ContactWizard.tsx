@@ -160,6 +160,8 @@ const InputGroup = styled.div.attrs({
 `;
 
 const Label = styled.label`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   display: block;
   margin-bottom: ${({ theme }) => theme.spacing.sm};
   color: ${({ theme }) => theme.colors.text};
@@ -271,6 +273,8 @@ const ButtonGroup = styled.div`
 `;
 
 const Button = styled.button<{ $variant?: 'primary' | 'secondary' }>`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   padding: ${({ theme }) => `${theme.spacing.md} ${theme.spacing.xxl}`};
   background-color: ${({ $variant, theme }) =>
         $variant === 'secondary' ? 'transparent' : theme.colors.gold};

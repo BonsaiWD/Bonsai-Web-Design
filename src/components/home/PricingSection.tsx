@@ -169,6 +169,8 @@ const PriceContainer = styled.div`
 `;
 
 const PricePrefix = styled.div`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.8rem;
   color: ${({ theme }) => theme.colors.textSecondary};
   text-transform: uppercase;

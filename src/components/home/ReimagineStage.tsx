@@ -63,7 +63,8 @@ const SwitchLabel = styled.span`
 const SwitchButton = styled.button<{ $active: boolean }>`
   min-height: 44px;
   padding: 0 ${({ theme }) => theme.spacing.xs};
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.72rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -135,6 +136,8 @@ const Chrome = styled.div`
 `;
 
 const ConceptTag = styled.span`
+  font-family: ${({ theme }) => theme.fonts.label};
+  font-stretch: 112%;
   font-size: 0.66rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -213,7 +216,9 @@ const B = {
     flex-direction: column;
     background: ${({ theme }) => theme.colors.text};
     color: ${({ theme }) => theme.colors.background};
-    font-family: ${({ theme }) => theme.fonts.main};
+    /* A plain, normal-width sans: the generic template look */
+    font-family: ${({ theme }) => theme.fonts.label};
+    font-stretch: 100%;
     font-size: 1.3cqw;
     line-height: 1.4;
   `,
@@ -366,6 +371,8 @@ const A = {
     text-transform: uppercase;
   `,
   Nav: styled.span`
+    font-family: ${({ theme }) => theme.fonts.label};
+    font-stretch: 112%;
     display: flex;
     gap: 2.4cqw;
     font-size: 0.95cqw;
@@ -381,6 +388,8 @@ const A = {
     align-items: center;
   `,
   Eyebrow: styled.span`
+    font-family: ${({ theme }) => theme.fonts.label};
+    font-stretch: 112%;
     display: block;
     font-size: 0.95cqw;
     letter-spacing: 0.24em;
@@ -409,6 +418,8 @@ const A = {
     margin-bottom: 2.4cqw;
   `,
   Ctas: styled.span`
+    font-family: ${({ theme }) => theme.fonts.label};
+    font-stretch: 112%;
     display: flex;
     align-items: center;
     gap: 2.4cqw;
@@ -440,6 +451,8 @@ const A = {
     opacity: 0.14;
   `,
   RoastHead: styled.span`
+    font-family: ${({ theme }) => theme.fonts.label};
+    font-stretch: 112%;
     display: block;
     font-size: 0.95cqw;
     letter-spacing: 0.24em;
