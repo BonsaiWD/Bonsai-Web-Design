@@ -29,6 +29,11 @@ import { mulberry32 } from './bonsai/bonsaiField';
  * spray at the end. They fade towards their tips and grow in as the tip of
  * the trace passes.
  *
+ * None of it runs through the page's content. Each side run keeps to the
+ * margin beside its section's content column, and where that margin is too
+ * narrow for the jog or the forks (as on most laptops) it goes straight down
+ * without them. The organic roots stop growing where they meet content.
+ *
  * A soft glow follows the tip and brightens while the page is scrolling,
  * then settles when it stops. It sits behind the sections (z-index -1 in an
  * isolated stage). Phones get no root. Under reduced motion it is drawn in
@@ -120,9 +125,20 @@ interface Geometry {
   vias: P[];
 }
 
+/** A rectangle in the stage, by its edges. */
+interface Box {
+  l: number;
+  t: number;
+  r: number;
+  b: number;
+}
+
 /** Lengths of the comet of light near the tip: a soft tail and a bright head. */
 const TAIL = 200;
 const HEAD = 70;
+
+/** The room the root keeps from the page's content, so it never runs through text. */
+const CLEAR = 12;
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const fmt = ([x, y]: P) => `${x.toFixed(1)},${y.toFixed(1)}`;
@@ -158,9 +174,10 @@ const DOWN = Math.PI / 2;
 
 /**
  * An organic root: a random walk that wanders with some momentum, sinks a
- * little (gravity), and forks into finer roots, as in the hero.
+ * little (gravity), and forks into finer roots, as in the hero. It stops
+ * where it would leave the free ground, i.e. reach the page's content.
  */
-function grow(rand: () => number, start: P, angle: number, length: number, width: number, gravity = 0.02, depth = 0): Rootlet[] {
+function grow(rand: () => number, free: (p: P) => boolean, start: P, angle: number, length: number, width: number, gravity = 0.02, depth = 0): Rootlet[] {
   const pts: P[] = [start];
   const found: Rootlet[] = [];
   let [x, y] = start;
@@ -171,15 +188,32 @@ function grow(rand: () => number, start: P, angle: number, length: number, width
     a += turn + (DOWN - a) * gravity;
     x += Math.cos(a) * 4;
     y += Math.sin(a) * 4;
+    if (!free([x, y])) break;
     pts.push([x, y]);
     if (depth < 2 && g > 16 && rand() < 0.05) {
       const side = rand() < 0.5 ? -1 : 1;
-      found.push(...grow(rand, [x, y], a + side * (0.5 + 0.5 * rand()), (length - g) * (0.4 + 0.4 * rand()), width * 0.65, gravity, depth + 1));
+      found.push(...grow(rand, free, [x, y], a + side * (0.5 + 0.5 * rand()), (length - g) * (0.4 + 0.4 * rand()), width * 0.65, gravity, depth + 1));
     }
   }
+  // Stopped almost at once: too short to read as a root.
+  if (pts.length < 4) return [];
   const d = `M${pts.map(fmt).join(' L')}`;
   const ys = pts.map((p) => p[1]);
   return [{ d, from: Math.min(...ys), to: Math.max(...ys), width, a: start, b: pts[pts.length - 1] }, ...found];
+}
+
+/** A section's content column (its container, less padding), in stage coordinates. */
+function contentBox(section: HTMLElement): Box {
+  const col = section.firstElementChild as HTMLElement;
+  const pad = getComputedStyle(col);
+  const x = section.offsetLeft + col.offsetLeft;
+  const y = section.offsetTop + col.offsetTop;
+  return {
+    l: x + parseFloat(pad.paddingLeft),
+    t: y + parseFloat(pad.paddingTop),
+    r: x + col.clientWidth - parseFloat(pad.paddingRight),
+    b: y + col.clientHeight - parseFloat(pad.paddingBottom),
+  };
 }
 
 function measure(stage: HTMLElement): Geometry {
@@ -188,6 +222,9 @@ function measure(stage: HTMLElement): Geometry {
   const cx = w / 2;
   const gutter = clamp(w * 0.03, 20, 56);
   const sections = Array.from(stage.querySelectorAll<HTMLElement>(':scope > section'));
+  const boxes = sections.map(contentBox);
+  // Ground the roots may grow through: anywhere at least CLEAR away from every section's content.
+  const free = ([x, y]: P) => boxes.every((b) => x < b.l - CLEAR || x > b.r + CLEAR || y < b.t - CLEAR || y > b.b + CLEAR);
   const pts: P[] = [[cx, 0]];
   const forks: Fork[] = [];
   const rootlets: Rootlet[] = [];
@@ -197,14 +234,19 @@ function measure(stage: HTMLElement): Geometry {
 
   // Where the hero's taproot arrives: a few roots spread out, so the two read as one.
   for (const side of [-1, 1, 1]) {
-    rootlets.push(...grow(rand, [cx + side * 4, 6], DOWN - side * (0.9 + 0.4 * rand()), 140 + 90 * rand(), 1.3, 0.012));
+    rootlets.push(...grow(rand, free, [cx + side * 4, 6], DOWN - side * (0.9 + 0.4 * rand()), 140 + 90 * rand(), 1.3, 0.012));
   }
 
   sections.forEach((section, i) => {
     const top = section.offsetTop;
     const bottom = top + section.offsetHeight;
-    const side = i % 2 === 0 ? gutter : w - gutter;
+    // The side run sits in the gutter, or halfway across the margin beside the content where that is narrower,
+    // and reaches in towards the content only as far as `room` allows.
+    const margin = i % 2 === 0 ? boxes[i].l : w - boxes[i].r;
+    const inset = Math.min(gutter, margin / 2);
+    const side = i % 2 === 0 ? inset : w - inset;
     const out = Math.sign(side - cx);
+    const room = margin - inset - CLEAR;
 
     if (i > 0) {
       // From the previous gutter: 45° in, across the gap, 45° into the via.
@@ -213,7 +255,7 @@ function measure(stage: HTMLElement): Geometry {
       vias.push([cx, top]);
       // Rootlets reaching out sideways from the via, staying above the heading.
       for (const side of [-1, 1]) {
-        rootlets.push(...grow(rand, [cx + side * 6, top + 2], DOWN - side * (1.2 + 0.2 * rand()), 110 + 80 * rand(), 1.1, 0.006));
+        rootlets.push(...grow(rand, free, [cx + side * 6, top + 2], DOWN - side * (1.2 + 0.2 * rand()), 110 + 80 * rand(), 1.1, 0.006));
       }
     }
 
@@ -227,7 +269,7 @@ function measure(stage: HTMLElement): Geometry {
       }
       // And a wider spray of roots, as the root system ends.
       for (const side of [-1, 1, -1, 1]) {
-        rootlets.push(...grow(rand, [cx + side * 8, top + 4], DOWN - side * (0.8 + 0.5 * rand()), 170 + 110 * rand(), 1.3, 0.01));
+        rootlets.push(...grow(rand, free, [cx + side * 8, top + 4], DOWN - side * (0.8 + 0.5 * rand()), 170 + 110 * rand(), 1.3, 0.01));
       }
       return;
     }
@@ -236,17 +278,21 @@ function measure(stage: HTMLElement): Geometry {
     const entry = top + 70;
     pts.push([cx + out * 30, top + 30], [side - out * 40, top + 30], [side, entry]);
 
-    // Down the gutter, with one small jog inwards and two root forks.
+    // Down the gutter, with one small jog inwards (12px) and two root forks (reaching 44px in), where there is room.
     const leave = bottom - 70;
     const run = leave - entry;
     if (run > 260) {
-      const jog = entry + run * 0.5;
-      pts.push([side, jog], [side - out * 12, jog + 12], [side - out * 12, jog + 92], [side, jog + 104]);
-      forks.push(...forksAt(side, entry + run * 0.26, -out, 40 + (i % 3) * 18));
-      forks.push(...forksAt(side, entry + run * 0.74, -out, 70 - (i % 3) * 12));
-      // Organic roots wandering inwards off the run.
+      if (room >= 12) {
+        const jog = entry + run * 0.5;
+        pts.push([side, jog], [side - out * 12, jog + 12], [side - out * 12, jog + 92], [side, jog + 104]);
+      }
+      if (room >= 44) {
+        forks.push(...forksAt(side, entry + run * 0.26, -out, 40 + (i % 3) * 18));
+        forks.push(...forksAt(side, entry + run * 0.74, -out, 70 - (i % 3) * 12));
+      }
+      // Organic roots wandering inwards off the run, as far as the content.
       for (const at of [0.1, 0.42, 0.85]) {
-        rootlets.push(...grow(rand, [side, entry + run * at], DOWN + out * (0.7 + 0.4 * rand()), 150 + 110 * rand(), 1.2));
+        rootlets.push(...grow(rand, free, [side, entry + run * at], DOWN + out * (0.7 + 0.4 * rand()), 150 + 110 * rand(), 1.2));
       }
     }
     pts.push([side, leave]);
