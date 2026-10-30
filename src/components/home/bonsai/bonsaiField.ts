@@ -26,8 +26,11 @@ export interface BonsaiSource {
   fadeBottom: [number, number];
   /** Where the particle roots leave the tree, as fractions of the crop. */
   rootBase: [number, number];
-  /** The lit part of the pot's rim, left and right, as fractions of the crop width. */
-  pot: [number, number];
+  /**
+   * The lit part of the pot: its rim's left and right ends, as fractions of
+   * the crop width, and the middle of its body, as a fraction of the height.
+   */
+  pot: { x: [number, number]; body: number };
 }
 
 export interface BonsaiField {

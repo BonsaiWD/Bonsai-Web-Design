@@ -6,10 +6,10 @@ import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
-import { clearGlass, frostedGlass } from '@/styles/frosted';
+import { frostedGlass } from '@/styles/frosted';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE_HEIGHT } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -97,10 +97,10 @@ const entrance = (delayMs: number) => css`
 /*
  * Phones and short windows: the hero grows to fit its CTAs instead of clipping
  * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 462px tall and the cue 88px tall, 40px from the bottom, so the cue
- * clears the buttons by at least 16px from 750px tall.
+ * about 400px tall and the cue 88px tall, 40px from the bottom, so the cue
+ * clears the button by at least 16px from 736px tall.
  */
-const COMPACT_HEIGHT = 749;
+const COMPACT_HEIGHT = 735;
 const COMPACT = `(max-width: 767px), (max-height: ${COMPACT_HEIGHT}px)`;
 
 /*
@@ -322,52 +322,63 @@ const focusRing = css`
   }
 `;
 
+const CTA_HEIGHT = 48;
+
+/** The hero's centred content, with the button lowered, in px (measured; the same at every desktop width). */
+const CONTENT_HEIGHT = 462;
+
+const { pot, crop } = BONSAI_SOURCE;
 /** How far the lit pot's centre sits from the tree's, in tree heights (negative is left). */
-const POT_SHIFT =
-  ((BONSAI_SOURCE.pot[0] + BONSAI_SOURCE.pot[1]) / 2 - 0.5) * (BONSAI_SOURCE.crop.w / BONSAI_SOURCE.crop.h);
+const POT_ACROSS = ((pot.x[0] + pot.x[1]) / 2 - 0.5) * (crop.w / crop.h);
+const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
 
 /*
- * The two actions stack at one width, "Plant your project" first and "See
- * the work" in quieter clear glass beneath it (owner, 2026-10-30).
+ * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
+ * the price line left the hero), placed where it says what it does: planted in
+ * the bonsai's pot.
  *
- * Where the tree is drawn behind them and the hero isn't compact, the stack
- * floats in the pot: it shifts left from the page's centre to the lit part of
- * the pot, which sits left of the tree's own centre. The tree is a share of
- * the pinned layer's height (as in BonsaiCanvas), so the shift is too. The
- * still fallback frames the photo differently and keeps the stack centred.
+ * Where the tree is drawn behind it and the hero isn't compact, the button
+ * leaves the content's flow by a button's height and a gap (so the text sits
+ * as if it were still there) and moves onto the lit middle of the pot's body.
+ * Across, that is left of the page's centre, as the pot sits left of the
+ * tree's own centre. Down, it is the pot body's place in the tree (centred
+ * TREE.centre down the layer) less the button's place in the centred content
+ * (half the content less half the button below the layer's middle). The tree
+ * is a share of the pinned layer's height, as in BonsaiCanvas, so both follow
+ * the window. The still fallback frames the whole photo, so it keeps the
+ * button centred under the text, as do phones and short windows.
  */
 const CtaRow = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.md};
   ${entrance(200)}
 
   @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
     ${HeroWrapper}:not([data-bonsai='still']) & {
-      translate: calc(${POT_SHIFT.toFixed(3)} * min(${TREE_HEIGHT.share * 100}svh, ${TREE_HEIGHT.max}px)) 0;
+      margin-top: ${({ theme }) => `calc(${CTA_HEIGHT}px + ${theme.spacing.md})`};
+      translate:
+        calc(${POT_ACROSS.toFixed(3)} * ${treeHeight})
+        calc(
+          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(pot.body - 0.5).toFixed(2)} * ${treeHeight} -
+            ${(CONTENT_HEIGHT - CTA_HEIGHT) / 2}px
+        );
     }
   }
 `;
 
-const cta = css`
+const PrimaryCta = styled.a`
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: ${CTA_HEIGHT}px;
   /* Letter-spacing trails the last letter, so the right padding gives it back and the label sits centred */
   padding: 0 ${({ theme }) => `calc(${theme.spacing.lg} - 0.15em) 0 ${theme.spacing.lg}`};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.85rem;
+  font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   border-radius: 0;
-  ${focusRing}
-`;
-
-const PrimaryCta = styled.a`
-  ${cta}
-  font-weight: 600;
   ${frostedGlass}
 
   /* Bronze hover halo (0.15), faded in on opacity rather than box-shadow */
@@ -384,12 +395,8 @@ const PrimaryCta = styled.a`
   &:hover::after {
     opacity: 1;
   }
-`;
 
-const SecondaryCta = styled.a`
-  ${cta}
-  font-weight: 500;
-  ${clearGlass}
+  ${focusRing}
 `;
 
 const ScrollIndicator = styled.div`
@@ -413,7 +420,7 @@ const ScrollIndicator = styled.div`
     display: none;
   }
 
-  /* Where the hero is compact the cue would sit on the buttons */
+  /* Where the hero is compact the cue would sit on the button */
   @media ${COMPACT} {
     display: none;
   }
@@ -489,7 +496,6 @@ export default function HeroSection() {
 
           <CtaRow>
             <PrimaryCta href="#contact">Plant your project</PrimaryCta>
-            <SecondaryCta href="#portfolio">See the work</SecondaryCta>
           </CtaRow>
         </Content>
 

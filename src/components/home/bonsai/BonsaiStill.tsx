@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import type { Ref } from 'react';
 import styled from 'styled-components';
-import { BONSAI_INTRO_QUERY, BONSAI_SOURCE } from './timeline';
+import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, TREE } from './timeline';
 
 /*
  * The finished tree at its resting opacity, for phones, tablets, reduced
@@ -15,8 +15,8 @@ import { BONSAI_INTRO_QUERY, BONSAI_SOURCE } from './timeline';
 const Frame = styled.div`
   position: absolute;
   left: 50%;
-  top: 47%;
-  height: min(80%, 780px);
+  top: ${TREE.centre * 100}%;
+  height: min(${TREE.share * 100}%, ${TREE.max}px);
   aspect-ratio: 693 / 783;
   transform: translate(-50%, -50%);
   z-index: 1;
