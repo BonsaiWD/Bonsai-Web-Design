@@ -37,6 +37,21 @@ const fadeIn = keyframes`
 
 const SETTLE_S = INTRO.textSettle / 1000;
 
+/*
+ * "timeless" catches the light once as it lands (owner's request,
+ * 2026-10-30): a bone-white glint with a bronze halo travels through the word
+ * from left to right, like the light through the tree, and leaves a faint
+ * warmth behind it. The glint is the word's own fill, a gradient clipped to
+ * the text; the halo is a copy of the word drawn only as its text-shadow,
+ * masked to the same band. Both share one box, so they move together.
+ */
+const glint = keyframes`
+  from { background-position: 100% 0; mask-position: 100% 0; }
+  to { background-position: 0 0; mask-position: 0 0; }
+`;
+const GLINT_S = 3.6;
+const GLINT_EASE = 'cubic-bezier(0.37, 0, 0.63, 1)';
+
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
     animation: ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) ${delayMs}ms both;
@@ -193,6 +208,58 @@ const Tagline = styled.h1`
     font-family: ${({ theme }) => theme.fonts.heading};
     font-style: italic;
     color: ${({ theme }) => theme.colors.primary};
+  }
+
+  /*
+   * The padding gives the halo room (and the italic its overhang); the
+   * negative margin takes it back out of the line. The band sits in a gradient
+   * 2.4 times the box's width, so moving it from 100% to 0% sweeps it from just
+   * before the first letter to just past the last.
+   */
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    @media (prefers-reduced-motion: no-preference) {
+      em {
+        position: relative;
+        display: inline-block;
+        padding: 0.5em 0.6em;
+        margin: -0.5em -0.6em;
+        background: linear-gradient(
+            100deg,
+            ${({ theme }) => theme.colors.primary} 0 41%,
+            ${({ theme }) => theme.colors.text} 48% 52%,
+            ${({ theme }) => theme.colors.primary} 59% 100%
+          )
+          100% 0 / 240% 100% no-repeat;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: ${glint} ${GLINT_S}s ${GLINT_EASE} 600ms both;
+      }
+
+      em::after {
+        content: attr(data-glow) / '';
+        position: absolute;
+        inset: 0;
+        padding: inherit;
+        white-space: nowrap;
+        text-shadow:
+          0 0 0.06em ${({ theme }) => theme.colors.text},
+          0 0 0.18em ${({ theme }) => theme.colors.primary},
+          0 0 0.5em ${({ theme }) => theme.colors.primary};
+        mask: linear-gradient(100deg, rgb(0 0 0 / 0.25) 0 41%, #000 48% 52%, transparent 59%) 100% 0 / 240% 100%
+          no-repeat;
+        pointer-events: none;
+        user-select: none;
+        animation: inherit;
+      }
+    }
+
+    /* Where the bonsai plays, the glint runs as the headline lands, with the tree's last growth */
+    @media ${BONSAI_INTRO_QUERY} {
+      em {
+        animation-delay: ${Math.round(INTRO.text + INTRO.textSettle * 0.4)}ms;
+      }
+    }
   }
 
   @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
@@ -403,7 +470,7 @@ export default function HeroSection() {
           <PreTitle>Est. 2022</PreTitle>
 
           <Tagline ref={headlineRef}>
-            Crafting <em>timeless</em> digital legacies.
+            Crafting <em data-glow="timeless">timeless</em> digital legacies.
           </Tagline>
 
           <SubText>
