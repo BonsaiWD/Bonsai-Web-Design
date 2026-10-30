@@ -57,22 +57,29 @@ const entrance = (delayMs: number) => css`
 const COMPACT = '(max-width: 767px), (max-height: 735px)';
 
 /*
- * The section is a stage around a pinned layer that holds everything. It is
- * normally exactly as tall as the layer, so nothing pins. The scroll version
- * (?dissolve=scroll) adds a runway, so the hero holds still while the tree
- * turns to light, then scrolls away as usual.
+ * The section is a stage around a pinned layer that holds everything. Where
+ * the bonsai plays, it adds a runway (set in CSS, so it is right before
+ * hydration): the hero holds still while the tree turns to light with the
+ * scroll, then scrolls away as usual. Everywhere else, and for the automatic
+ * dissolve (?dissolve=auto) or the still fallback, it is exactly as tall as
+ * the layer, so nothing pins.
  */
 const HeroWrapper = styled.section`
   position: relative;
   width: 100%;
   background-color: ${({ theme }) => theme.colors.background};
 
-  &[data-runway='true'] {
+  @media ${BONSAI_INTRO_QUERY} {
     height: ${(1 + DISSOLVE_RUNWAY) * 100}svh;
 
-    @media ${COMPACT} {
+    &[data-dissolve='auto'],
+    &[data-bonsai='still'] {
       height: auto;
     }
+  }
+
+  @media ${COMPACT} {
+    height: auto;
   }
 `;
 
@@ -97,11 +104,15 @@ const Pin = styled.div`
 `;
 
 const noSubscribe = () => () => {};
-/** Prototype switch: ?dissolve=scroll. False on the server and during hydration. */
-const useScrollDissolve = () =>
+/**
+ * The automatic dissolve, kept by link (?dissolve=auto); the scroll-driven
+ * dissolve is the default (owner, 2026-10-29). False on the server and
+ * during hydration.
+ */
+const useAutoDissolve = () =>
   useSyncExternalStore(
     noSubscribe,
-    () => new URLSearchParams(window.location.search).get('dissolve') === 'scroll',
+    () => new URLSearchParams(window.location.search).get('dissolve') === 'auto',
     () => false
   );
 
@@ -347,7 +358,7 @@ export default function HeroSection() {
   const intro = useMediaQuery(BONSAI_INTRO_QUERY);
   const [fallback, setFallback] = useState(false);
   const showStill = useCallback(() => setFallback(true), []);
-  const onScroll = useScrollDissolve() && intro && !fallback;
+  const auto = useAutoDissolve();
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end start"]
@@ -357,7 +368,12 @@ export default function HeroSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   return (
-    <HeroWrapper id="hero" ref={ref} data-bonsai={fallback ? 'still' : undefined} data-runway={onScroll || undefined}>
+    <HeroWrapper
+      id="hero"
+      ref={ref}
+      data-bonsai={fallback ? 'still' : undefined}
+      data-dissolve={auto ? 'auto' : undefined}
+    >
       <Pin>
         <BackgroundImage style={{ y: reduce ? 0 : y, opacity: reduce ? 1 : opacity }} />
         <BonsaiStill imgRef={stillRef} />
@@ -366,7 +382,7 @@ export default function HeroSection() {
             heroRef={ref}
             imageRef={stillRef}
             clockRef={headlineRef}
-            dissolveOnScroll={onScroll}
+            dissolveOnScroll={!auto}
             onFallback={showStill}
           />
         )}

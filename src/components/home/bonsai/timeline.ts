@@ -46,7 +46,7 @@ export const INTRO = {
 } as const;
 
 /**
- * The scroll version (?dissolve=scroll) holds the hero in place for this much
+ * The default, scroll-driven dissolve holds the hero in place for this much
  * scroll, as a fraction of the viewport height, while the tree turns to light.
  */
 export const DISSOLVE_RUNWAY = 0.8;

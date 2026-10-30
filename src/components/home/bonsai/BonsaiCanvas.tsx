@@ -30,9 +30,9 @@ interface Props {
   /** The H1, whose CSS entrance is the intro's clock. */
   clockRef: RefObject<HTMLElement | null>;
   /**
-   * The scroll version (?dissolve=scroll): no particles until the visitor
-   * scrolls, then the photo turns to light with the scroll, while the hero
-   * holds still on its runway. Otherwise it dissolves on its own.
+   * The default: no particles until the visitor scrolls, then the photo
+   * turns to light with the scroll while the hero holds still on its runway.
+   * False for the automatic dissolve (?dissolve=auto), which plays on its own.
    */
   dissolveOnScroll: boolean;
   onFallback: () => void;
@@ -49,9 +49,9 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
   const scrolledDissolve = useRef(0);
   const requestDraw = useRef<() => void>(() => {});
 
-  // Scroll through the hero: first its runway (the scroll version's
-  // dissolve), then its exit (the drain to the root). Without a runway the
-  // whole scroll is exit.
+  // Scroll through the hero: first its runway (the default dissolve), then
+  // its exit (the drain to the root). Without a runway the whole scroll is
+  // exit.
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
   useMotionValueEvent(scrollYProgress, 'change', (p) => {
     const hero = heroRef.current;
@@ -60,7 +60,9 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
     const pinned = canvas.clientHeight || 1;
     const runway = Math.max(0, hero.offsetHeight - pinned);
     const scrolled = p * hero.offsetHeight;
-    scrolledDissolve.current = runway > 0 ? clamp01(scrolled / runway) : 0;
+    // Short windows get no runway (the hero is compact), so the tree turns
+    // to light over the first part of the hero's exit instead.
+    scrolledDissolve.current = clamp01(scrolled / (runway > 0 ? runway : pinned * 0.4));
     exit.current = clamp01((scrolled - runway) / pinned);
     requestDraw.current();
   });
@@ -92,9 +94,9 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
 
     /*
      * Two dissolves, both kept by the owner (2026-10-29). By default the tree
-     * dissolves on its own as the text arrives. In the scroll version it
      * holds, dimmed behind the text, and turns to light as the visitor
-     * scrolls (scrolledDissolve).
+     * scrolls (scrolledDissolve). With ?dissolve=auto it dissolves on its own
+     * as the text arrives.
      */
     const onScroll = dissolveOnScroll;
     const dissolveLength = INTRO.dissolveEnd - INTRO.dissolveStart;
