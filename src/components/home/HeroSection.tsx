@@ -83,23 +83,37 @@ const polishedBronze = css`
 
 /*
  * The same polish for the subtext's capitals, one line box (1.8em) tall: the
- * capitals run from 0.53em to the baseline at 1.26em. Gentler than the
- * headline's, so the small text stays legible: its darkest stop is 5:1 on
- * the page.
+ * capitals run from 0.53em to the baseline at 1.26em. Brighter than the
+ * headline's (owner, 2026-10-30): its darkest stop is plain bronze.
  */
 const bronzeCaps = css`
   linear-gradient(
     180deg,
-    ${lit(50)} 0.53em,
-    ${lit(10)} 0.76em,
-    ${shade(22)} 0.86em,
-    ${shade(8)} 0.93em,
-    ${lit(25)} 1.18em,
-    ${shade(12)} 1.27em
+    ${lit(60)} 0.53em,
+    ${lit(30)} 0.76em,
+    ${lit(5)} 0.86em,
+    ${lit(20)} 0.93em,
+    ${lit(45)} 1.18em,
+    ${lit(15)} 1.27em
   )
 `;
-/** The glint crosses the subtext more slowly than "timeless": it has further to go. */
-const GLISTEN_S = 5;
+
+/*
+ * "timeless" and the subtext catch the light together (owner, 2026-10-30):
+ * their glints share a band, a duration and a start, after the text's quick
+ * entrance or, where the bonsai plays, as the headline lands. Each band
+ * enters its own text at the same moment and leaves it at the same moment.
+ */
+const GLINT_AT = { quick: 600, intro: Math.round(INTRO.text + INTRO.textSettle * 0.4) };
+const glintBand = css`
+  linear-gradient(
+      100deg,
+      transparent 0 41%,
+      ${({ theme }) => theme.colors.text} 48% 52%,
+      ${({ theme }) => theme.colors.primary} 59% 100%
+    )
+    0 0 / 240% 100% no-repeat
+`;
 
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
@@ -275,13 +289,7 @@ const Tagline = styled.h1`
       padding: 0.5em 0.6em;
       margin: -0.5em -0.6em;
       background:
-        linear-gradient(
-            100deg,
-            transparent 0 41%,
-            ${({ theme }) => theme.colors.text} 48% 52%,
-            ${({ theme }) => theme.colors.primary} 59% 100%
-          )
-          0 0 / 240% 100% no-repeat,
+        ${glintBand},
         ${polishedBronze};
       -webkit-background-clip: text;
       background-clip: text;
@@ -307,14 +315,14 @@ const Tagline = styled.h1`
 
     @media (prefers-reduced-motion: no-preference) {
       em {
-        animation: ${glint} ${GLINT_S}s ${GLINT_EASE} 600ms both;
+        animation: ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
       }
     }
 
     /* Where the bonsai plays, the glint runs as the headline lands, with the tree's last growth */
     @media ${BONSAI_INTRO_QUERY} {
       em {
-        animation-delay: ${Math.round(INTRO.text + INTRO.textSettle * 0.4)}ms;
+        animation-delay: ${GLINT_AT.intro}ms;
       }
     }
   }
@@ -326,13 +334,11 @@ const Tagline = styled.h1`
 
 /*
  * The subtext in bronze capitals, tracked like the header's links (owner,
- * 2026-10-30). All of it arrives at once with the usual entrance; then, as
- * in "timeless", a bone-white glint travels through it from left to right
- * and leaves it polished bronze. The bronze is the text's own fill, clipped
- * to it and repeated once per line; the band is a second layer 3 times the
- * box's width, so it starts clear of the first letter and ends clear of the
- * last on any number of lines. Reduced motion shows the polished bronze at
- * once.
+ * 2026-10-30). All of it arrives at once with the usual entrance; then,
+ * together with "timeless" and in the same way, a bone-white glint travels
+ * through it from left to right and leaves it polished bronze. The bronze is
+ * the text's own fill, clipped to it and repeated once per line. Reduced
+ * motion shows the polished bronze at once.
  */
 const SubText = styled.p`
   font-size: 1.1rem;
@@ -348,13 +354,7 @@ const SubText = styled.p`
 
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     background:
-      linear-gradient(
-          100deg,
-          transparent 0 38%,
-          ${({ theme }) => theme.colors.text} 45% 47%,
-          ${({ theme }) => theme.colors.primary} 54% 100%
-        )
-        0 0 / 300% 100% no-repeat,
+      ${glintBand},
       ${bronzeCaps} 0 0 / 100% 1.8em repeat-y;
     -webkit-background-clip: text;
     background-clip: text;
@@ -363,16 +363,14 @@ const SubText = styled.p`
     @media (prefers-reduced-motion: no-preference) {
       animation:
         ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 100ms both,
-        ${glint} ${GLISTEN_S}s ${GLINT_EASE} 700ms both;
+        ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
     }
 
-    /* Where the bonsai plays, it settles with the headline and catches the light just after "timeless" */
+    /* Where the bonsai plays, it settles with the headline and catches the light with "timeless" */
     @media ${BONSAI_INTRO_QUERY} {
       animation-name: ${heroSettle}, ${glint};
-      animation-duration: ${SETTLE_S}s, ${GLISTEN_S}s;
-      animation-delay:
-        ${INTRO.text + INTRO.textStep}ms,
-        ${Math.round(INTRO.text + INTRO.textSettle * 0.4) + INTRO.textStep}ms;
+      animation-duration: ${SETTLE_S}s, ${GLINT_S}s;
+      animation-delay: ${INTRO.text + INTRO.textStep}ms, ${GLINT_AT.intro}ms;
     }
   }
 `;
