@@ -256,7 +256,7 @@ const Tagline = styled.h1`
       text-shadow:
         0 0 0.18em ${({ theme }) => theme.colors.primary},
         0 0 0.5em ${({ theme }) => theme.colors.primary};
-      mask: linear-gradient(100deg, rgb(0 0 0 / 0.5) 0 44%, transparent 52%) 0 0 / 240% 100% no-repeat;
+      mask: linear-gradient(100deg, rgb(0 0 0 / 0.25) 0 44%, transparent 52%) 0 0 / 240% 100% no-repeat;
     }
 
     /* The band's halo, over the letters */
