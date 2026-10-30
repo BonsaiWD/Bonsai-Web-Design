@@ -10,7 +10,10 @@
  *      the hero. As the hero scrolls away the rest drain to the root;
  *   3. the roots: motes laid along roots grown down from the pot, with a
  *      taproot to the bottom of the hero, lit by a light that runs out
- *      along them as the tree dissolves (bonsaiRoots.ts).
+ *      along them as the tree dissolves (bonsaiRoots.ts);
+ *   4. the circuit: motes laid along PCB traces beneath the tree, lit by a
+ *      light that runs down them to the drain as the hero scrolls away
+ *      (bonsaiCircuit.ts). Same program as the roots, paced by the exit.
  * Every frame is a pure function of the uniforms in BonsaiFrame, so the
  * caller decides when to draw and nothing animates on its own.
  */
@@ -41,6 +44,8 @@ export interface BonsaiRenderer {
   layout(rect: [number, number, number, number], drain: [number, number]): void;
   /** Root motes from buildRoots, in CSS pixels of the canvas. */
   roots(data: Float32Array): void;
+  /** Circuit motes from buildCircuit, in CSS pixels of the canvas. */
+  circuit(data: Float32Array): void;
   draw(frame: BonsaiFrame): void;
   dispose(): void;
 }
@@ -154,21 +159,19 @@ const ROOT_VS = `#version 300 es
 in vec2 aPos;
 in vec4 aData;
 uniform vec2 uRes;
-uniform float uDpr, uDissolve, uExit, uTime;
+uniform float uDpr, uReach, uFade, uTime;
 out float vI;
 out float vHot;
 float sq(float x) { return x * x; }
 void main() {
   float t = aData.x, b = aData.y, s = aData.z, size = aData.w;
-  // A light runs down the roots as the tree turns to light. They stay a
-  // little longer than the tree as the hero leaves, so it drains into them.
-  float reach = clamp((uDissolve - 0.08) / 0.6, 0.0, 1.0) * 1.08;
-  float d = reach - t;
+  // A light runs along the motes as far as uReach (0..1.08 of the way),
+  // leaving them lit behind it; uFade takes them all out.
+  float d = uReach - t;
   float shown = smoothstep(0.0, 0.05, d);
-  float front = exp(-sq((d - 0.025) / 0.035)) * smoothstep(0.0, 0.02, reach) * (1.0 - smoothstep(1.0, 1.08, reach));
+  float front = exp(-sq((d - 0.025) / 0.035)) * smoothstep(0.0, 0.02, uReach) * (1.0 - smoothstep(1.0, 1.08, uReach));
   float twinkle = 0.75 + 0.25 * sin(uTime * (0.6 + 1.2 * fract(s * 31.7)) + s * 60.0);
-  float fade = 1.0 - smoothstep(0.25, 0.85, uExit);
-  float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * fade;
+  float I = (shown * b * 0.8 + front * (0.9 + b) * twinkle) * uFade;
   vI = I;
   vHot = clamp(front, 0.0, 1.0);
   vec2 c = aPos / uRes * 2.0 - 1.0;
@@ -192,6 +195,12 @@ void main() {
   float a = min(1.0, (core + halo) * vI);
   outColor = vec4(col * a, a);
 }`;
+
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const smoothstep = (a: number, b: number, x: number) => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
 
 const hexToRgb = (hex: string): [number, number, number] => {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -243,7 +252,7 @@ export function createBonsaiRenderer(
 
   const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uDim', 'uTint', 'uHot']);
   const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uEdgeMotes', 'uTint', 'uHot']);
-  const ru = uniforms(gl, rootPoints, ['uRes', 'uDpr', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
+  const ru = uniforms(gl, rootPoints, ['uRes', 'uDpr', 'uReach', 'uFade', 'uTime', 'uTint', 'uHot']);
   const tint = hexToRgb(colors.tint);
   const hot = hexToRgb(colors.hot);
 
@@ -271,20 +280,34 @@ export function createBonsaiRenderer(
   gl.enableVertexAttribArray(aData);
   gl.vertexAttribPointer(aData, 4, gl.FLOAT, false, stride, 8);
 
-  // Roots, filled in by roots() once the layout is known.
-  const rootVao = gl.createVertexArray()!;
-  const rootBuf = gl.createBuffer()!;
-  let rootCount = 0;
-  gl.bindVertexArray(rootVao);
-  gl.bindBuffer(gl.ARRAY_BUFFER, rootBuf);
+  // Roots and circuit, filled in once the layout is known.
   const rootStride = ROOT_STRIDE * 4;
   const rPos = gl.getAttribLocation(rootPoints, 'aPos');
   const rData = gl.getAttribLocation(rootPoints, 'aData');
-  gl.enableVertexAttribArray(rPos);
-  gl.vertexAttribPointer(rPos, 2, gl.FLOAT, false, rootStride, 0);
-  gl.enableVertexAttribArray(rData);
-  gl.vertexAttribPointer(rData, 4, gl.FLOAT, false, rootStride, 8);
-  gl.bindVertexArray(null);
+  const moteSet = () => {
+    const vao = gl.createVertexArray()!;
+    const buf = gl.createBuffer()!;
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.enableVertexAttribArray(rPos);
+    gl.vertexAttribPointer(rPos, 2, gl.FLOAT, false, rootStride, 0);
+    gl.enableVertexAttribArray(rData);
+    gl.vertexAttribPointer(rData, 4, gl.FLOAT, false, rootStride, 8);
+    gl.bindVertexArray(null);
+    const set = {
+      vao,
+      buf,
+      count: 0,
+      fill(data: Float32Array) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        set.count = data.length / ROOT_STRIDE;
+      },
+    };
+    return set;
+  };
+  const rootSet = moteSet();
+  const circuitSet = moteSet();
 
   // Textures.
   const photoTex = gl.createTexture()!;
@@ -323,9 +346,10 @@ export function createBonsaiRenderer(
       drain = d;
     },
     roots(data) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, rootBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-      rootCount = data.length / ROOT_STRIDE;
+      rootSet.fill(data);
+    },
+    circuit(data) {
+      circuitSet.fill(data);
     },
     draw(f) {
       gl.viewport(0, 0, canvas.width, canvas.height);
@@ -372,25 +396,35 @@ export function createBonsaiRenderer(
       gl.bindVertexArray(pointVao);
       gl.drawArrays(gl.POINTS, 0, data.count);
 
-      if (rootCount) {
-        gl.useProgram(rootPoints);
-        gl.uniform2fv(ru.uRes, res);
-        gl.uniform1f(ru.uDpr, dpr);
-        gl.uniform1f(ru.uDissolve, f.dissolve);
-        gl.uniform1f(ru.uExit, f.exit);
-        gl.uniform1f(ru.uTime, f.time);
-        gl.uniform3fv(ru.uTint, tint);
-        gl.uniform3fv(ru.uHot, hot);
-        gl.bindVertexArray(rootVao);
-        gl.drawArrays(gl.POINTS, 0, rootCount);
+      gl.useProgram(rootPoints);
+      gl.uniform2fv(ru.uRes, res);
+      gl.uniform1f(ru.uDpr, dpr);
+      gl.uniform1f(ru.uTime, f.time);
+      gl.uniform3fv(ru.uTint, tint);
+      gl.uniform3fv(ru.uHot, hot);
+      const motes = [
+        // The roots light up as the tree turns to light, and stay a little
+        // longer than the tree as the hero leaves, so it drains into them.
+        { set: rootSet, reach: clamp01((f.dissolve - 0.08) / 0.6) * 1.08, fade: 1 - smoothstep(0.25, 0.85, f.exit) },
+        // The circuit lights up as the tree drains, down to where it drains.
+        { set: circuitSet, reach: clamp01((f.exit - 0.03) / 0.5) * 1.08, fade: 1 - smoothstep(0.7, 1, f.exit) },
+      ];
+      for (const { set, reach, fade } of motes) {
+        if (!set.count || reach <= 0 || fade <= 0) continue;
+        gl.uniform1f(ru.uReach, reach);
+        gl.uniform1f(ru.uFade, fade);
+        gl.bindVertexArray(set.vao);
+        gl.drawArrays(gl.POINTS, 0, set.count);
       }
       gl.bindVertexArray(null);
     },
     dispose() {
       gl.deleteBuffer(quadBuf);
       gl.deleteBuffer(pointBuf);
-      gl.deleteBuffer(rootBuf);
-      gl.deleteVertexArray(rootVao);
+      for (const set of [rootSet, circuitSet]) {
+        gl.deleteBuffer(set.buf);
+        gl.deleteVertexArray(set.vao);
+      }
       gl.deleteProgram(rootPoints);
       gl.deleteVertexArray(quadVao);
       gl.deleteVertexArray(pointVao);
