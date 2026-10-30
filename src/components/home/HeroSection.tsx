@@ -365,6 +365,19 @@ const SubText = styled.p`
   text-transform: uppercase;
   text-wrap: balance;
 
+  /*
+   * Where the button rests in the tree (CtaRow), the content keeps the height
+   * CONTENT_HEIGHT was measured at, with a two-line subtext: the one line
+   * (owner, 2026-10-30) sits centred where the two were, so the headline and
+   * button stay where they were set.
+   */
+  @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
+    ${HeroWrapper}:not([data-bonsai='still']) & {
+      margin-top: 0.9em;
+      margin-bottom: calc(${({ theme }) => theme.spacing.xl} + 0.9em);
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     animation: ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both;
   }
@@ -581,7 +594,7 @@ export default function HeroSection() {
           </Tagline>
 
           <SubText>
-            We design websites that make a lasting impression without compromising polish for performance.
+            Bespoke websites that make a lasting impression.
           </SubText>
 
           <CtaRow>
