@@ -217,7 +217,7 @@ const navItems = [
   { href: '#contact', label: 'Contact', delay: 0.25 },
 ];
 
-const CTA = { href: '#contact', label: 'Plant a project', delay: 0.3 };
+const CTA = { href: '#contact', label: 'Plant your project', delay: 0.3 };
 
 export default function Header() {
   const [hidden, setHidden] = useState(false);

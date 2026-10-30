@@ -515,7 +515,7 @@ export default function HeroSection() {
           </SubText>
 
           <CtaRow>
-            <PrimaryCta href="#contact">Plant a project</PrimaryCta>
+            <PrimaryCta href="#contact">Plant your project</PrimaryCta>
             <SecondaryCta href="#portfolio">See the work</SecondaryCta>
           </CtaRow>
 
