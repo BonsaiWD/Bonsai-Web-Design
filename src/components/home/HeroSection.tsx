@@ -6,7 +6,7 @@ import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
-import { frostedGlass } from '@/styles/frosted';
+import { clearGlass, frostedGlass } from '@/styles/frosted';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
 import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE_HEIGHT } from './bonsai/timeline';
@@ -97,10 +97,11 @@ const entrance = (delayMs: number) => css`
 /*
  * Phones and short windows: the hero grows to fit its CTAs instead of clipping
  * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 444px tall and the cue 88px tall, 40px from the bottom, so the cue
- * clears the price line by at least 16px from 736px tall.
+ * about 462px tall and the cue 88px tall, 40px from the bottom, so the cue
+ * clears the buttons by at least 16px from 750px tall.
  */
-const COMPACT = '(max-width: 767px), (max-height: 735px)';
+const COMPACT_HEIGHT = 749;
+const COMPACT = `(max-width: 767px), (max-height: ${COMPACT_HEIGHT}px)`;
 
 /*
  * The section is a stage around a pinned layer that holds everything. Where
@@ -325,45 +326,30 @@ const focusRing = css`
 const POT_SHIFT =
   ((BONSAI_SOURCE.pot[0] + BONSAI_SOURCE.pot[1]) / 2 - 0.5) * (BONSAI_SOURCE.crop.w / BONSAI_SOURCE.crop.h);
 
+/*
+ * The two actions stack at one width, "Plant your project" first and "See
+ * the work" in quieter clear glass beneath it (owner, 2026-10-30).
+ *
+ * Where the tree is drawn behind them and the hero isn't compact, the stack
+ * floats in the pot: it shifts left from the page's centre to the lit part of
+ * the pot, which sits left of the tree's own centre. The tree is a share of
+ * the pinned layer's height (as in BonsaiCanvas), so the shift is too. The
+ * still fallback frames the photo differently and keeps the stack centred.
+ */
 const CtaRow = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.xl};
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
   ${entrance(200)}
 
-  @media (max-width: 767px) {
-    column-gap: ${({ theme }) => theme.spacing.lg};
-  }
-
-  /*
-   * Where the tree is drawn behind it and the hero isn't compact,
-   * "Plant your project" floats in the pot (owner, 2026-10-30). The grid
-   * centres the button on the page, with "See the work" to its right, and the
-   * row shifts left to the lit part of the pot, which sits left of the tree's
-   * centre. The tree is a share of the pinned layer's height (as in
-   * BonsaiCanvas), so the shift is too. The still fallback frames the photo
-   * differently and keeps the centred row.
-   */
-  @media ${BONSAI_INTRO_QUERY} and (min-height: 736px) {
+  @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
     ${HeroWrapper}:not([data-bonsai='still']) & {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
       translate: calc(${POT_SHIFT.toFixed(3)} * min(${TREE_HEIGHT.share * 100}svh, ${TREE_HEIGHT.max}px)) 0;
-
-      & > :first-child {
-        grid-column: 2;
-      }
-
-      & > :last-child {
-        justify-self: start;
-      }
     }
   }
 `;
 
-const PrimaryCta = styled.a`
+const cta = css`
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -373,10 +359,15 @@ const PrimaryCta = styled.a`
   padding: 0 ${({ theme }) => `calc(${theme.spacing.lg} - 0.15em) 0 ${theme.spacing.lg}`};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.85rem;
-  font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   border-radius: 0;
+  ${focusRing}
+`;
+
+const PrimaryCta = styled.a`
+  ${cta}
+  font-weight: 600;
   ${frostedGlass}
 
   /* Bronze hover halo (0.15), faded in on opacity rather than box-shadow */
@@ -393,56 +384,12 @@ const PrimaryCta = styled.a`
   &:hover::after {
     opacity: 1;
   }
-
-  ${focusRing}
 `;
 
 const SecondaryCta = styled.a`
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
-  font-family: ${({ theme }) => theme.fonts.main};
-  font-size: 0.85rem;
-  font-weight: 400;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.text};
-  text-decoration: underline;
-  text-decoration-color: ${({ theme }) => theme.colors.primary};
-  text-decoration-thickness: 1px;
-  text-underline-offset: 6px;
-  transition: color ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
-
-  &:hover {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-
-  ${focusRing}
-`;
-
-const PriceLine = styled.p`
-  font-family: ${({ theme }) => theme.fonts.main};
-  font-size: 0.85rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  margin: ${({ theme }) => theme.spacing.lg} 0 0;
-  ${entrance(300)}
-`;
-
-const PriceClause = styled.span`
-  @media (max-width: 767px) {
-    display: block;
-  }
-`;
-
-const PriceSeparator = styled.span`
-  color: ${({ theme }) => theme.colors.primary};
-
-  /* On phones the two clauses stack, so the dot is not needed */
-  @media (max-width: 767px) {
-    display: none;
-  }
+  ${cta}
+  font-weight: 500;
+  ${clearGlass}
 `;
 
 const ScrollIndicator = styled.div`
@@ -466,7 +413,7 @@ const ScrollIndicator = styled.div`
     display: none;
   }
 
-  /* Where the hero is compact the cue would sit on the price line */
+  /* Where the hero is compact the cue would sit on the buttons */
   @media ${COMPACT} {
     display: none;
   }
@@ -544,12 +491,6 @@ export default function HeroSection() {
             <PrimaryCta href="#contact">Plant your project</PrimaryCta>
             <SecondaryCta href="#portfolio">See the work</SecondaryCta>
           </CtaRow>
-
-          <PriceLine>
-            <PriceClause>Custom sites from $1500 per page</PriceClause>{' '}
-            <PriceSeparator>·</PriceSeparator>{' '}
-            <PriceClause>Updates and care at $120/hr</PriceClause>
-          </PriceLine>
         </Content>
 
         <ScrollIndicator>
