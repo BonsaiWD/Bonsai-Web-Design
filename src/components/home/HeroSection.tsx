@@ -281,7 +281,8 @@ const Tagline = styled.h1`
     font-family: ${({ theme }) => theme.fonts.caps};
     font-size: 0.4em;
     font-style: normal;
-    font-weight: 400;
+    /* Lighter, near the header's 300 but not as faint (owner, 2026-10-30) */
+    font-weight: 350;
     letter-spacing: 0.2em;
     color: ${({ theme }) => theme.colors.primary};
   }
