@@ -261,11 +261,13 @@ const PreTitle = styled.span`
 /*
  * Capitals tracked like the BONSAI wordmark, in Italiana, lighter and with
  * subtler serifs than its Playfair (owner, 2026-10-30), over the statements
- * in widely tracked Jost capitals.
+ * in Jost capitals. At half its size and tracked 0.1em, even the longest
+ * statement stays within its width (owner, 2026-10-30).
  */
 const Tagline = styled.h1`
   font-family: ${({ theme }) => theme.fonts.display};
-  font-size: 2.25rem;
+  /* On phones as large as one line allows: it runs about 9.7 times its size */
+  font-size: min(2.25rem, calc((100vw - 2 * ${({ theme }) => theme.spacing.md}) / 10));
   line-height: 1.1;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -276,14 +278,13 @@ const Tagline = styled.h1`
   text-wrap: balance;
   ${entrance(0)}
 
-  /* On phones smaller, so the longest statement still fits one line */
   em {
     font-family: ${({ theme }) => theme.fonts.caps};
-    font-size: 0.4em;
+    font-size: 0.5em;
     font-style: normal;
     /* Lighter, near the header's 300 but not as faint (owner, 2026-10-30) */
     font-weight: 350;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.1em;
     color: ${({ theme }) => theme.colors.primary};
   }
 
@@ -300,7 +301,7 @@ const Tagline = styled.h1`
     em {
       position: relative;
       display: inline-block;
-      padding: 0.5em 0.6em 0.5em 0.8em;
+      padding: 0.5em 0.6em 0.5em 0.7em;
       margin: -0.5em -0.6em;
       background:
         ${glintBand},
@@ -347,10 +348,6 @@ const Tagline = styled.h1`
 
   @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
     font-size: 3.75rem;
-
-    em {
-      font-size: 0.5em;
-    }
   }
 `;
 
