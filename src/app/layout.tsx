@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Jost, Marcellus, Playfair_Display } from 'next/font/google';
+import { Inter, Italiana, Jost, Playfair_Display } from 'next/font/google';
 import StyledComponentsRegistry from '@/lib/registry';
 import Providers from '@/lib/providers';
 
@@ -26,12 +26,12 @@ const jost = Jost({
   variable: '--font-jost',
 });
 
-// Light, flared capitals with barely-there serifs: the hero headline (owner's choice, 2026-10-30)
-const marcellus = Marcellus({
+// Thin, tall capitals with barely-there serifs: the hero headline (owner's choice, 2026-10-30)
+const italiana = Italiana({
   subsets: ['latin'],
   weight: '400',
   display: 'swap',
-  variable: '--font-marcellus',
+  variable: '--font-italiana',
 });
 
 export const metadata: Metadata = {
@@ -45,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable} ${jost.variable} ${marcellus.variable}`}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable} ${jost.variable} ${italiana.variable}`}>
       <body>
         <StyledComponentsRegistry>
           <Providers>{children}</Providers>
