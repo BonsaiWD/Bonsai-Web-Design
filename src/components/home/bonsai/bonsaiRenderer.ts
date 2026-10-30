@@ -1,8 +1,9 @@
 /*
  * Raw WebGL2 renderer for the hero bonsai (no 3D library). Two passes:
  *   1. the plate: the photographed tree, revealed along its growth field and
- *      erased pixel by pixel as it dissolves, with a faint bronze light on
- *      the growing edge;
+ *      erased pixel by pixel as it dissolves. A band of bronze light, with a
+ *      bone-white core and a fading wake, travels up the trunk and out along
+ *      the branches at the growing edge;
  *   2. the particles: additive points that flash at the growing edge, sparkle
  *      as the tree dissolves, settle into a dim constellation and, as the
  *      hero scrolls away, drain to the root at the bottom of the hero.
@@ -50,7 +51,7 @@ in vec2 vUv;
 uniform sampler2D uPhoto;
 uniform sampler2D uField;
 uniform float uIntro, uGrow, uDissolve, uExit;
-uniform vec3 uTint;
+uniform vec3 uTint, uHot;
 out vec4 outColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float sq(float x) { return x * x; }
@@ -67,8 +68,14 @@ void main() {
   float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(luma), c, 0.82);
   float a = m * grown * keep * uIntro * (1.0 - uExit);
-  float band = exp(-sq((t - uGrow + 0.02) / 0.018)) * m * (1.0 - smoothstep(1.0, 1.05, uGrow));
-  vec3 glow = uTint * band * 0.45 * uIntro;
+  // The travelling light: a soft halo, a bright core and a wake behind it.
+  // Not on the pot (t = 0), which is there from the start.
+  float d = uGrow - 0.015 - t;
+  float halo = exp(-sq(d / 0.03));
+  float core = exp(-sq(d / 0.008));
+  float wake = d > 0.0 ? exp(-d / 0.07) : 0.0;
+  float live = m * step(0.006, t) * (1.0 - smoothstep(1.0, 1.05, uGrow)) * uIntro * keep;
+  vec3 glow = (uTint * (0.42 * halo + 0.28 * wake) + uHot * 0.45 * core) * live;
   outColor = vec4(c * a + glow, max(a, max(glow.r, max(glow.g, glow.b))));
 }`;
 
@@ -87,8 +94,8 @@ void main() {
   float lum = aData.x, t = aData.y, s = aData.z, size = aData.w;
   vec2 p = uRect.xy + aHome * uRect.zw;
 
-  // A brief flash where the growing edge passes.
-  float front = exp(-sq((uGrow - 0.025 - t) / 0.03)) * step(0.01, uGrow)
+  // Motes flare where the travelling light passes.
+  float front = exp(-sq((uGrow - 0.02 - t) / 0.025)) * step(0.006, t)
     * (1.0 - smoothstep(1.0, 1.05, uGrow)) * uIntro;
 
   // Dissolve: tips first, trunk last; sparkle, then settle dim and still.
@@ -111,13 +118,13 @@ void main() {
 
   // About one mote in twenty-five is a glint: larger, hotter, longer-lived.
   float glint = step(0.96, fract(s * 91.7));
-  float I = (front * (0.45 + lum) + spark * twinkle * (0.5 + 0.8 * lum) * (1.0 + 1.6 * glint)
+  float I = (front * (1.2 + 1.2 * lum) + spark * twinkle * (0.5 + 0.8 * lum) * (1.0 + 1.6 * glint)
     + rest * (1.0 + 0.8 * glint)) * drain;
   vI = I;
-  vHot = clamp((spark * twinkle + front * 0.7) * (1.0 + glint), 0.0, 1.0);
+  vHot = clamp((spark * twinkle + front) * (1.0 + glint), 0.0, 1.0);
   vec2 c = p / uRes * 2.0 - 1.0;
   gl_Position = I < 0.004 ? vec4(2.0, 2.0, 2.0, 1.0) : vec4(c.x, -c.y, 0.0, 1.0);
-  gl_PointSize = clamp(size * (1.0 + 0.8 * spark + 0.5 * front) * (1.0 + 1.4 * glint) * 2.2 * uDpr, 1.0, 32.0);
+  gl_PointSize = clamp(size * (1.0 + 0.8 * spark + 0.9 * front) * (1.0 + 1.4 * glint) * 2.2 * uDpr, 1.0, 32.0);
 }`;
 
 const POINT_FS = `#version 300 es
@@ -183,7 +190,7 @@ export function createBonsaiRenderer(
     return null;
   }
 
-  const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTint']);
+  const pu = uniforms(gl, plate, ['uRect', 'uRes', 'uPhoto', 'uField', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTint', 'uHot']);
   const qu = uniforms(gl, points, ['uRect', 'uRes', 'uDrain', 'uDpr', 'uIntro', 'uGrow', 'uDissolve', 'uExit', 'uTime', 'uTint', 'uHot']);
   const tint = hexToRgb(colors.tint);
   const hot = hexToRgb(colors.hot);
@@ -271,6 +278,7 @@ export function createBonsaiRenderer(
         gl.uniform1f(pu.uDissolve, f.dissolve);
         gl.uniform1f(pu.uExit, f.exit);
         gl.uniform3fv(pu.uTint, tint);
+        gl.uniform3fv(pu.uHot, hot);
         gl.bindVertexArray(quadVao);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       }
