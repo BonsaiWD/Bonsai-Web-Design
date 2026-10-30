@@ -74,9 +74,10 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, onFallback }
     };
 
     /*
-     * Prototype switch (?dissolve=scroll): the tree holds, dimmed behind the
-     * text, until the first scroll, then dissolves at its usual pace.
-     * Otherwise it dissolves on its own as the text arrives.
+     * Two dissolves, both kept by the owner (2026-10-29). By default the tree
+     * dissolves on its own as the text arrives. With ?dissolve=scroll it
+     * holds, dimmed behind the text, until the first scroll, then dissolves
+     * at its usual pace.
      */
     const onScroll = new URLSearchParams(window.location.search).get('dissolve') === 'scroll';
     const dissolveLength = INTRO.dissolveEnd - INTRO.dissolveStart;
