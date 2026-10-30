@@ -1,6 +1,6 @@
 'use client';
 
-import styled, { css, keyframes } from 'styled-components';
+import styled, { css, keyframes, type DefaultTheme } from 'styled-components';
 import { motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
 import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
@@ -40,14 +40,12 @@ const SETTLE_S = INTRO.textSettle / 1000;
 /*
  * "timeless" catches the light once as it lands (owner's request,
  * 2026-10-30): a bone-white glint with a bronze halo travels through the word
- * from left to right, like the light through the tree, and leaves a soft
- * glow behind the solid bronze letters, with a bevel (light on their upper
- * edges, shade under the lower) so they stand out from it (owner, the same
- * day). The glint is the word's own fill, a gradient clipped to the text; the
- * halo is a copy of the word drawn only as its text-shadow, masked to the
- * same band, and the glow and bevel it leaves are another copy beneath the
- * letters, so they never veil them. All three share one box, so they move
- * together. The glowing word is the resting state, so reduced motion shows
+ * from left to right, like the light through the tree, and leaves it
+ * polished bronze (owner, the same day; a resting glow and a bevel were tried
+ * and dropped). The glint and the polish are the word's own fill, gradients
+ * clipped to the text; the halo is a copy of the word drawn only as its
+ * text-shadow, masked to the same band. They share one box, so they move
+ * together. The polished word is the resting state, so reduced motion shows
  * it too, without the sweep.
  */
 const glint = keyframes`
@@ -56,6 +54,33 @@ const glint = keyframes`
 `;
 const GLINT_S = 3.6;
 const GLINT_EASE = 'cubic-bezier(0.37, 0, 0.63, 1)';
+
+/** Bronze lit toward bone, or shaded toward the page's own dark, which polished metal reflects. */
+const lit = (pct: number) => ({ theme }: { theme: DefaultTheme }) =>
+  `color-mix(in srgb, ${theme.colors.primary}, ${theme.colors.text} ${pct}%)`;
+const shade = (pct: number) => ({ theme }: { theme: DefaultTheme }) =>
+  `color-mix(in srgb, ${theme.colors.primary}, ${theme.colors.background} ${pct}%)`;
+
+/*
+ * Polished bronze lit from above: bright where the light meets the tops of
+ * the letters, a dark horizon across the lowercase, and light bouncing up
+ * near the baseline. The stops are in em down the word's box (0.5em padding,
+ * then a 1.1 line): the ascenders reach up to 0.66em, the lowercase runs from
+ * 0.93em to the baseline at 1.46em.
+ */
+const polishedBronze = css`
+  linear-gradient(
+    180deg,
+    ${shade(40)} 0.66em,
+    ${lit(45)} 0.8em,
+    ${lit(60)} 0.93em,
+    ${lit(10)} 1.1em,
+    ${shade(55)} 1.17em,
+    ${shade(30)} 1.22em,
+    ${lit(25)} 1.4em,
+    ${shade(15)} 1.48em
+  )
+`;
 
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
@@ -219,8 +244,9 @@ const Tagline = styled.h1`
    * The padding gives the halo room (and the italic its overhang); the
    * negative margin takes it back out of the line. The band sits in a gradient
    * 2.4 times the box's width, so moving it from 100% to 0% sweeps it from just
-   * before the first letter to just past the last. Everything left of the band
-   * keeps the glow, so 0% (where it rests) glows all through.
+   * before the first letter to just past the last. Ahead of the band the word
+   * is flat bronze; behind it the band's layer is clear and the polished
+   * bronze beneath shows, so 0% (where it rests) is polished all through.
    */
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     em {
@@ -228,48 +254,35 @@ const Tagline = styled.h1`
       display: inline-block;
       padding: 0.5em 0.6em;
       margin: -0.5em -0.6em;
-      background: linear-gradient(
-          100deg,
-          ${({ theme }) => theme.colors.primary} 0 41%,
-          ${({ theme }) => theme.colors.text} 48% 52%,
-          ${({ theme }) => theme.colors.primary} 59% 100%
-        )
-        0 0 / 240% 100% no-repeat;
+      background:
+        linear-gradient(
+            100deg,
+            transparent 0 41%,
+            ${({ theme }) => theme.colors.text} 48% 52%,
+            ${({ theme }) => theme.colors.primary} 59% 100%
+          )
+          0 0 / 240% 100% no-repeat,
+        ${polishedBronze};
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    em::before,
+    /* The band's halo, over the letters */
     em::after {
       content: attr(data-glow) / '';
       position: absolute;
       inset: 0;
       padding: inherit;
       white-space: nowrap;
-      pointer-events: none;
-      user-select: none;
-      animation: inherit;
-    }
-
-    /* What the band leaves, beneath the letters: bevel (seen only at their edges), then glow */
-    em::before {
-      z-index: -1;
-      text-shadow:
-        -0.012em -0.016em 0 ${({ theme }) => `color-mix(in srgb, ${theme.colors.text} 55%, transparent)`},
-        0.016em 0.024em 0 ${({ theme }) => `color-mix(in srgb, ${theme.colors.background} 90%, transparent)`},
-        0 0 0.18em ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 50%, transparent)`},
-        0 0 0.5em ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 50%, transparent)`};
-      mask: linear-gradient(100deg, #000 0 44%, transparent 52%) 0 0 / 240% 100% no-repeat;
-    }
-
-    /* The band's halo, over the letters */
-    em::after {
       text-shadow:
         0 0 0.06em ${({ theme }) => theme.colors.text},
         0 0 0.18em ${({ theme }) => theme.colors.primary},
         0 0 0.5em ${({ theme }) => theme.colors.primary};
       mask: linear-gradient(100deg, transparent 0 41%, #000 48% 52%, transparent 59%) 0 0 / 240% 100% no-repeat;
+      pointer-events: none;
+      user-select: none;
+      animation: inherit;
     }
 
     @media (prefers-reduced-motion: no-preference) {
