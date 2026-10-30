@@ -6,6 +6,7 @@ import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { DUR, EASE_OUT } from '@/lib/motion';
+import { frostedGlass } from '@/styles/frosted';
 
 const EASE = `cubic-bezier(${EASE_OUT.join(', ')})`;
 
@@ -129,23 +130,13 @@ const HeaderCta = styled.a`
   min-height: 40px;
   padding: 0 ${({ theme }) => theme.spacing.md};
   margin-left: ${({ theme }) => theme.spacing.sm};
-  border: 1px solid ${({ theme }) => theme.colors.primary};
   border-radius: 0;
-  background-color: transparent;
-  color: ${({ theme }) => theme.colors.primary};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  transition:
-    background-color ${DUR.hover}s ${EASE},
-    color ${DUR.hover}s ${EASE};
-
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.background};
-  }
+  ${frostedGlass}
 
   ${focusRing}
 
@@ -207,22 +198,13 @@ const MobileCta = styled(motion.a)`
   justify-content: center;
   min-height: 48px;
   padding: 0 ${({ theme }) => theme.spacing.xl};
-  border: 1px solid ${({ theme }) => theme.colors.primary};
   border-radius: 0;
-  color: ${({ theme }) => theme.colors.primary};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  transition:
-    background-color ${DUR.hover}s ${EASE},
-    color ${DUR.hover}s ${EASE};
-
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.background};
-  }
+  ${frostedGlass}
 
   ${focusRing}
 `;
@@ -235,7 +217,7 @@ const navItems = [
   { href: '#contact', label: 'Contact', delay: 0.25 },
 ];
 
-const CTA = { href: '#contact', label: 'Start a project', delay: 0.3 };
+const CTA = { href: '#contact', label: 'Plant a project', delay: 0.3 };
 
 export default function Header() {
   const [hidden, setHidden] = useState(false);

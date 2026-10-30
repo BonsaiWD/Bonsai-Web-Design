@@ -6,6 +6,7 @@ import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
+import { frostedGlass } from '@/styles/frosted';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
 import { BONSAI_INTRO_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
@@ -236,16 +237,13 @@ const PrimaryCta = styled.a`
   justify-content: center;
   min-height: 48px;
   padding: 0 ${({ theme }) => theme.spacing.xl};
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: ${({ theme }) => theme.colors.background};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   border-radius: 0;
-  /* Override GlobalStyle's a { transition: all }; only the halo below fades */
-  transition: none;
+  ${frostedGlass}
 
   @media (max-width: 767px) {
     padding: 0 ${({ theme }) => theme.spacing.lg};
@@ -400,7 +398,7 @@ export default function HeroSection() {
           </SubText>
 
           <CtaRow>
-            <PrimaryCta href="#contact">Start a project</PrimaryCta>
+            <PrimaryCta href="#contact">Plant a project</PrimaryCta>
             <SecondaryCta href="#portfolio">See the work</SecondaryCta>
           </CtaRow>
 
