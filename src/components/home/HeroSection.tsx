@@ -41,12 +41,14 @@ const SETTLE_S = INTRO.textSettle / 1000;
  * "timeless" catches the light once as it lands (owner's request,
  * 2026-10-30): a bone-white glint with a bronze halo travels through the word
  * from left to right, like the light through the tree, and leaves a soft
- * glow behind the solid bronze letters (owner, the same day). The glint is
- * the word's own fill, a gradient clipped to the text; the halo is a copy of
- * the word drawn only as its text-shadow, masked to the same band, and the
- * glow it leaves is another copy beneath the letters, so it never veils
- * them. All three share one box, so they move together. The glowing word is
- * the resting state, so reduced motion shows it too, without the sweep.
+ * glow behind the solid bronze letters, with a bevel (light on their upper
+ * edges, shade under the lower) so they stand out from it (owner, the same
+ * day). The glint is the word's own fill, a gradient clipped to the text; the
+ * halo is a copy of the word drawn only as its text-shadow, masked to the
+ * same band, and the glow and bevel it leaves are another copy beneath the
+ * letters, so they never veil them. All three share one box, so they move
+ * together. The glowing word is the resting state, so reduced motion shows
+ * it too, without the sweep.
  */
 const glint = keyframes`
   from { background-position: 100% 0; mask-position: 100% 0; }
@@ -250,13 +252,15 @@ const Tagline = styled.h1`
       animation: inherit;
     }
 
-    /* The glow the band leaves, beneath the letters */
+    /* What the band leaves, beneath the letters: bevel (seen only at their edges), then glow */
     em::before {
       z-index: -1;
       text-shadow:
-        0 0 0.18em ${({ theme }) => theme.colors.primary},
-        0 0 0.5em ${({ theme }) => theme.colors.primary};
-      mask: linear-gradient(100deg, rgb(0 0 0 / 0.25) 0 44%, transparent 52%) 0 0 / 240% 100% no-repeat;
+        -0.012em -0.016em 0 ${({ theme }) => `color-mix(in srgb, ${theme.colors.text} 55%, transparent)`},
+        0.016em 0.024em 0 ${({ theme }) => `color-mix(in srgb, ${theme.colors.background} 90%, transparent)`},
+        0 0 0.18em ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 50%, transparent)`},
+        0 0 0.5em ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 50%, transparent)`};
+      mask: linear-gradient(100deg, #000 0 44%, transparent 52%) 0 0 / 240% 100% no-repeat;
     }
 
     /* The band's halo, over the letters */
