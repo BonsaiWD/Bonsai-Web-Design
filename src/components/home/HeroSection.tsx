@@ -1,6 +1,6 @@
 'use client';
 
-import styled, { css, keyframes } from 'styled-components';
+import styled, { css, keyframes, type DefaultTheme } from 'styled-components';
 import { motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
 import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
@@ -36,6 +36,51 @@ const fadeIn = keyframes`
 `;
 
 const SETTLE_S = INTRO.textSettle / 1000;
+
+/*
+ * "timeless" catches the light once as it lands (owner's request,
+ * 2026-10-30): a bone-white glint with a bronze halo travels through the word
+ * from left to right, like the light through the tree, and leaves it
+ * polished bronze (owner, the same day; a resting glow and a bevel were tried
+ * and dropped). The glint and the polish are the word's own fill, gradients
+ * clipped to the text; the halo is a copy of the word drawn only as its
+ * text-shadow, masked to the same band. They share one box, so they move
+ * together. The polished word is the resting state, so reduced motion shows
+ * it too, without the sweep.
+ */
+const glint = keyframes`
+  from { background-position: 100% 0; mask-position: 100% 0; }
+  to { background-position: 0 0; mask-position: 0 0; }
+`;
+const GLINT_S = 3.6;
+const GLINT_EASE = 'cubic-bezier(0.37, 0, 0.63, 1)';
+
+/** Bronze lit toward bone, or shaded toward the page's own dark, which polished metal reflects. */
+const lit = (pct: number) => ({ theme }: { theme: DefaultTheme }) =>
+  `color-mix(in srgb, ${theme.colors.primary}, ${theme.colors.text} ${pct}%)`;
+const shade = (pct: number) => ({ theme }: { theme: DefaultTheme }) =>
+  `color-mix(in srgb, ${theme.colors.primary}, ${theme.colors.background} ${pct}%)`;
+
+/*
+ * Polished bronze lit from above: bright where the light meets the tops of
+ * the letters, a dark horizon across the lowercase, and light bouncing up
+ * near the baseline. The stops are in em down the word's box (0.5em padding,
+ * then a 1.1 line): the ascenders reach up to 0.66em, the lowercase runs from
+ * 0.93em to the baseline at 1.46em.
+ */
+const polishedBronze = css`
+  linear-gradient(
+    180deg,
+    ${shade(40)} 0.66em,
+    ${lit(45)} 0.8em,
+    ${lit(60)} 0.93em,
+    ${lit(10)} 1.1em,
+    ${shade(28)} 1.17em,
+    ${shade(12)} 1.22em,
+    ${lit(25)} 1.4em,
+    ${shade(15)} 1.48em
+  )
+`;
 
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
@@ -193,6 +238,65 @@ const Tagline = styled.h1`
     font-family: ${({ theme }) => theme.fonts.heading};
     font-style: italic;
     color: ${({ theme }) => theme.colors.primary};
+  }
+
+  /*
+   * The padding gives the halo room (and the italic its overhang); the
+   * negative margin takes it back out of the line. The band sits in a gradient
+   * 2.4 times the box's width, so moving it from 100% to 0% sweeps it from just
+   * before the first letter to just past the last. Ahead of the band the word
+   * is flat bronze; behind it the band's layer is clear and the polished
+   * bronze beneath shows, so 0% (where it rests) is polished all through.
+   */
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    em {
+      position: relative;
+      display: inline-block;
+      padding: 0.5em 0.6em;
+      margin: -0.5em -0.6em;
+      background:
+        linear-gradient(
+            100deg,
+            transparent 0 41%,
+            ${({ theme }) => theme.colors.text} 48% 52%,
+            ${({ theme }) => theme.colors.primary} 59% 100%
+          )
+          0 0 / 240% 100% no-repeat,
+        ${polishedBronze};
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* The band's halo, over the letters */
+    em::after {
+      content: attr(data-glow) / '';
+      position: absolute;
+      inset: 0;
+      padding: inherit;
+      white-space: nowrap;
+      text-shadow:
+        0 0 0.06em ${({ theme }) => theme.colors.text},
+        0 0 0.18em ${({ theme }) => theme.colors.primary},
+        0 0 0.5em ${({ theme }) => theme.colors.primary};
+      mask: linear-gradient(100deg, transparent 0 41%, #000 48% 52%, transparent 59%) 0 0 / 240% 100% no-repeat;
+      pointer-events: none;
+      user-select: none;
+      animation: inherit;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      em {
+        animation: ${glint} ${GLINT_S}s ${GLINT_EASE} 600ms both;
+      }
+    }
+
+    /* Where the bonsai plays, the glint runs as the headline lands, with the tree's last growth */
+    @media ${BONSAI_INTRO_QUERY} {
+      em {
+        animation-delay: ${Math.round(INTRO.text + INTRO.textSettle * 0.4)}ms;
+      }
+    }
   }
 
   @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
@@ -403,7 +507,7 @@ export default function HeroSection() {
           <PreTitle>Est. 2022</PreTitle>
 
           <Tagline ref={headlineRef}>
-            Crafting <em>timeless</em> digital legacies.
+            Crafting <em data-glow="timeless">timeless</em> digital legacies.
           </Tagline>
 
           <SubText>
