@@ -333,12 +333,22 @@ const Tagline = styled.h1`
 `;
 
 /*
+ * The subtext fades in more gently than the other lines (owner, 2026-10-30):
+ * half as long again, on an even curve, with a smaller rise and no blur.
+ */
+const gentleIn = keyframes`
+  from { opacity: 0; transform: translateY(${RISE.word}px); }
+  to { opacity: 1; transform: none; }
+`;
+const GENTLE_S = { quick: DUR.hero * 2, intro: SETTLE_S * 1.5 };
+
+/*
  * The subtext in bronze capitals, tracked like the header's links (owner,
- * 2026-10-30). All of it arrives at once with the usual entrance; then,
- * together with "timeless" and in the same way, a bone-white glint travels
- * through it from left to right and leaves it polished bronze. The bronze is
- * the text's own fill, clipped to it and repeated once per line. Reduced
- * motion shows the polished bronze at once.
+ * 2026-10-30). All of it arrives at once, gently; then, together with
+ * "timeless" and in the same way, a bone-white glint travels through it from
+ * left to right and leaves it polished bronze. The bronze is the text's own
+ * fill, clipped to it and repeated once per line. Reduced motion shows the
+ * polished bronze at once.
  */
 const SubText = styled.p`
   font-size: 1.1rem;
@@ -350,7 +360,15 @@ const SubText = styled.p`
   letter-spacing: 0.1em;
   text-transform: uppercase;
   text-wrap: balance;
-  ${entrance(100)}
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both;
+  }
+
+  @media ${BONSAI_INTRO_QUERY} {
+    animation-duration: ${GENTLE_S.intro}s;
+    animation-delay: ${INTRO.text + INTRO.textStep}ms;
+  }
 
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     background:
@@ -362,14 +380,13 @@ const SubText = styled.p`
 
     @media (prefers-reduced-motion: no-preference) {
       animation:
-        ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 100ms both,
+        ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both,
         ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
     }
 
-    /* Where the bonsai plays, it settles with the headline and catches the light with "timeless" */
+    /* Where the bonsai plays, it arrives with the headline and catches the light with "timeless" */
     @media ${BONSAI_INTRO_QUERY} {
-      animation-name: ${heroSettle}, ${glint};
-      animation-duration: ${SETTLE_S}s, ${GLINT_S}s;
+      animation-duration: ${GENTLE_S.intro}s, ${GLINT_S}s;
       animation-delay: ${INTRO.text + INTRO.textStep}ms, ${GLINT_AT.intro}ms;
     }
   }
