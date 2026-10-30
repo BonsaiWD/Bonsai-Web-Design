@@ -8,7 +8,7 @@ import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -398,48 +398,16 @@ const focusRing = css`
 
 const CTA_HEIGHT = 48;
 
-/** The hero's centred content, with the button lowered, in px (measured; the same at every desktop width). */
-const CONTENT_HEIGHT = 311;
-
-const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
-
-/**
- * Where the button's middle rests, as a fraction of the tree's height: above
- * the pot's rim, over the trunk, so it sits closer to the text (owner,
- * 2026-10-30).
- */
-const CTA_REST = BONSAI_SOURCE.rim - 0.075;
-
 /*
- * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
- * the price line left the hero), as a line of text on a bronze hairline,
- * centred under the headline. A box would show that the pot sits left of the
+ * One action (owner, 2026-10-30: "See the work" and the price line left the
+ * hero), "Let's plant your next project", as a line of text on a bronze
+ * hairline, centred right under the headline (owner, the same day; it had
+ * rested over the trunk). A box would show that the pot sits left of the
  * page's centre; a hairline doesn't.
- *
- * Where the tree is drawn behind it and the hero isn't compact, it rests above
- * the pot's rim: it leaves the content's flow by a button's height (so
- * the text sits as if it were still there) and moves down to
- * CTA_REST. That is its place in the tree (centred TREE.centre down the
- * layer) less the button's place in the centred content (half the content
- * less half the button below the layer's middle). The tree is a share of the
- * pinned layer's height, as in BonsaiCanvas, so the move follows the window.
- * The still fallback frames the whole photo, so it keeps the button in the
- * flow under the text, as do phones and short windows.
  */
 const CtaRow = styled.div`
   display: flex;
   ${entrance(200)}
-
-  @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
-    ${HeroWrapper}:not([data-bonsai='still']) & {
-      margin-top: ${CTA_HEIGHT}px;
-      translate: 0
-        calc(
-          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(CTA_REST - 0.5).toFixed(3)} * ${treeHeight} -
-            ${(CONTENT_HEIGHT - CTA_HEIGHT) / 2}px
-        );
-    }
-  }
 `;
 
 const PrimaryCta = styled.a`
@@ -652,7 +620,7 @@ export default function HeroSection() {
           </Tagline>
 
           <CtaRow>
-            <PrimaryCta href="#contact">Plant your project</PrimaryCta>
+            <PrimaryCta href="#contact">Let’s plant your next project</PrimaryCta>
           </CtaRow>
         </Content>
 
