@@ -16,6 +16,9 @@ import { DUR, EASE_OUT, EASE_REVEAL } from '@/lib/motion';
 
 type Mode = 'before' | 'after';
 
+// 10% slower than the standard mask reveal, so the transformation reads as a moment
+const WIPE_DURATION = DUR.mask * 1.1;
+
 const fadeIn = keyframes`
   from { opacity: 0; }
 `;
@@ -560,7 +563,7 @@ export default function ReimagineStage() {
   };
 
   const after = mode === 'after';
-  const wipe = { duration: DUR.mask, ease: EASE_REVEAL };
+  const wipe = { duration: WIPE_DURATION, ease: EASE_REVEAL };
 
   return (
     <Stage ref={stageRef} style={{ scale: reduce ? 1 : scale }}>
@@ -602,7 +605,7 @@ export default function ReimagineStage() {
                 <Edge
                   initial={false}
                   animate={{ x: after ? '100%' : '0%', opacity: [1, 1, 0] }}
-                  transition={{ x: wipe, opacity: { duration: DUR.mask, times: [0, 0.8, 1] } }}
+                  transition={{ x: wipe, opacity: { duration: WIPE_DURATION, times: [0, 0.8, 1] } }}
                 />
               </>
             )}
