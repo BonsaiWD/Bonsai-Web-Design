@@ -75,8 +75,8 @@ const polishedBronze = css`
     ${lit(45)} 0.8em,
     ${lit(60)} 0.93em,
     ${lit(10)} 1.1em,
-    ${shade(55)} 1.17em,
-    ${shade(30)} 1.22em,
+    ${shade(28)} 1.17em,
+    ${shade(12)} 1.22em,
     ${lit(25)} 1.4em,
     ${shade(15)} 1.48em
   )
