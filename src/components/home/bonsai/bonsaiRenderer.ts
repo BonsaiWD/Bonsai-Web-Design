@@ -102,7 +102,7 @@ void main() {
   float order = 0.75 * (1.0 - t) + 0.25 * s;
   float l = clamp((uDissolve - order * 0.45) / 0.55, 0.0, 1.0);
   float spark = smoothstep(0.0, 0.16, l) * (1.0 - smoothstep(0.16, 0.85, l));
-  float twinkle = 0.55 + 0.45 * sin(uTime * (4.0 + 9.0 * fract(s * 31.7)) + s * 60.0);
+  float twinkle = 0.55 + 0.45 * sin(uTime * (2.0 + 4.5 * fract(s * 31.7)) + s * 60.0);
   float rest = smoothstep(0.1, 0.9, l) * (0.22 + 0.5 * lum);
   float ang = s * 43.98;
   p += vec2(cos(ang), sin(ang)) * (3.0 + 12.0 * fract(s * 13.37)) * easeOut(l);

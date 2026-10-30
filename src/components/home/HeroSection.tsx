@@ -8,7 +8,7 @@ import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, INTRO, INTRO_PACE } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, INTRO } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -34,7 +34,7 @@ const fadeIn = keyframes`
   from { opacity: 0; }
 `;
 
-const SETTLE_S = 1.2 * INTRO_PACE;
+const SETTLE_S = INTRO.textSettle / 1000;
 
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
@@ -44,7 +44,7 @@ const entrance = (delayMs: number) => css`
   @media ${BONSAI_INTRO_QUERY} {
     animation-name: ${heroSettle};
     animation-duration: ${SETTLE_S}s;
-    animation-delay: ${INTRO.text + delayMs}ms;
+    animation-delay: ${INTRO.text + (delayMs / 100) * INTRO.textStep}ms;
   }
 `;
 
@@ -293,7 +293,7 @@ const ScrollIndicator = styled.div`
   }
 
   @media ${BONSAI_INTRO_QUERY} {
-    animation-delay: ${INTRO.text + 400}ms;
+    animation-delay: ${INTRO.text + 4 * INTRO.textStep}ms;
   }
 
   /* Where the hero is compact the cue would sit on the price line */
