@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
   variable: '--font-playfair',
 });
 
-// The hero subtext's bronze capitals (owner's choice, 2026-10-30)
+// Tracked capitals: the header's links and the hero subtext (owner's choice, 2026-10-30)
 const jost = Jost({
   subsets: ['latin'],
   display: 'swap',

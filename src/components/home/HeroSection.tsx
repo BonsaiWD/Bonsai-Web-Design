@@ -351,7 +351,7 @@ const GENTLE_S = { quick: DUR.hero * 2, intro: SETTLE_S * 1.5 };
  * polished bronze at once.
  */
 const SubText = styled.p`
-  font-family: ${({ theme }) => theme.fonts.subtext};
+  font-family: ${({ theme }) => theme.fonts.caps};
   font-size: 1.1rem;
   color: ${({ theme }) => theme.colors.primary};
   margin-bottom: ${({ theme }) => theme.spacing.xl};

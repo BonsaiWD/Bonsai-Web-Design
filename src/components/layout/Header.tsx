@@ -80,7 +80,7 @@ const NavLinks = styled.div`
 `;
 
 const NavLink = styled(Link)<{ $wideOnly?: boolean }>`
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.caps};
   font-size: 0.9rem;
   font-weight: 300;
   letter-spacing: 0.1em;
