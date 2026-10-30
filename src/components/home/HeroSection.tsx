@@ -81,6 +81,26 @@ const polishedBronze = css`
   )
 `;
 
+/*
+ * The same polish for the subtext's capitals, one line box (1.8em) tall: the
+ * capitals run from 0.53em to the baseline at 1.26em. Gentler than the
+ * headline's, so the small text stays legible: its darkest stop is 5:1 on
+ * the page.
+ */
+const bronzeCaps = css`
+  linear-gradient(
+    180deg,
+    ${lit(50)} 0.53em,
+    ${lit(10)} 0.76em,
+    ${shade(22)} 0.86em,
+    ${shade(8)} 0.93em,
+    ${lit(25)} 1.18em,
+    ${shade(12)} 1.27em
+  )
+`;
+/** The subtext appears more slowly than "timeless" glints: it has further to go. */
+const GLISTEN_S = 5;
+
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
     animation: ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) ${delayMs}ms both;
@@ -304,14 +324,52 @@ const Tagline = styled.h1`
   }
 `;
 
+/*
+ * The subtext in bronze capitals, tracked like the header's links (owner,
+ * 2026-10-30). It appears slowly from left to right behind a soft edge, with
+ * a bone-white glint riding just behind the edge as in "timeless", and
+ * settles to polished bronze. The bronze is the text's own fill, clipped to
+ * it and repeated once per line; the band is a second layer and the edge a
+ * mask, both 3 times the box's width, so they start clear of the first letter
+ * and end clear of the last. These replace the usual entrance, which stays
+ * for browsers that can't clip a background to text. Reduced motion shows
+ * the polished bronze at once.
+ */
 const SubText = styled.p`
   font-size: 1.1rem;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  color: ${({ theme }) => theme.colors.primary};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
-  max-width: 500px;
+  max-width: 560px;
   line-height: 1.8;
   font-weight: 300;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-wrap: balance;
   ${entrance(100)}
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    background:
+      linear-gradient(
+          100deg,
+          transparent 0 38%,
+          ${({ theme }) => theme.colors.text} 45% 47%,
+          ${({ theme }) => theme.colors.primary} 54% 100%
+        )
+        0 0 / 300% 100% no-repeat,
+      ${bronzeCaps} 0 0 / 100% 1.8em repeat-y;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+    @media (prefers-reduced-motion: no-preference) {
+      mask: linear-gradient(100deg, #000 0 42%, transparent 58%) 0 0 / 300% 100% no-repeat;
+      animation: ${glint} ${GLISTEN_S}s ${GLINT_EASE} 300ms both;
+    }
+
+    @media ${BONSAI_INTRO_QUERY} {
+      animation-delay: ${INTRO.text + INTRO.textStep}ms;
+    }
+  }
 `;
 
 const focusRing = css`
