@@ -6,7 +6,7 @@ import { useMotionValueEvent, useScroll } from 'framer-motion';
 import { buildBonsaiField } from './bonsaiField';
 import { createBonsaiRenderer, type BonsaiRenderer } from './bonsaiRenderer';
 import { buildRoots } from './bonsaiRoots';
-import { BONSAI_SOURCE, INTRO } from './timeline';
+import { BONSAI_SOURCE, INTRO, TREE } from './timeline';
 
 const Canvas = styled.canvas`
   position: absolute;
@@ -156,7 +156,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
       if (cancelled) return;
 
       // The canvas fills the hero's pinned layer.
-      const treeHeight = () => Math.min(canvas.clientHeight * 0.8, 780);
+      const treeHeight = () => Math.min(canvas.clientHeight * TREE.share, TREE.max);
       const count = Math.round(16000 * Math.min(1.2, Math.max(0.6, treeHeight() / 760)));
       const field = buildBonsaiField(img, BONSAI_SOURCE, count);
       renderer = createBonsaiRenderer(canvas, field, { tint: theme.colors.primary, hot: theme.colors.text });
@@ -172,7 +172,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
         const th = treeHeight();
         const tw = th * field.aspect;
         const x = (w - tw) / 2;
-        const y = h * 0.47 - th / 2;
+        const y = h * TREE.centre - th / 2;
         const [bx, by] = BONSAI_SOURCE.rootBase;
         renderer.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
         renderer.layout([x, y, tw, th], [w / 2, h]);

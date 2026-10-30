@@ -4,7 +4,7 @@ import { css } from 'styled-components';
 import { DUR, EASE_OUT } from '@/lib/motion';
 
 /*
- * Frosted glass for the "Plant a project" buttons (owner's request,
+ * Frosted glass for the "Plant your project" buttons (owner's request,
  * 2026-10-30): a faint bronze tint over whatever is behind it, blurred, with
  * a hairline bronze edge and a soft light catching the top. Bone text keeps
  * it legible (about 12:1). Brighter tint and edge on hover.

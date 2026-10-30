@@ -62,3 +62,10 @@ export const BONSAI_SOURCE: BonsaiSource = {
   fadeBottom: [0.83, 0.97],
   rootBase: [0.33, 0.86],
 };
+
+/**
+ * The tree in the pinned hero: this share of the layer's height (capped), its
+ * centre this far down the layer. Shared by the canvas, the still and the
+ * hero's button, which rests at the pot's rim.
+ */
+export const TREE = { share: 0.8, max: 780, centre: 0.53 } as const;

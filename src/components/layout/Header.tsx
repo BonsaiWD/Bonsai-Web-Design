@@ -80,7 +80,7 @@ const NavLinks = styled.div`
 `;
 
 const NavLink = styled(Link)<{ $wideOnly?: boolean }>`
-  font-family: ${({ theme }) => theme.fonts.main};
+  font-family: ${({ theme }) => theme.fonts.caps};
   font-size: 0.9rem;
   font-weight: 300;
   letter-spacing: 0.1em;
@@ -217,7 +217,7 @@ const navItems = [
   { href: '#contact', label: 'Contact', delay: 0.25 },
 ];
 
-const CTA = { href: '#contact', label: 'Plant a project', delay: 0.3 };
+const CTA = { href: '#contact', label: 'Plant your project', delay: 0.3 };
 
 export default function Header() {
   const [hidden, setHidden] = useState(false);

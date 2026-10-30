@@ -15,6 +15,8 @@ export const theme = {
     fonts: {
         main: "var(--font-inter), 'Inter', sans-serif",
         heading: "var(--font-playfair), 'Playfair Display', serif",
+        // Tracked capitals: the header's links and the hero subtext (owner's choice, 2026-10-30)
+        caps: "var(--font-jost), 'Jost', sans-serif",
     },
     breakpoints: {
         mobile: '375px',

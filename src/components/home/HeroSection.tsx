@@ -6,10 +6,9 @@ import { Container } from '../layout/Container';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
-import { frostedGlass } from '@/styles/frosted';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, DISSOLVE_RUNWAY, INTRO, TREE } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -82,6 +81,43 @@ const polishedBronze = css`
   )
 `;
 
+/*
+ * The same polish for the subtext's capitals, one line box (1.8em) tall: in
+ * Jost the capitals run from 0.55em to the baseline at 1.25em. Brighter than
+ * the headline's, with a little glisten at rest (owner, 2026-10-30): the light
+ * on the tops of the capitals and bouncing up near the baseline is close to
+ * bone, falling quickly to the dark band between; its darkest stop is plain
+ * bronze.
+ */
+const bronzeCaps = css`
+  linear-gradient(
+    180deg,
+    ${lit(80)} 0.55em,
+    ${lit(45)} 0.72em,
+    ${lit(5)} 0.86em,
+    ${lit(25)} 0.92em,
+    ${lit(65)} 1.15em,
+    ${lit(20)} 1.26em
+  )
+`;
+
+/*
+ * "timeless" and the subtext catch the light together (owner, 2026-10-30):
+ * their glints share a band, a duration and a start, after the text's quick
+ * entrance or, where the bonsai plays, as the headline lands. Each band
+ * enters its own text at the same moment and leaves it at the same moment.
+ */
+const GLINT_AT = { quick: 600, intro: Math.round(INTRO.text + INTRO.textSettle * 0.4) };
+const glintBand = css`
+  linear-gradient(
+      100deg,
+      transparent 0 41%,
+      ${({ theme }) => theme.colors.text} 48% 52%,
+      ${({ theme }) => theme.colors.primary} 59% 100%
+    )
+    0 0 / 240% 100% no-repeat
+`;
+
 const entrance = (delayMs: number) => css`
   @media (prefers-reduced-motion: no-preference) {
     animation: ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) ${delayMs}ms both;
@@ -97,10 +133,11 @@ const entrance = (delayMs: number) => css`
 /*
  * Phones and short windows: the hero grows to fit its CTAs instead of clipping
  * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 444px tall and the cue 88px tall, 40px from the bottom, so the cue
- * clears the price line by at least 16px from 736px tall.
+ * about 415px tall and the cue 88px tall, 40px from the bottom, so the cue
+ * clears the button by at least 16px from 736px tall.
  */
-const COMPACT = '(max-width: 767px), (max-height: 735px)';
+const COMPACT_HEIGHT = 735;
+const COMPACT = `(max-width: 767px), (max-height: ${COMPACT_HEIGHT}px)`;
 
 /*
  * The section is a stage around a pinned layer that holds everything. Where
@@ -229,7 +266,7 @@ const Tagline = styled.h1`
   font-size: 3.5rem;
   line-height: 1.1;
   color: ${({ theme }) => theme.colors.text};
-  margin-bottom: ${({ theme }) => theme.spacing.xl};
+  margin-bottom: ${({ theme }) => `calc(${theme.spacing.xl} + ${theme.spacing.md})`};
   max-width: 900px;
   font-weight: 400;
   ${entrance(0)}
@@ -255,13 +292,7 @@ const Tagline = styled.h1`
       padding: 0.5em 0.6em;
       margin: -0.5em -0.6em;
       background:
-        linear-gradient(
-            100deg,
-            transparent 0 41%,
-            ${({ theme }) => theme.colors.text} 48% 52%,
-            ${({ theme }) => theme.colors.primary} 59% 100%
-          )
-          0 0 / 240% 100% no-repeat,
+        ${glintBand},
         ${polishedBronze};
       -webkit-background-clip: text;
       background-clip: text;
@@ -287,14 +318,14 @@ const Tagline = styled.h1`
 
     @media (prefers-reduced-motion: no-preference) {
       em {
-        animation: ${glint} ${GLINT_S}s ${GLINT_EASE} 600ms both;
+        animation: ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
       }
     }
 
     /* Where the bonsai plays, the glint runs as the headline lands, with the tree's last growth */
     @media ${BONSAI_INTRO_QUERY} {
       em {
-        animation-delay: ${Math.round(INTRO.text + INTRO.textSettle * 0.4)}ms;
+        animation-delay: ${GLINT_AT.intro}ms;
       }
     }
   }
@@ -304,14 +335,65 @@ const Tagline = styled.h1`
   }
 `;
 
+/*
+ * The subtext fades in more gently than the other lines (owner, 2026-10-30):
+ * half as long again, on an even curve, with a smaller rise and no blur.
+ */
+const gentleIn = keyframes`
+  from { opacity: 0; transform: translateY(${RISE.word}px); }
+  to { opacity: 1; transform: none; }
+`;
+const GENTLE_S = { quick: DUR.hero * 2, intro: SETTLE_S * 1.5 };
+
+/*
+ * The subtext in bronze capitals, tracked like the header's links (owner,
+ * 2026-10-30). All of it arrives at once, gently; then, together with
+ * "timeless" and in the same way, a bone-white glint travels through it from
+ * left to right and leaves it polished bronze. The bronze is the text's own
+ * fill, clipped to it and repeated once per line. Reduced motion shows the
+ * polished bronze at once.
+ */
 const SubText = styled.p`
+  font-family: ${({ theme }) => theme.fonts.caps};
   font-size: 1.1rem;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  color: ${({ theme }) => theme.colors.primary};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
-  max-width: 500px;
+  max-width: 560px;
   line-height: 1.8;
   font-weight: 300;
-  ${entrance(100)}
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-wrap: balance;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both;
+  }
+
+  @media ${BONSAI_INTRO_QUERY} {
+    animation-duration: ${GENTLE_S.intro}s;
+    animation-delay: ${INTRO.text + INTRO.textStep}ms;
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    background:
+      ${glintBand},
+      ${bronzeCaps} 0 0 / 100% 1.8em repeat-y;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+    @media (prefers-reduced-motion: no-preference) {
+      animation:
+        ${gentleIn} ${GENTLE_S.quick}s ${GLINT_EASE} 100ms both,
+        ${glint} ${GLINT_S}s ${GLINT_EASE} ${GLINT_AT.quick}ms both;
+    }
+
+    /* Where the bonsai plays, it arrives with the headline and catches the light with "timeless" */
+    @media ${BONSAI_INTRO_QUERY} {
+      animation-duration: ${GENTLE_S.intro}s, ${GLINT_S}s;
+      animation-delay: ${INTRO.text + INTRO.textStep}ms, ${GLINT_AT.intro}ms;
+    }
+  }
 `;
 
 const focusRing = css`
@@ -321,16 +403,49 @@ const focusRing = css`
   }
 `;
 
+const CTA_HEIGHT = 48;
+
+/** The hero's centred content, with the button lowered, in px (measured; the same at every desktop width). */
+const CONTENT_HEIGHT = 462;
+
+const treeHeight = `min(${TREE.share * 100}svh, ${TREE.max}px)`;
+
+/**
+ * Where the button's middle rests, as a fraction of the tree's height: above
+ * the pot's rim, over the trunk, so it sits closer to the subtext (owner,
+ * 2026-10-30).
+ */
+const CTA_REST = BONSAI_SOURCE.rim - 0.075;
+
+/*
+ * One action, "Plant your project" (owner, 2026-10-30: "See the work" and
+ * the price line left the hero), as a line of text on a bronze hairline,
+ * centred under the subtext. A box would show that the pot sits left of the
+ * page's centre; a hairline doesn't.
+ *
+ * Where the tree is drawn behind it and the hero isn't compact, it rests above
+ * the pot's rim: it leaves the content's flow by a button's height (so
+ * the text sits as if it were still there) and moves down to
+ * CTA_REST. That is its place in the tree (centred TREE.centre down the
+ * layer) less the button's place in the centred content (half the content
+ * less half the button below the layer's middle). The tree is a share of the
+ * pinned layer's height, as in BonsaiCanvas, so the move follows the window.
+ * The still fallback frames the whole photo, so it keeps the button in the
+ * flow under the text, as do phones and short windows.
+ */
 const CtaRow = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.xl};
   ${entrance(200)}
 
-  @media (max-width: 767px) {
-    column-gap: ${({ theme }) => theme.spacing.lg};
+  @media ${BONSAI_INTRO_QUERY} and (min-height: ${COMPACT_HEIGHT + 1}px) {
+    ${HeroWrapper}:not([data-bonsai='still']) & {
+      margin-top: ${CTA_HEIGHT}px;
+      translate: 0
+        calc(
+          ${(TREE.centre - 0.5).toFixed(2)} * 100svh + ${(CTA_REST - 0.5).toFixed(3)} * ${treeHeight} -
+            ${(CONTENT_HEIGHT - CTA_HEIGHT) / 2}px
+        );
+    }
   }
 `;
 
@@ -339,84 +454,39 @@ const PrimaryCta = styled.a`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0 ${({ theme }) => theme.spacing.xl};
+  min-height: ${CTA_HEIGHT}px;
+  /* Letter-spacing trails the last letter, so the right padding gives it back and the label sits centred */
+  padding: 0 ${({ theme }) => `calc(${theme.spacing.lg} - 0.15em) 0 ${theme.spacing.lg}`};
   font-family: ${({ theme }) => theme.fonts.main};
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  border-radius: 0;
-  ${frostedGlass}
+  color: ${({ theme }) => theme.colors.text};
+  transition: color ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
 
-  @media (max-width: 767px) {
-    padding: 0 ${({ theme }) => theme.spacing.lg};
-  }
-
-  /* Bronze hover halo (0.15), faded in on opacity rather than box-shadow */
+  /* The hairline it rests on, fading out at both ends; it reaches a little wider on hover */
   &::after {
     content: '';
     position: absolute;
-    inset: -4px;
-    border: 4px solid rgba(200, 159, 129, 0.15);
-    opacity: 0;
+    left: 0;
+    right: 0;
+    bottom: 8px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200, 159, 129, 0.6) 25% 75%, transparent);
     pointer-events: none;
-    transition: opacity ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
+    transition: transform ${DUR.state}s cubic-bezier(${EASE_OUT.join(', ')});
   }
-
-  &:hover::after {
-    opacity: 1;
-  }
-
-  ${focusRing}
-`;
-
-const SecondaryCta = styled.a`
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
-  font-family: ${({ theme }) => theme.fonts.main};
-  font-size: 0.85rem;
-  font-weight: 400;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.text};
-  text-decoration: underline;
-  text-decoration-color: ${({ theme }) => theme.colors.primary};
-  text-decoration-thickness: 1px;
-  text-underline-offset: 6px;
-  transition: color ${DUR.hover}s cubic-bezier(${EASE_OUT.join(', ')});
 
   &:hover {
     color: ${({ theme }) => theme.colors.primary};
   }
 
+  &:hover::after {
+    transform: scaleX(1.2);
+  }
+
   ${focusRing}
-`;
-
-const PriceLine = styled.p`
-  font-family: ${({ theme }) => theme.fonts.main};
-  font-size: 0.85rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  margin: ${({ theme }) => theme.spacing.lg} 0 0;
-  ${entrance(300)}
-`;
-
-const PriceClause = styled.span`
-  @media (max-width: 767px) {
-    display: block;
-  }
-`;
-
-const PriceSeparator = styled.span`
-  color: ${({ theme }) => theme.colors.primary};
-
-  /* On phones the two clauses stack, so the dot is not needed */
-  @media (max-width: 767px) {
-    display: none;
-  }
 `;
 
 const ScrollIndicator = styled.div`
@@ -440,7 +510,7 @@ const ScrollIndicator = styled.div`
     display: none;
   }
 
-  /* Where the hero is compact the cue would sit on the price line */
+  /* Where the hero is compact the cue would sit on the button */
   @media ${COMPACT} {
     display: none;
   }
@@ -515,15 +585,8 @@ export default function HeroSection() {
           </SubText>
 
           <CtaRow>
-            <PrimaryCta href="#contact">Plant a project</PrimaryCta>
-            <SecondaryCta href="#portfolio">See the work</SecondaryCta>
+            <PrimaryCta href="#contact">Plant your project</PrimaryCta>
           </CtaRow>
-
-          <PriceLine>
-            <PriceClause>Custom sites from $1500 per page</PriceClause>{' '}
-            <PriceSeparator>·</PriceSeparator>{' '}
-            <PriceClause>Updates and care at $120/hr</PriceClause>
-          </PriceLine>
         </Content>
 
         <ScrollIndicator>

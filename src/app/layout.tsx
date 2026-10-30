@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
+import { Inter, Jost, Playfair_Display } from 'next/font/google';
 import StyledComponentsRegistry from '@/lib/registry';
 import Providers from '@/lib/providers';
 
@@ -19,6 +19,13 @@ const playfair = Playfair_Display({
   variable: '--font-playfair',
 });
 
+// Tracked capitals: the header's links and the hero subtext (owner's choice, 2026-10-30)
+const jost = Jost({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-jost',
+});
+
 export const metadata: Metadata = {
   title: 'Bonsai Web Design | Premium Web Design Agency',
   description: 'Crafting timeless design and meaningful content for modern brands.',
@@ -30,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable} ${jost.variable}`}>
       <body>
         <StyledComponentsRegistry>
           <Providers>{children}</Providers>
