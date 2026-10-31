@@ -29,7 +29,7 @@ export interface BonsaiSource {
 }
 
 export interface BonsaiField {
-  /** The cropped photo at source resolution. */
+  /** The cropped photo, at the working resolution (detail). */
   photo: HTMLCanvasElement;
   /** RG8 texture data: R = growth time (0..1), G = matte (0..1). */
   field: Uint8Array;
@@ -45,6 +45,12 @@ export interface BonsaiField {
 export const PARTICLE_STRIDE = 6;
 
 const FIELD_W = 192;
+
+/**
+ * Hands the main thread back between the heavier steps, so a tap or a frame
+ * never waits long behind the build (on a phone it runs several times slower).
+ */
+const breathe = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -161,23 +167,33 @@ function geodesic(matte: Float32Array, w: number, h: number, seeds: number[], ri
   return dist;
 }
 
-export function buildBonsaiField(img: HTMLImageElement, source: BonsaiSource, particleCount: number): BonsaiField {
+/**
+ * @param detail  the crop's resolution to work at (0.5..1 of the source's).
+ *   Where the tree is shown smaller (phones) the photo and the growth field
+ *   need fewer pixels, and the build takes about half as long.
+ */
+export async function buildBonsaiField(
+  img: HTMLImageElement,
+  source: BonsaiSource,
+  particleCount: number,
+  detail = 1
+): Promise<BonsaiField> {
   const { crop } = source;
   // The image optimiser may serve a different width than the source file.
   const scale = img.naturalWidth / source.width;
 
-  // Full-resolution crop: the photo texture and the particle source.
+  // The crop at the working resolution: the photo texture and the particle source.
   const photo = document.createElement('canvas');
-  photo.width = crop.w;
-  photo.height = crop.h;
+  const pw = (photo.width = Math.round(crop.w * detail));
+  const ph = (photo.height = Math.round(crop.h * detail));
   const pctx = photo.getContext('2d', { willReadFrequently: true })!;
-  pctx.drawImage(img, crop.x * scale, crop.y * scale, crop.w * scale, crop.h * scale, 0, 0, crop.w, crop.h);
-  const full = pctx.getImageData(0, 0, crop.w, crop.h).data;
-  const bg = backdrop(full, crop.w, crop.h);
+  pctx.drawImage(img, crop.x * scale, crop.y * scale, crop.w * scale, crop.h * scale, 0, 0, pw, ph);
+  const full = pctx.getImageData(0, 0, pw, ph).data;
+  const bg = backdrop(full, pw, ph);
 
   // Low-resolution analysis grid.
-  const fieldW = FIELD_W;
-  const fieldH = Math.round((FIELD_W * crop.h) / crop.w);
+  const fieldW = Math.round(FIELD_W * detail);
+  const fieldH = Math.round((fieldW * crop.h) / crop.w);
   const small = document.createElement('canvas');
   small.width = fieldW;
   small.height = fieldH;
@@ -200,7 +216,9 @@ export function buildBonsaiField(img: HTMLImageElement, source: BonsaiSource, pa
     }
   }
 
+  await breathe();
   const dist = geodesic(matte, fieldW, fieldH, seeds, rimRow);
+  await breathe();
 
   // Normalise on the 98th percentile of reachable tree cells, so a few stray
   // far-off cells do not stretch the timeline.
@@ -230,31 +248,32 @@ export function buildBonsaiField(img: HTMLImageElement, source: BonsaiSource, pa
 
   // Particles: brighter, more solid parts of the tree get more of them. The
   // pot gets fewer, so the resting tree is not bottom-heavy.
-  const weights = new Float32Array(crop.w * crop.h);
-  const rimY = source.rim * crop.h;
+  const weights = new Float32Array(pw * ph);
+  const rimY = source.rim * ph;
   let total = 0;
   for (let i = 0; i < weights.length; i++) {
     const r = full[i * 4];
     const g = full[i * 4 + 1];
     const b = full[i * 4 + 2];
     const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    const x = i % crop.w;
-    const y = (i - x) / crop.w;
+    const x = i % pw;
+    const y = (i - x) / pw;
     const w =
-      matteOf(r, g, b, bg) * (0.3 + lum) * edge((x + 0.5) / crop.w, (y + 0.5) / crop.h) * (y > rimY ? 0.45 : 1);
+      matteOf(r, g, b, bg) * (0.3 + lum) * edge((x + 0.5) / pw, (y + 0.5) / ph) * (y > rimY ? 0.45 : 1);
     weights[i] = w;
     total += w;
   }
 
+  await breathe();
   const particles = new Float32Array(particleCount * PARTICLE_STRIDE);
   const k = particleCount / total;
   let count = 0;
   for (let i = 0; i < weights.length && count < particleCount; i++) {
     if (rand() >= weights[i] * k) continue;
-    const x = i % crop.w;
-    const y = (i - x) / crop.w;
-    const u = (x + rand()) / crop.w;
-    const v = (y + rand()) / crop.h;
+    const x = i % pw;
+    const y = (i - x) / pw;
+    const u = (x + rand()) / pw;
+    const v = (y + rand()) / ph;
     const fx = Math.min(fieldW - 1, Math.floor(u * fieldW));
     const fy = Math.min(fieldH - 1, Math.floor(v * fieldH));
     const r = full[i * 4];

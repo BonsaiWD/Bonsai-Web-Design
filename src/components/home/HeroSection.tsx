@@ -8,7 +8,7 @@ import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
+import { BONSAI_INTRO_QUERY, BONSAI_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -127,13 +127,16 @@ const entrance = (delayMs: number) => css`
 `;
 
 /*
- * Phones and short windows: the hero grows to fit its CTAs instead of clipping
- * them, and the scroll cue is hidden. From 768px wide the centred content is
- * about 265px tall and the cue 88px tall, 40px from the bottom, so the cue
- * clears the button by at least 16px from 736px tall.
+ * Short windows: the hero grows to fit its CTAs instead of clipping them, and
+ * the scroll cue is hidden. From 768px wide the centred content is about
+ * 265px tall and the cue 88px tall, 40px from the bottom, so the cue clears
+ * the button by at least 16px from 736px tall. Phones in portrait hold it all
+ * in one screen, so they pin like desktop and the bonsai holds while it turns
+ * to light (owner, 2026-10-31); held sideways (under 500px tall) they grow to
+ * fit.
  */
 const COMPACT_HEIGHT = 735;
-const COMPACT = `(max-width: 767px), (max-height: ${COMPACT_HEIGHT}px)`;
+const COMPACT = `(min-width: 768px) and (max-height: ${COMPACT_HEIGHT}px), (max-width: 767px) and (max-height: 499px)`;
 
 /*
  * The section is a stage around a pinned layer that holds everything. Where
@@ -148,7 +151,7 @@ const HeroWrapper = styled.section`
   width: 100%;
   background-color: ${({ theme }) => theme.colors.background};
 
-  @media ${BONSAI_INTRO_QUERY} {
+  @media ${BONSAI_QUERY} {
     height: ${(1 + DISSOLVE_RUNWAY) * 100}svh;
 
     &[data-dissolve='auto'],
@@ -506,7 +509,7 @@ const ScrollIndicator = styled.div`
   }
 
   /* Where the bonsai plays, its glowing taproot leads the eye down instead */
-  @media ${BONSAI_INTRO_QUERY} {
+  @media ${BONSAI_QUERY} {
     display: none;
   }
 
@@ -527,7 +530,7 @@ export default function HeroSection() {
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const stillRef = useRef<HTMLImageElement>(null);
   const reduce = useReducedMotionSafe();
-  const intro = useMediaQuery(BONSAI_INTRO_QUERY);
+  const bonsai = useMediaQuery(BONSAI_QUERY);
   const [fallback, setFallback] = useState(false);
   const showStill = useCallback(() => setFallback(true), []);
   const auto = useAutoDissolve();
@@ -582,7 +585,7 @@ export default function HeroSection() {
       <Pin ref={pinRef}>
         <BackgroundImage style={{ y: reduce ? 0 : y, opacity: reduce ? 1 : opacity }} />
         <BonsaiStill imgRef={stillRef} />
-        {intro && !fallback && (
+        {bonsai && !fallback && (
           <BonsaiCanvas
             heroRef={ref}
             imageRef={stillRef}
