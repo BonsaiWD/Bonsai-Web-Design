@@ -418,10 +418,12 @@ export function createBonsaiRenderer(
       gl.uniform3fv(ru.uTint, tint);
       gl.uniform3fv(ru.uHot, hot);
       const motes = [
-        // The roots light up as the tree turns to light, and drain to the
-        // root ahead of it as the hero leaves (owner, 2026-10-30): gone by
-        // a third of the way out, so they don't hang in the air.
-        { set: rootSet, reach: clamp01((f.dissolve - 0.08) / 0.6) * 1.08, fade: 1, pull: Math.min(1, f.exit * 2) },
+        // The roots light up once the tree has mostly turned to light: from
+        // when the trunk starts to dissolve to the end of the dissolve
+        // (owner, 2026-10-31: they formed too early). They drain to the root
+        // ahead of the tree as the hero leaves (owner, 2026-10-30): gone by a
+        // third of the way out, so they don't hang in the air.
+        { set: rootSet, reach: clamp01((f.dissolve - 0.45) / 0.5) * 1.08, fade: 1, pull: Math.min(1, f.exit * 2) },
         // The circuit lights up as the tree drains, down to where it drains,
         // and stays put: it is the path.
         { set: circuitSet, reach: clamp01((f.exit - 0.03) / 0.5) * 1.08, fade: 1 - smoothstep(0.7, 1, f.exit), pull: 0 },

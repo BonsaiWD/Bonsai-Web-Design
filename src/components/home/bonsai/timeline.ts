@@ -60,7 +60,9 @@ export const BONSAI_SOURCE: BonsaiSource = {
   seed: { x0: 0.24, x1: 0.4, y: 0.765 },
   rim: 0.775,
   fadeBottom: [0.83, 0.97],
-  rootBase: [0.33, 0.86],
+  // At the soil line under the trunk, not the pot's base, so the trunk's light runs straight into
+  // its roots with no dark band between them (owner, 2026-10-31)
+  rootBase: [0.32, 0.775],
 };
 
 /**
