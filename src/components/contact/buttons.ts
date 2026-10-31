@@ -25,8 +25,8 @@ export const frostedButton = css`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0 28px;
+  min-height: 3rem;
+  padding: 0 1.75rem;
   border-radius: 0;
   cursor: pointer;
   ${buttonText}

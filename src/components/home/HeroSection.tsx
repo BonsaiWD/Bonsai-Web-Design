@@ -178,7 +178,7 @@ const Pin = styled.div`
     height: auto;
     min-height: 100vh;
     min-height: 100svh;
-    padding: 104px 0 ${({ theme }) => theme.spacing.xxl};
+    padding: 6.5rem 0 ${({ theme }) => theme.spacing.xxl};
   }
 `;
 
@@ -273,7 +273,7 @@ const Tagline = styled.h1`
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.text};
   margin-bottom: ${({ theme }) => `calc(${theme.spacing.xl} + ${theme.spacing.md})`};
-  max-width: 900px;
+  max-width: 56.25rem;
   font-weight: 400;
   text-wrap: balance;
   ${entrance(0)}
@@ -396,8 +396,6 @@ const focusRing = css`
   }
 `;
 
-const CTA_HEIGHT = 48;
-
 /*
  * One action (owner, 2026-10-30: "See the work" and the price line left the
  * hero), "Let's plant your next project", as a line of text on a bronze
@@ -415,7 +413,7 @@ const PrimaryCta = styled.a`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: ${CTA_HEIGHT}px;
+  min-height: 3rem;
   /* Letter-spacing trails the last letter, so the right padding gives it back and the label sits centred */
   padding: 0 ${({ theme }) => `calc(${theme.spacing.lg} - 0.15em) 0 ${theme.spacing.lg}`};
   font-family: ${({ theme }) => theme.fonts.main};
@@ -432,7 +430,7 @@ const PrimaryCta = styled.a`
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 8px;
+    bottom: 0.5rem;
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(200, 159, 129, 0.6) 25% 75%, transparent);
     pointer-events: none;
@@ -462,8 +460,8 @@ const PauseButton = styled.button`
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 0;
   background: none;
@@ -493,13 +491,13 @@ const PauseButton = styled.button`
 
 const ScrollIndicator = styled.div`
   position: absolute;
-  bottom: 40px;
+  bottom: 2.5rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   opacity: 0.5;
 
   /* Opacity only, so the centering transform is left alone */
@@ -520,7 +518,7 @@ const ScrollIndicator = styled.div`
 
 const Line = styled.div`
   width: 1px;
-  height: 60px;
+  height: 3.75rem;
   background: ${({ theme }) => theme.colors.textSecondary};
 `;
 

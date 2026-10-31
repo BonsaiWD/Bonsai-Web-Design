@@ -26,14 +26,15 @@ export const theme = {
         desktop: '1024px',
         wide: '1440px',
     },
+    // In rem, so spacing grows with the base size on large monitors (4px to 128px at 16px)
     spacing: {
-        xs: '4px',
-        sm: '8px',
-        md: '16px',
-        lg: '24px',
-        xl: '32px',
-        xxl: '64px',
-        xxxl: '128px',
+        xs: '0.25rem',
+        sm: '0.5rem',
+        md: '1rem',
+        lg: '1.5rem',
+        xl: '2rem',
+        xxl: '4rem',
+        xxxl: '8rem',
     },
     transitions: {
         default: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',

@@ -73,7 +73,7 @@ const LightField = styled.div`
 /* ---------- Featured client ---------- */
 
 const FeaturedStage = styled(GlassStage)`
-  margin-bottom: 96px;
+  margin-bottom: 6rem;
 
   @media (max-width: 768px) {
     margin-bottom: ${({ theme }) => theme.spacing.xxl};
@@ -85,16 +85,16 @@ const FeaturedPanel = styled.div`
   display: grid;
   grid-template-columns: 5fr 7fr;
   gap: ${({ theme }) => theme.spacing.xxl};
-  padding: 56px;
+  padding: 3.5rem;
 
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
     gap: ${({ theme }) => theme.spacing.xl};
-    padding: 40px;
+    padding: 2.5rem;
   }
 
   @media (max-width: 768px) {
-    padding: 28px 20px;
+    padding: 1.75rem 1.25rem;
   }
 `;
 
@@ -108,7 +108,7 @@ const FeaturedIntro = styled.div`
 const MetaRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
   font-size: 0.72rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -121,8 +121,8 @@ const MetaRow = styled.div`
 `;
 
 const MetaDot = styled.span`
-  width: 4px;
-  height: 4px;
+  width: 0.25rem;
+  height: 0.25rem;
   border-radius: 50%;
   background: ${({ theme }) => theme.colors.primary};
   opacity: 0.6;
@@ -159,7 +159,7 @@ const Summary = styled.p`
   font-size: 0.98rem;
   line-height: 1.7;
   color: ${({ theme }) => theme.colors.textSecondary};
-  max-width: 420px;
+  max-width: 26.25rem;
 `;
 
 const Branch = styled.ul`
@@ -172,9 +172,9 @@ const Branch = styled.ul`
   &::before {
     content: '';
     position: absolute;
-    left: 5px;
-    top: 46px;
-    bottom: 46px;
+    left: calc(0.34375rem - 0.5px); /* centred on the nodes: half their width, less half its own */
+    top: 2.875rem;
+    bottom: 2.875rem;
     width: 1px;
     background: linear-gradient(
       180deg,
@@ -187,8 +187,8 @@ const Branch = styled.ul`
 const BranchNode = styled.span`
   position: relative;
   z-index: 1;
-  width: 11px;
-  height: 11px;
+  width: 0.6875rem;
+  height: 0.6875rem;
   border-radius: 50%;
   border: 1px solid ${({ theme }) => theme.colors.primary};
   background: ${({ theme }) => theme.colors.background};
@@ -216,10 +216,10 @@ const BranchTitle = styled.span`
 
 const BranchLink = styled(motion.a)`
   display: grid;
-  grid-template-columns: 11px minmax(0, 1fr) auto;
+  grid-template-columns: 0.6875rem minmax(0, 1fr) auto;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.lg};
-  padding: 18px 0;
+  padding: 1.125rem 0;
   text-decoration: none;
   border-bottom: 1px solid ${({ theme }) => tint(theme.colors.primary, 18)};
 
@@ -248,7 +248,7 @@ const BranchLink = styled(motion.a)`
 
   @media (max-width: 768px) {
     gap: ${({ theme }) => theme.spacing.md};
-    padding: 16px 0;
+    padding: 1rem 0;
   }
 `;
 
@@ -262,7 +262,7 @@ const Kind = styled.span`
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
 `;
 
 const Domain = styled.span`
@@ -288,14 +288,14 @@ const MoreLightField = styled(LightField)`
 // The rows' own padding brings their text in line with the featured client's
 const MorePanel = styled.div`
   ${glassPane}
-  padding: 48px 40px 8px;
+  padding: 3rem 2.5rem 0.5rem;
 
   @media (max-width: 1024px) {
-    padding: 40px 24px 8px;
+    padding: 2.5rem 1.5rem 0.5rem;
   }
 
   @media (max-width: 768px) {
-    padding: 28px 16px 4px;
+    padding: 1.75rem 1rem 0.25rem;
   }
 `;
 
@@ -305,7 +305,7 @@ const MoreHeading = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.md};
-  padding: 0 16px;
+  padding: 0 1rem;
   font-size: 0.72rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -313,7 +313,7 @@ const MoreHeading = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing.md};
 
   @media (max-width: 768px) {
-    padding: 0 4px;
+    padding: 0 0.25rem;
   }
 
   &::after {
@@ -362,7 +362,7 @@ const WorkBody = styled.div`
 `;
 
 const WorkDescription = styled.p`
-  max-width: 480px;
+  max-width: 30rem;
   font-size: 1rem;
   line-height: 1.7;
   color: ${({ theme }) => theme.colors.textSecondary};
@@ -372,7 +372,7 @@ const WorkDescription = styled.p`
 const WorkFoot = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.625rem;
   font-size: 0.82rem;
   color: ${({ theme }) => theme.colors.textSecondary};
 
@@ -407,11 +407,11 @@ const WorkArrow = styled.span`
 const WorkRow = styled(motion.a)`
   position: relative;
   display: grid;
-  grid-template-columns: 5fr 6fr 32px;
+  grid-template-columns: 5fr 6fr 2rem;
   grid-template-areas: 'intro body arrow';
   align-items: center;
   gap: ${({ theme }) => theme.spacing.xxl};
-  padding: 40px 16px;
+  padding: 2.5rem 1rem;
   text-decoration: none;
   border-bottom: 1px solid rgba(200, 159, 129, 0.14);
 
@@ -452,12 +452,12 @@ const WorkRow = styled(motion.a)`
   }
 
   @media (max-width: 1024px) {
-    grid-template-columns: minmax(0, 1fr) 32px;
+    grid-template-columns: minmax(0, 1fr) 2rem;
     grid-template-areas:
       'intro arrow'
       'body body';
     gap: ${({ theme }) => theme.spacing.lg};
-    padding: 32px 16px;
+    padding: 2rem 1rem;
   }
 
   /* Labels get the full width on phones; the arrow drops beside the domain */
@@ -466,7 +466,7 @@ const WorkRow = styled(motion.a)`
       'intro intro'
       'body arrow';
     align-items: end;
-    padding: 28px 4px;
+    padding: 1.75rem 0.25rem;
   }
 `;
 

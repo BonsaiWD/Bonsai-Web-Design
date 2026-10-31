@@ -9,8 +9,9 @@ import { DUR, EASE_OUT, RISE, STAGGER } from '@/lib/motion';
 
 // Headshots render at up to 350px: full container width on small phones, and
 // the 1fr column of a 1fr / 1.5fr grid (128px gap) between 768px and ~1046px.
+// Past 1728px wide the base size grows (GlobalStyle), to at most 482px.
 const HEADSHOT_SIZES =
-  '(min-width: 1047px) 350px, (min-width: 768px) calc(40vw - 70px), (min-width: 382px) 350px, calc(100vw - 32px)';
+  '(min-width: 1729px) 482px, (min-width: 1047px) 350px, (min-width: 768px) calc(40vw - 70px), (min-width: 382px) 350px, calc(100vw - 32px)';
 
 const AboutWrapper = styled(Section)`
   background: linear-gradient(
@@ -43,7 +44,7 @@ const Eyebrow = styled(motion.p)`
 `;
 
 const IntroCopy = styled(motion.p)`
-  max-width: 560px;
+  max-width: 35rem;
   margin: 0 auto ${({ theme }) => theme.spacing.lg};
   font-size: 1.15rem;
   line-height: 1.8;
@@ -92,7 +93,7 @@ const TeamContainer = styled(motion.div)`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.xl};
-  max-width: 1200px;
+  max-width: 75rem;
   margin: 0 auto;
 `;
 
@@ -122,10 +123,10 @@ const PhotoContainer = styled.div<{ $order?: number }>`
 const PhotoFrame = styled(motion.div)`
   position: relative;
   width: 100%;
-  max-width: 350px;
+  max-width: 21.875rem;
   margin: 0 auto;
   aspect-ratio: 1;
-  border-radius: 20px;
+  border-radius: 1.25rem;
   overflow: hidden;
   background: rgba(20, 30, 25, 0.6);
   backdrop-filter: blur(12px);
@@ -138,7 +139,7 @@ const PhotoFrame = styled(motion.div)`
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 20px;
+    border-radius: 1.25rem;
     padding: 2px;
     background: linear-gradient(
       135deg,
@@ -180,10 +181,10 @@ const NameLabel = styled(motion.div)`
   &::after {
     content: '';
     position: absolute;
-    bottom: -8px;
+    bottom: -0.5rem;
     left: 50%;
     transform: translateX(-50%);
-    width: 60px;
+    width: 3.75rem;
     height: 1px;
     background: linear-gradient(
       90deg,
@@ -229,7 +230,7 @@ const IntroText = styled.p`
   letter-spacing: 0.02em;
   background: rgba(20, 30, 25, 0.3);
   padding: ${({ theme }) => theme.spacing.lg};
-  border-radius: 12px;
+  border-radius: 0.75rem;
   border: 1px solid rgba(200, 159, 129, 0.1);
   backdrop-filter: blur(8px);
   position: relative;
@@ -240,13 +241,13 @@ const IntroText = styled.p`
     left: 0;
     top: 0;
     bottom: 0;
-    width: 3px;
+    width: 0.1875rem;
     background: linear-gradient(
       180deg,
       ${({ theme }) => theme.colors.primary},
       ${({ theme }) => theme.colors.accent}
     );
-    border-radius: 12px 0 0 12px;
+    border-radius: 0.75rem 0 0 0.75rem;
   }
 
   @media (max-width: 768px) {
@@ -276,7 +277,7 @@ const StatsGrid = styled.div`
 const StatCard = styled(motion.div)`
   background: rgba(20, 30, 25, 0.4);
   padding: ${({ theme }) => theme.spacing.lg};
-  border-radius: 12px;
+  border-radius: 0.75rem;
   border: 1px solid rgba(200, 159, 129, 0.1);
   backdrop-filter: blur(8px);
   text-align: center;
@@ -397,7 +398,7 @@ export default function AboutSection() {
               <StatCard
                 whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.2 }}
-                style={{ maxWidth: '400px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}
+                style={{ maxWidth: '25rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}
               >
                 <StatNumber style={{ marginBottom: 0 }}>WGU</StatNumber>
                 <StatLabel>Bachelor of Science in Software Engineering</StatLabel>

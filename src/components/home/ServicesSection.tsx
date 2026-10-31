@@ -22,7 +22,7 @@ const ServicesWrapper = styled(Section)`
 const Header = styled.div`
   text-align: center;
   margin-bottom: ${({ theme }) => theme.spacing.xxl};
-  max-width: 800px;
+  max-width: 50rem;
   margin-left: auto;
   margin-right: auto;
   position: relative;
@@ -63,7 +63,7 @@ const CardWrapper = styled(motion.div)`
 const ServiceCard = styled(motion.div)`
   background: rgba(20, 30, 25, 0.6);
   padding: ${({ theme }) => theme.spacing.xl};
-  border-radius: 16px;
+  border-radius: 1rem;
   border: 1px solid rgba(200, 159, 129, 0.1);
   backdrop-filter: blur(12px);
   display: flex;
@@ -79,7 +79,7 @@ const ServiceCard = styled(motion.div)`
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 16px;
+    border-radius: 1rem;
     padding: 1px;
     background: linear-gradient(
       135deg,

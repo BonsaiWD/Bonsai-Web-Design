@@ -41,10 +41,10 @@ const focusRing = css`
 
 const FooterWrapper = styled.footer`
   position: relative;
-  padding: 88px 0 48px;
+  padding: 5.5rem 0 3rem;
   color: ${({ theme }) => theme.colors.textSecondary};
   background:
-    radial-gradient(50% 160px at 50% 0, rgba(200, 159, 129, 0.08), transparent),
+    radial-gradient(50% 10rem at 50% 0, rgba(200, 159, 129, 0.08), transparent),
     ${({ theme }) => theme.colors.background};
 
   /* The hairline across its top, the one strong line that sets the footer apart */
@@ -58,7 +58,7 @@ const FooterWrapper = styled.footer`
   }
 
   @media (max-width: 768px) {
-    padding: 64px 0 40px;
+    padding: 4rem 0 2.5rem;
   }
 `;
 
@@ -66,14 +66,14 @@ const FooterWrapper = styled.footer`
 const FooterContent = styled.div`
   display: grid;
   grid-template-columns: 1fr;
-  gap: 40px;
+  gap: 2.5rem;
   text-align: center;
 
   @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
     /* minmax(0, 1fr): a plain 1fr track will not shrink below its content, so the
        unwrappable payment-icon row pushed the page wider than 768–786px viewports */
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 48px;
+    gap: 3rem;
     text-align: left;
   }
 `;
@@ -90,11 +90,11 @@ const Wordmark = styled.p`
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.text};
-  margin-bottom: 18px;
+  margin-bottom: 1.125rem;
 
   span {
     display: block;
-    margin-top: 8px;
+    margin-top: 0.5rem;
     padding-left: 0.34em;
     text-indent: 0;
     font-family: ${({ theme }) => theme.fonts.caps};
@@ -121,14 +121,14 @@ const Label = styled.h2`
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 `;
 
 // The address in the ink, with a bronze hairline that draws across under it on hover
 const MailLink = styled.a`
   position: relative;
   display: inline-block;
-  padding-bottom: 4px;
+  padding-bottom: 0.25rem;
   color: ${({ theme }) => theme.colors.text};
   transition: color ${DUR.hover}s ${ease};
 
@@ -174,7 +174,7 @@ const Payments = styled.ul`
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 14px 18px;
+  gap: 0.875rem 1.125rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -191,18 +191,18 @@ const Payments = styled.ul`
 `;
 
 const Bottom = styled.div`
-  margin-top: 64px;
+  margin-top: 4rem;
 
   /* A quieter divider than the footer's top edge, in the range of the site's other row dividers */
   &::before {
     content: '';
     display: block;
-    margin-bottom: 24px;
+    margin-bottom: 1.5rem;
     ${hairline(18)}
   }
 
   @media (max-width: 768px) {
-    margin-top: 48px;
+    margin-top: 3rem;
   }
 `;
 

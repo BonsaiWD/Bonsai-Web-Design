@@ -9,8 +9,16 @@ export const GlobalStyle = createGlobalStyle`
     padding: 0;
   }
 
+  /*
+   * The page's base size: 16px up to a 1728px-wide window (a 16" laptop), so
+   * laptops are unchanged. On larger monitors it grows with the window, to
+   * 22px at about 2600px wide, and everything sized in rem grows with it, so
+   * the page fills a big screen as it fills a laptop (owner, 2026-10-31). The
+   * height term holds it back on short, wide windows, where larger type
+   * would crowd the hero. Breakpoints stay in px.
+   */
   html {
-    font-size: 16px;
+    font-size: clamp(16px, min(16px + (100vw - 1728px) * 0.0068, 16px + (100vh - 840px) * 0.0117), 22px);
   }
 
   /* Smooth anchor jumps only for readers who have not asked for less motion */
@@ -67,7 +75,7 @@ export const GlobalStyle = createGlobalStyle`
      it clear of the fixed header instead of tucking it underneath. Section
      anchors (#portfolio, #contact) are not matched, so jump targets are unchanged. */
   a, button, input, select, textarea, [tabindex] {
-    scroll-margin-top: 104px;
+    scroll-margin-top: 6.5rem;
   }
 
   /* Hide the native cursor only where CursorGlow renders (same query string) */

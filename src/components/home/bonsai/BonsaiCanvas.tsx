@@ -156,9 +156,12 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
       }
       if (cancelled) return;
 
-      // The canvas fills the hero's pinned layer.
-      const treeHeight = () => Math.min(canvas.clientHeight * TREE.share, TREE.max);
-      const count = Math.round(16000 * Math.min(1.2, Math.max(0.6, treeHeight() / 760)));
+      // The canvas fills the hero's pinned layer. The tree's cap is in rem, so it grows with the base
+      // size on large monitors, and the count grows with its area there, to keep it as dense.
+      const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const treeHeight = () => Math.min(canvas.clientHeight * TREE.share, TREE.max * rem());
+      const grown = rem() / 16;
+      const count = Math.round(16000 * grown ** 2 * Math.min(1.2, Math.max(0.6, treeHeight() / grown / 760)));
       const field = buildBonsaiField(img, BONSAI_SOURCE, count);
       renderer = createBonsaiRenderer(canvas, field, { tint: theme.colors.primary, hot: theme.colors.text });
       if (!renderer) {

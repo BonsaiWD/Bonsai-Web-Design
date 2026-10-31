@@ -49,7 +49,7 @@ const Overlay = styled(motion.div)`
 const Stage = styled(motion.div)`
   position: relative;
   width: 100%;
-  max-width: 460px;
+  max-width: 28.75rem;
   margin: auto;
 `;
 
@@ -57,7 +57,7 @@ const Stage = styled(motion.div)`
 // fading out inside the field so no edge shows around the card
 const Light = styled.div`
   ${lightField}
-  inset: -48px;
+  inset: -3rem;
   background:
     radial-gradient(40% 30% at 50% 26%, rgba(200, 159, 129, 0.3), transparent 70%),
     radial-gradient(44% 34% at 40% 72%, rgba(174, 196, 168, 0.22), transparent 70%);
@@ -65,11 +65,11 @@ const Light = styled.div`
 
 const Card = styled.div`
   ${glassPane}
-  padding: 40px 36px 36px;
+  padding: 2.5rem 2.25rem 2.25rem;
   text-align: center;
 
   @media (max-width: 768px) {
-    padding: 32px 20px 28px;
+    padding: 2rem 1.25rem 1.75rem;
   }
 `;
 
@@ -86,9 +86,9 @@ const appear = keyframes`
 
 const Mark = styled.svg`
   display: block;
-  width: 120px;
+  width: 7.5rem;
   height: auto;
-  margin: 0 auto 22px;
+  margin: 0 auto 1.375rem;
   overflow: visible;
   color: ${({ theme }) => theme.colors.primary};
 `;
@@ -175,7 +175,7 @@ const Title = styled.h2`
 
 const Message = styled.p`
   max-width: 34ch;
-  margin: 0 auto 32px;
+  margin: 0 auto 2rem;
   font-size: 1rem;
   line-height: 1.7;
   color: ${({ theme }) => theme.colors.textSecondary};
@@ -183,7 +183,7 @@ const Message = styled.p`
 
 const CloseButton = styled.button`
   ${frostedButton}
-  padding: 0 36px;
+  padding: 0 2.25rem;
 `;
 
 interface SuccessModalProps {

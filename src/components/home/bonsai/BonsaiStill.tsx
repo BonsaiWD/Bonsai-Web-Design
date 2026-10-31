@@ -16,7 +16,7 @@ const Frame = styled.div`
   position: absolute;
   left: 50%;
   top: ${TREE.centre * 100}%;
-  height: min(${TREE.share * 100}%, ${TREE.max}px);
+  height: min(${TREE.share * 100}%, ${TREE.max}rem);
   aspect-ratio: 693 / 783;
   transform: translate(-50%, -50%);
   z-index: 1;

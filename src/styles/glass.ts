@@ -30,7 +30,7 @@ export const glassTheme: DefaultTheme = {
  */
 export const lightField = css`
   position: absolute;
-  inset: -60px -24px;
+  inset: -3.75rem -1.5rem;
   background:
     radial-gradient(38% 46% at 24% 42%, rgba(174, 196, 168, 0.32), transparent 70%),
     radial-gradient(34% 44% at 80% 66%, rgba(200, 159, 129, 0.24), transparent 72%);
@@ -40,7 +40,7 @@ export const lightField = css`
 /** The pane itself */
 export const glassPane = css`
   position: relative;
-  border-radius: 28px;
+  border-radius: 1.75rem;
   /* Smoked forest glass: a little light caught across its upper half, over a deep green tint */
   background:
     linear-gradient(160deg, rgba(232, 240, 228, 0.1) 0%, rgba(232, 240, 228, 0.02) 42%, transparent 60%),
@@ -74,6 +74,6 @@ export const glassPane = css`
   }
 
   @media (max-width: 768px) {
-    border-radius: 20px;
+    border-radius: 1.25rem;
   }
 `;

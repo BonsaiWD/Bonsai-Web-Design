@@ -72,7 +72,7 @@ const WizardWrapper = styled(Section)`
     rgba(20, 40, 30, 0.25) 50%,
     rgba(16, 32, 24, 0.35) 100%
   );
-  padding: 168px 0 ${({ theme }) => theme.spacing.xxxl};
+  padding: 10.5rem 0 ${({ theme }) => theme.spacing.xxxl};
   position: relative;
 
   @media (max-width: 768px) {
@@ -81,7 +81,7 @@ const WizardWrapper = styled(Section)`
 `;
 
 const FormContainer = styled(Container)`
-  max-width: 800px;
+  max-width: 50rem;
   position: relative;
   z-index: 1;
 `;
@@ -104,7 +104,7 @@ const BRANCHES = [
 
 const Steps = styled.div`
   position: relative;
-  width: min(${FAN_W}px, 100%);
+  width: min(${FAN_W / 16}rem, 100%);
   margin: 0 auto ${({ theme }) => theme.spacing.lg};
 `;
 
@@ -235,7 +235,7 @@ const PadGroup = styled.g`
 const StepNames = styled.ol`
   position: relative;
   height: 1.2rem;
-  margin: 10px 0 0;
+  margin: 0.625rem 0 0;
   padding: 0;
   list-style: none;
 `;
@@ -330,10 +330,10 @@ const CardLight = styled.div`
 
 const FormCard = styled.div`
   ${glassPane}
-  padding: 56px;
+  padding: 3.5rem;
 
   @media (max-width: 768px) {
-    padding: 36px 20px 32px;
+    padding: 2.25rem 1.25rem 2rem;
   }
 `;
 
@@ -369,7 +369,7 @@ const FormLead = styled.p`
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: 40px;
+  margin-bottom: 2.5rem;
 
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     background: ${bronzeCaps} 0 0 / 100% 1.8em repeat-y;
@@ -381,7 +381,7 @@ const FormLead = styled.p`
 
 // Room for the tallest step (the details), so the card and its button stay put from step to step
 const StepFields = styled.div`
-  min-height: 260px;
+  min-height: 16.25rem;
 `;
 
 // Each step is a group whose legend names it for screen readers, read out as focus moves into it
@@ -405,7 +405,7 @@ const Field = styled.div.attrs({
     // Allow hydration mismatches from browser extensions (e.g., LastPass)
     suppressHydrationWarning: true,
 })`
-  margin-bottom: 28px;
+  margin-bottom: 1.75rem;
 `;
 
 const Label = styled.label`
@@ -425,7 +425,7 @@ const FIELD_LINE = 60;
 // and full bronze and doubled while it has focus
 const hairline = css`
   width: 100%;
-  padding: 10px 0 12px;
+  padding: 0.625rem 0 0.75rem;
   border: 0;
   border-bottom: 1px solid ${({ theme }) => tint(theme.colors.primary, FIELD_LINE)};
   border-radius: 0;
@@ -483,10 +483,10 @@ const Select = styled.select`
   ${hairline}
   appearance: none;
   cursor: pointer;
-  padding-right: 28px;
+  padding-right: 1.75rem;
   background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23C89F81' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 4px center;
+  background-position: right 0.25rem center;
 
   /* The open list, where the browser lets it be styled */
   option {
@@ -502,9 +502,9 @@ const TextArea = styled.textarea.attrs({
     suppressHydrationWarning: true,
 })`
   ${hairline}
-  min-height: 132px;
-  margin-top: 8px;
-  padding: 12px 14px;
+  min-height: 8.25rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem 0.875rem;
   border: 1px solid ${({ theme }) => tint(theme.colors.primary, FIELD_LINE)};
   line-height: 1.6;
   resize: vertical;
@@ -521,7 +521,7 @@ const TextArea = styled.textarea.attrs({
 
 const ErrorMessage = styled.span`
   display: block;
-  margin-top: 6px;
+  margin-top: 0.375rem;
   font-size: 0.85rem;
   color: ${({ theme }) => theme.colors.error};
 `;
@@ -531,7 +531,7 @@ const ButtonGroup = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: ${({ theme }) => theme.spacing.md};
-  margin-top: 40px;
+  margin-top: 2.5rem;
 `;
 
 const NextButton = styled.button`
@@ -551,8 +551,8 @@ const NextButton = styled.button`
 // Back: a line of text on a bronze hairline, like the hero's button
 const BackButton = styled.button`
   position: relative;
-  min-height: 48px;
-  padding: 0 4px;
+  min-height: 3rem;
+  padding: 0 0.25rem;
   background: none;
   border: 0;
   cursor: pointer;
@@ -565,7 +565,7 @@ const BackButton = styled.button`
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 10px;
+    bottom: 0.625rem;
     height: 1px;
     background: linear-gradient(90deg, transparent, ${({ theme }) => tint(theme.colors.primary, 60)} 25% 75%, transparent);
     pointer-events: none;
@@ -611,7 +611,9 @@ export default function ContactWizard() {
     useEffect(() => {
         if (!planted) return;
         const pads = document.querySelector(`[${ROOT_END_ATTR}]`)?.getBoundingClientRect();
-        const padsSeen = !!pads && pads.top + PAD_Y > 0 && pads.top + PAD_Y < window.innerHeight;
+        // PAD_Y is in the fan's own units, which grow and shrink with it
+        const padsY = pads ? pads.top + (PAD_Y * pads.width) / FAN_W : 0;
+        const padsSeen = !!pads && padsY > 0 && padsY < window.innerHeight;
         const timer = window.setTimeout(() => setShowSuccessModal(true), reduce || !padsSeen ? 0 : THANKS_AT);
         return () => window.clearTimeout(timer);
     }, [planted, reduce]);

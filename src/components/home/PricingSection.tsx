@@ -24,7 +24,7 @@ const PricingWrapper = styled(Section)`
 const Header = styled.div`
   text-align: center;
   margin-bottom: ${({ theme }) => theme.spacing.xxl};
-  max-width: 800px;
+  max-width: 50rem;
   margin-left: auto;
   margin-right: auto;
   position: relative;
@@ -66,7 +66,7 @@ const CardWrapper = styled(motion.div)`
 const PricingCard = styled(motion.div) <{ $isHovered?: boolean }>`
   background: rgba(20, 30, 25, 0.5);
   padding: ${({ theme }) => theme.spacing.xl};
-  border-radius: 24px;
+  border-radius: 1.5rem;
   border: 1px solid rgba(200, 159, 129, 0.15);
   backdrop-filter: blur(20px);
   display: flex;
@@ -85,7 +85,7 @@ const PricingCard = styled(motion.div) <{ $isHovered?: boolean }>`
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 24px;
+    border-radius: 1.5rem;
     padding: 1px;
     background: linear-gradient(
       135deg,
@@ -130,10 +130,10 @@ const PricingCard = styled(motion.div) <{ $isHovered?: boolean }>`
 
 const FloatingShadow = styled(motion.div)`
   position: absolute;
-  bottom: -20px;
+  bottom: -1.25rem;
   left: 10%;
   right: 10%;
-  height: 40px;
+  height: 2.5rem;
   background: radial-gradient(
     ellipse at center,
     rgba(0, 0, 0, 0.3) 0%,
@@ -146,15 +146,15 @@ const FloatingShadow = styled(motion.div)`
 `;
 
 const IconWrapper = styled(motion.div)`
-  width: 70px;
-  height: 70px;
+  width: 4.375rem;
+  height: 4.375rem;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2rem;
   color: ${({ theme }) => theme.colors.primary};
   background: rgba(200, 159, 129, 0.1);
-  border-radius: 20px;
+  border-radius: 1.25rem;
   border: 1px solid rgba(200, 159, 129, 0.2);
   filter: drop-shadow(0 0 15px rgba(200, 159, 129, 0.2));
   transition: all 0.4s ease;
@@ -165,7 +165,7 @@ const PriceContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
 `;
 
 const PricePrefix = styled.div`
@@ -208,7 +208,7 @@ const PriceDescription = styled.div`
 `;
 
 const Divider = styled(motion.div)`
-  width: 60px;
+  width: 3.75rem;
   height: 2px;
   background: linear-gradient(
     90deg,

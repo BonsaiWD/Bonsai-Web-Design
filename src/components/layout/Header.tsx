@@ -138,7 +138,7 @@ const NavLink = styled(Link)<{ $wideOnly?: boolean }>`
   &::after {
     content: '';
     position: absolute;
-    bottom: -4px;
+    bottom: -0.25rem;
     left: 0;
     width: 100%;
     height: 1px;
@@ -169,7 +169,7 @@ const HeaderCta = styled.a`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: 2.5rem;
   padding: 0 ${({ theme }) => theme.spacing.md};
   margin-left: ${({ theme }) => theme.spacing.sm};
   border-radius: 0;
@@ -183,7 +183,7 @@ const HeaderCta = styled.a`
   ${focusRing}
 
   @media (min-width: ${({ theme }) => theme.breakpoints.desktop}) {
-    padding: 0 20px;
+    padding: 0 1.25rem;
     margin-left: 0;
   }
 `;
@@ -238,7 +238,7 @@ const MobileCta = styled(motion.a)`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: 3rem;
   padding: 0 ${({ theme }) => theme.spacing.xl};
   border-radius: 0;
   font-family: ${({ theme }) => theme.fonts.main};

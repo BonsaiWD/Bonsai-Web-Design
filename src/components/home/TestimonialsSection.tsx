@@ -50,16 +50,16 @@ const TestimonialsWrapper = styled(Section)`
 const Carousel = styled.div``;
 
 const CarouselContainer = styled.div`
-  max-width: 800px;
+  max-width: 50rem;
   margin: 0 auto;
   position: relative;
-  height: 400px;
+  height: 25rem;
   display: flex;
   align-items: center;
   justify-content: center;
 
   @media (max-width: 768px) {
-    height: 600px;
+    height: 37.5rem;
   }
 `;
 
@@ -129,8 +129,8 @@ const Controls = styled.div`
    The 0.7 ring is 4.3:1 on the background (WCAG 1.4.11 needs 3:1), and the
    state reads from fill as well as color. */
 const Dot = styled.button<{ $active: boolean }>`
-  width: 12px;
-  height: 12px;
+  width: 0.75rem;
+  height: 0.75rem;
   border-radius: 50%;
   border: 1px solid rgba(200, 159, 129, 0.7);
   background-color: ${({ $active, theme }) => ($active ? theme.colors.primary : 'transparent')};
