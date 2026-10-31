@@ -361,7 +361,7 @@ export default function AboutSection() {
               >
                 <Image
                   src="/images/headshot.png"
-                  alt="David Aaron Shapiro - Bonsai Web Designer"
+                  alt="David Aaron Shapiro - Technical Director"
                   width={350}
                   height={350}
                   sizes={HEADSHOT_SIZES}
@@ -381,7 +381,7 @@ export default function AboutSection() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.5 }}
               >
-                Bonsai Web Designer
+                Technical Director
               </RoleLabel>
             </PhotoContainer>
 
