@@ -52,9 +52,27 @@ const Nav = styled.nav`
   align-items: center;
 `;
 
-const Logo = styled(Link)`
+/*
+ * The logo lockup, in proportions of BONSAI's size (em), so it keeps its shape at any size:
+ * "Web Design" under it, the gap between them, and the whole lockup's height (both lines set solid).
+ */
+const LOGO_SUB = 0.39;
+const LOGO_GAP = 0.25;
+const LOGO_HEIGHT = 1 + LOGO_GAP + LOGO_SUB;
+
+/*
+ * The logo is larger at the very top of the page and shrinks into the bar as the page scrolls
+ * (owner, 2026-10-31: double the old size was a little too big, and the old size itself a little
+ * small). It scales from its top-left corner, so nothing else moves, and the lift keeps BONSAI
+ * level with the nav: BONSAI's line centres 0.5em down the lockup and the nav half the lockup's
+ * height down. A touch slower than the bar's fade, since it travels further.
+ */
+const LOGO_LARGE = 1.3;
+const LOGO_LIFT = LOGO_HEIGHT / 2 - 0.5 * LOGO_LARGE; // em
+
+const Logo = styled(Link)<{ $large: boolean }>`
   font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 400;
   letter-spacing: 0.05em;
   color: ${({ theme }) => theme.colors.text};
@@ -65,19 +83,25 @@ const Logo = styled(Link)`
   display: inline-block;
   text-align: center;
   text-indent: 0.05em;
-  /* Override GlobalStyle's a { transition: all } so the focus ring appears at once */
+  transform-origin: left top;
+  transform: ${({ $large }) => ($large ? `translateY(${LOGO_LIFT.toFixed(3)}em) scale(${LOGO_LARGE})` : 'none')};
+  /* Override GlobalStyle's a { transition: all } so the focus ring appears at once; only the size moves */
   transition: none;
   ${focusRing}
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform ${DUR.state * 1.5}s ${EASE};
+  }
 
   /* "Web Design" set under the wordmark in small tracked bronze capitals, as in the footer (owner, 2026-10-31).
      Letter-spacing also trails the last letter, so the indent gives it back and the line sits centred. */
   span {
     display: block;
-    margin-top: 6px;
+    margin-top: ${(LOGO_GAP / LOGO_SUB).toFixed(3)}em;
     padding-left: 0.34em;
     text-indent: 0;
     font-family: ${({ theme }) => theme.fonts.caps};
-    font-size: 0.58rem;
+    font-size: ${LOGO_SUB}em;
     letter-spacing: 0.34em;
     color: ${({ theme }) => theme.colors.primary};
   }
@@ -355,7 +379,7 @@ export default function Header() {
       <HeaderWrapper ref={headerRef} $hidden={hidden} $scrolled={scrolled}>
         <Container>
           <Nav>
-            <Logo href="/">
+            <Logo href="/" $large={!scrolled}>
               Bonsai <span>Web Design</span>
             </Logo>
             <NavLinks>
