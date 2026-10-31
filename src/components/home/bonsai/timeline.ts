@@ -1,12 +1,18 @@
 import type { BonsaiSource } from './bonsaiField';
 
 /**
- * Where the growing bonsai plays: wide screens with a mouse, motion allowed.
- * Phones, tablets and reduced motion get a still of the finished tree, and
- * the hero text shows at once. CSS and JS both read this one string.
+ * Where the growing bonsai plays: wherever motion is allowed, phones and
+ * tablets included (owner, 2026-10-31). Reduced motion gets a still of the
+ * finished tree. CSS and JS both read these strings.
  */
-export const BONSAI_INTRO_QUERY =
-  '(prefers-reduced-motion: no-preference) and (min-width: 768px) and (hover: hover)';
+export const BONSAI_QUERY = '(prefers-reduced-motion: no-preference)';
+
+/**
+ * Where the hero text also waits for the tree, arriving with its last
+ * growth: wide screens with a mouse. On phones and tablets the text shows at
+ * once and the tree grows behind it, so the headline paints early (LCP).
+ */
+export const BONSAI_INTRO_QUERY = `${BONSAI_QUERY} and (min-width: 768px) and (hover: hover)`;
 
 /*
  * Pacing, as the owner has tuned it (2026-10-29): the whole intro 20%
@@ -69,6 +75,7 @@ export const BONSAI_SOURCE: BonsaiSource = {
  * The tree in the pinned hero: this share of the layer's height (capped), its
  * centre this far down the layer. Shared by the canvas, the still and the
  * hero's button, which rests at the pot's rim. The cap is in rem (780px at
- * the base size), so the tree grows with the page on large monitors.
+ * the base size), so the tree grows with the page on large monitors. On
+ * phones it is no wider than `fit` of the layer.
  */
-export const TREE = { share: 0.8, max: 48.75, centre: 0.53 } as const;
+export const TREE = { share: 0.8, max: 48.75, centre: 0.53, fit: 0.92 } as const;

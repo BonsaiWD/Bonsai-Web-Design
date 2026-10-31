@@ -157,12 +157,24 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
       if (cancelled) return;
 
       // The canvas fills the hero's pinned layer. The tree's cap is in rem, so it grows with the base
-      // size on large monitors, and the count grows with its area there, to keep it as dense.
+      // size on large monitors, and the count grows with its area there, to keep it as dense. On
+      // phones the tree is fitted to the width.
+      const { crop } = BONSAI_SOURCE;
+      const aspect = crop.w / crop.h;
       const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-      const treeHeight = () => Math.min(canvas.clientHeight * TREE.share, TREE.max * rem());
+      const treeHeight = () =>
+        Math.min(canvas.clientHeight * TREE.share, TREE.max * rem(), (canvas.clientWidth * TREE.fit) / aspect);
+      // Touch screens draw at up to 1.5x: the glow is soft, and it saves a third of the pixels.
+      const pixelRatio = () => Math.min(window.devicePixelRatio || 1, matchMedia('(hover: none)').matches ? 1.5 : 2);
       const grown = rem() / 16;
-      const count = Math.round(16000 * grown ** 2 * Math.min(1.2, Math.max(0.6, treeHeight() / grown / 760)));
-      const field = buildBonsaiField(img, BONSAI_SOURCE, count);
+      const size = treeHeight() / grown / 760;
+      // The particles keep their size on screen, so on a small tree (phones) the count follows its
+      // area, or the tree would be crowded and glare.
+      const count = Math.round(16000 * grown ** 2 * (size < 0.6 ? size ** 2 / 0.6 : Math.min(1.2, size)));
+      // And the photo is read at about the resolution it is shown at.
+      const detail = Math.min(1, Math.max(0.5, (treeHeight() * aspect * pixelRatio()) / crop.w));
+      const field = await buildBonsaiField(img, BONSAI_SOURCE, count, detail);
+      if (cancelled) return;
       renderer = createBonsaiRenderer(canvas, field, { tint: theme.colors.primary, hot: theme.colors.text });
       if (!renderer) {
         onFallback();
@@ -178,7 +190,7 @@ export default function BonsaiCanvas({ heroRef, imageRef, clockRef, dissolveOnSc
         const x = (w - tw) / 2;
         const y = h * TREE.centre - th / 2;
         const [bx, by] = BONSAI_SOURCE.rootBase;
-        renderer.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
+        renderer.resize(w, h, pixelRatio());
         renderer.layout([x, y, tw, th], [w / 2, h]);
         renderer.roots(buildRoots([x + bx * tw, y + by * th], [w / 2, h], tw * 0.17));
         renderer.circuit(buildCircuit([x, y, tw, th], [w / 2, h]));

@@ -3,14 +3,14 @@
 import Image from 'next/image';
 import type { Ref } from 'react';
 import styled from 'styled-components';
-import { BONSAI_INTRO_QUERY, BONSAI_SOURCE, TREE } from './timeline';
+import { BONSAI_QUERY, BONSAI_SOURCE, TREE } from './timeline';
 
 /*
- * The finished tree at its resting opacity, for phones, tablets, reduced
- * motion and browsers without WebGL2. Where it shows, it is the hero's
- * largest image, so it loads eagerly. Where the intro plays it is hidden,
- * and the canvas reads this same <img> (full width on desktop, by `sizes`),
- * so the photo is downloaded once either way.
+ * The finished tree at its resting opacity, for reduced motion and browsers
+ * without WebGL2. Where it shows, it is the hero's largest image, so it loads
+ * eagerly. Where the bonsai plays it is hidden, and the canvas reads this
+ * same <img> (full width on desktop, 92vw on phones, by `sizes`), so the
+ * photo is downloaded once either way.
  */
 const Frame = styled.div`
   position: absolute;
@@ -38,7 +38,7 @@ const Frame = styled.div`
     height: auto;
   }
 
-  @media ${BONSAI_INTRO_QUERY} {
+  @media ${BONSAI_QUERY} {
     display: none;
 
     [data-bonsai='still'] & {
