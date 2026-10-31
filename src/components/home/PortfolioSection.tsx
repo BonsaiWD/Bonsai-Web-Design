@@ -162,6 +162,29 @@ const Summary = styled.p`
   max-width: 26.25rem;
 `;
 
+// Who the work was built with (owner, 2026-10-31), in the panel's small tracked capitals behind a short
+// bronze hairline
+const Credit = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 26.25rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.6;
+  letter-spacing: 0.22em;
+  text-wrap: balance;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.textSecondary};
+
+  &::before {
+    content: '';
+    flex: 0 0 1.5rem;
+    height: 1px;
+    background: ${({ theme }) => tint(theme.colors.primary, 60)};
+  }
+`;
+
 const Branch = styled.ul`
   position: relative;
   list-style: none;
@@ -532,6 +555,7 @@ export default function PortfolioSection() {
                 <FeaturedTitle>{featured.name}</FeaturedTitle>
                 <Tagline>{featured.tagline}</Tagline>
                 <Summary>{featured.summary}</Summary>
+                {featured.credit && <Credit>{featured.credit}</Credit>}
               </FeaturedIntro>
 
               <Branch>

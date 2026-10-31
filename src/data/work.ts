@@ -10,6 +10,8 @@ export interface FeaturedClient {
   name: string;
   tagline: string;
   summary: string;
+  /** Who the work was built with, shown under the summary */
+  credit?: string;
   properties: FeaturedProperty[];
 }
 
@@ -30,6 +32,7 @@ export const featured: FeaturedClient = {
   tagline: 'Where evidence‑based longevity meets community & culture.',
   summary:
     'One longevity brand, five sites: its flagship home, an online academy, a community, and two live events.',
+  credit: 'Built In Partnership with the Healthspan Collective Team',
   properties: [
     { kind: 'Flagship Site', title: 'Healthspan Collective', url: 'https://healthspancollective.com' },
     { kind: 'Summit', title: 'Healthspan Summit', url: 'https://hssummit.com' },
