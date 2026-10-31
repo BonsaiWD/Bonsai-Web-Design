@@ -39,14 +39,20 @@ import { mulberry32 } from './bonsai/bonsaiField';
  * narrow for the jog or the forks (as on most laptops) it goes straight down
  * without them. The organic roots stop growing where they meet content.
  *
+ * On phones the content fills the width, leaving no margin to run down, so
+ * the root goes straight down the middle and shows only in the gaps between
+ * sections (owner's request, 2026-10-31): it passes behind each section and
+ * comes out below it, with its vias, its sprays of roots and its last stretch
+ * into the form. It is drawn as one path of separate stretches, so the scroll
+ * drawing and the glow at its tip carry on across the hidden parts.
+ *
  * A soft glow follows the tip and brightens while the page is scrolling,
  * then settles when it stops. It sits behind the sections (z-index -1 in an
- * isolated stage). Phones get no root. Under reduced motion it is drawn in
- * full, with no glow.
+ * isolated stage). Under reduced motion it is drawn in full, with no glow.
  */
 
-/** Where the root isn't drawn (phones). One media feature, so it can be combined with `and`. */
-export const ROOT_HIDDEN_QUERY = '(max-width: 767px)';
+/** Where the root shows only in the gaps between sections (phones). One media feature, so it can be combined with `and`. */
+export const ROOT_GAPS_QUERY = '(max-width: 767px)';
 
 const ease = `cubic-bezier(${EASE_OUT.join(', ')})`;
 
@@ -61,10 +67,6 @@ const Svg = styled.svg`
   left: 0;
   z-index: -1;
   pointer-events: none;
-
-  @media ${ROOT_HIDDEN_QUERY} {
-    display: none;
-  }
 `;
 
 const Trace = styled(motion.path)<{ $width: number; $alpha: number }>`
@@ -258,6 +260,76 @@ function contentBox(section: HTMLElement): Box {
   };
 }
 
+/** Where the root ends in the last section: the top centre of the element marked with ROOT_END_ATTR. */
+function endMark(section: HTMLElement, stage: HTMLElement): P | null {
+  const mark = section.querySelector<HTMLElement>(`[${ROOT_END_ATTR}]`);
+  if (!mark) return null;
+  const [mx, my] = offsetWithin(mark, stage);
+  return [mx + mark.offsetWidth / 2, my];
+}
+
+/** The end without a mark: a fan of traces spreading like roots from (cx, top), each ending in a pad. */
+function endFan(cx: number, top: number): Fork[] {
+  return [-2, -1, 1, 2].map((k) => {
+    const a = Math.abs(k);
+    const dir = Math.sign(k);
+    const end: P = [cx + dir * (60 + 80 * a), top + 16 * a];
+    return { d: trace([[cx, top], [cx + dir * 16 * a, top + 16 * a], end], 8), from: top, to: top + 120 * a, end };
+  });
+}
+
+/**
+ * Phones: straight down the middle, drawn only where it is clear of the content, so it shows in
+ * the gaps between sections (each stretch runs from just below one section's content to just
+ * above the next's) with a via at each section's top and roots sprouting there.
+ */
+function measureGaps(stage: HTMLElement, sections: HTMLElement[], boxes: Box[], free: (p: P) => boolean): Geometry {
+  const w = stage.clientWidth;
+  const h = stage.scrollHeight;
+  const cx = w / 2;
+  const stretches: P[][] = [];
+  const forks: Fork[] = [];
+  const rootlets: Rootlet[] = [];
+  const vias: P[] = [];
+  const rand = mulberry32(5);
+  let from = 0;
+
+  for (const side of [-1, 1, 1]) {
+    rootlets.push(...grow(rand, free, [cx + side * 4, 6], DOWN - side * (0.9 + 0.4 * rand()), 140 + 90 * rand(), 1.3, 0.012));
+  }
+
+  sections.forEach((section, i) => {
+    const top = section.offsetTop;
+    if (i > 0) {
+      vias.push([cx, top]);
+      for (const side of [-1, 1]) {
+        rootlets.push(...grow(rand, free, [cx + side * 6, top + 2], DOWN - side * (1.2 + 0.2 * rand()), 110 + 80 * rand(), 1.1, 0.006));
+      }
+    }
+    if (i === sections.length - 1) {
+      const end = endMark(section, stage);
+      if (end) stretches.push([[cx, from], [cx, end[1] - 24], end]);
+      else {
+        stretches.push([[cx, from], [cx, top]]);
+        forks.push(...endFan(cx, top));
+      }
+      for (const side of [-1, 1, -1, 1]) {
+        rootlets.push(...grow(rand, free, [cx + side * 8, top + 4], DOWN - side * (0.8 + 0.5 * rand()), 170 + 110 * rand(), 1.3, 0.01));
+      }
+      return;
+    }
+    // Down to just above this section's content, then out of sight until just below it
+    stretches.push([[cx, from], [cx, boxes[i].t - CLEAR]]);
+    from = boxes[i].b + CLEAR;
+  });
+
+  const main = stretches
+    .filter((st) => st[st.length - 1][1] - st[0][1] > 4)
+    .map((st) => trace(st))
+    .join(' ');
+  return { w, h, main, forks, rootlets, vias };
+}
+
 function measure(stage: HTMLElement): Geometry {
   const w = stage.clientWidth;
   const h = stage.scrollHeight;
@@ -267,6 +339,7 @@ function measure(stage: HTMLElement): Geometry {
   const boxes = sections.map(contentBox);
   // Ground the roots may grow through: anywhere at least CLEAR away from every section's content.
   const free = ([x, y]: P) => boxes.every((b) => x < b.l - CLEAR || x > b.r + CLEAR || y < b.t - CLEAR || y > b.b + CLEAR);
+  if (window.matchMedia(ROOT_GAPS_QUERY).matches) return measureGaps(stage, sections, boxes, free);
   const pts: P[] = [[cx, 0]];
   const forks: Fork[] = [];
   const rootlets: Rootlet[] = [];
@@ -302,21 +375,14 @@ function measure(stage: HTMLElement): Geometry {
     }
 
     if (i === sections.length - 1) {
-      const mark = section.querySelector<HTMLElement>(`[${ROOT_END_ATTR}]`);
-      if (mark) {
+      const end = endMark(section, stage);
+      if (end) {
         // The end, where the section marks it: straight down into the form, which draws the last fan.
-        const [mx, my] = offsetWithin(mark, stage);
-        const ex = mx + mark.offsetWidth / 2;
-        if (Math.abs(ex - cx) > 1) pts.push([cx, my - 40 - Math.abs(ex - cx)], [ex, my - 40]);
-        pts.push([ex, my]);
+        const [ex, ey] = end;
+        if (Math.abs(ex - cx) > 1) pts.push([cx, ey - 40 - Math.abs(ex - cx)], [ex, ey - 40]);
+        pts.push(end);
       } else {
-        // The end: a fan of traces spreading like roots, each ending in a pad.
-        for (const k of [-2, -1, 1, 2]) {
-          const a = Math.abs(k);
-          const dir = Math.sign(k);
-          const end: P = [cx + dir * (60 + 80 * a), top + 16 * a];
-          forks.push({ d: trace([[cx, top], [cx + dir * 16 * a, top + 16 * a], end], 8), from: top, to: top + 120 * a, end });
-        }
+        forks.push(...endFan(cx, top));
       }
       // And a wider spray of roots, as the root system ends.
       for (const side of [-1, 1, -1, 1]) {
@@ -394,6 +460,9 @@ export default function RootStage({ children }: { children: ReactNode }) {
       if (lk.ys[mid] < tipY) lo = mid + 1;
       else hi = mid;
     }
+    // Stop at the last point reached, so where the root passes out of sight (phones) the tip waits at
+    // the end of the gap above rather than jumping ahead to the next
+    if (lo > 0 && lk.ys[lo] > tipY) lo -= 1;
     target.set(lk.ls[lo]);
   };
 

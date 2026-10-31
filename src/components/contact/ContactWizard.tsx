@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Section, Container } from '../layout/Container';
 import SuccessModal from './SuccessModal';
-import { PLANTED_EVENT, ROOT_END_ATTR, ROOT_GLINT_MS, ROOT_HIDDEN_QUERY, ROOT_TIP_AT } from '../home/RootStage';
+import { PLANTED_EVENT, ROOT_END_ATTR, ROOT_GLINT_MS, ROOT_TIP_AT } from '../home/RootStage';
 import { DUR, EASE_OUT } from '@/lib/motion';
 import { useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { glassPane, glassTheme, lightField } from '@/styles/glass';
@@ -56,12 +56,12 @@ const ease = `cubic-bezier(${EASE_OUT.join(', ')})`;
 const tint = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 
 // When a project is sent: the root's glint reaches the steps, the fan catches the light, the pads
-// fill, and the thank-you opens. Phones don't draw the root (ROOT_HIDDEN_QUERY), so there the fan
-// starts at once. The fan's lead, 85% of the root's glint, is tuned by eye for a clean hand-off.
+// fill, and the thank-you opens. The fan's lead, 85% of the root's glint, is tuned by eye for a
+// clean hand-off.
 const FAN_GLINT_AT = Math.round(ROOT_GLINT_MS * 0.85);
 const FAN_GLINT_MS = 700;
-const PADS_FILL_AT = { wide: FAN_GLINT_AT + 500, phone: 500 };
-const THANKS_AT = { wide: FAN_GLINT_AT + FAN_GLINT_MS + 450, phone: FAN_GLINT_MS + 450 };
+const PADS_FILL_AT = FAN_GLINT_AT + 500;
+const THANKS_AT = FAN_GLINT_AT + FAN_GLINT_MS + 450;
 
 // Its content sits at the top rather than centred, so the place where the root ends stays put as
 // the steps change height; the room above is the root's way down from the via
@@ -179,11 +179,6 @@ const BranchGlint = styled.path`
     }
   }
 
-  @media (prefers-reduced-motion: no-preference) and ${ROOT_HIDDEN_QUERY} {
-    ${Steps}[data-planted='true'] & {
-      animation-delay: 0ms;
-    }
-  }
 `;
 
 // A soft light around the step in hand, like the glow at the root's tip; every pad glows once planted
@@ -198,13 +193,7 @@ const PadHalo = styled.circle`
 
   ${Steps}[data-planted='true'] & {
     opacity: 1;
-    transition-delay: ${PADS_FILL_AT.wide}ms;
-  }
-
-  @media ${ROOT_HIDDEN_QUERY} {
-    ${Steps}[data-planted='true'] & {
-      transition-delay: ${PADS_FILL_AT.phone}ms;
-    }
+    transition-delay: ${PADS_FILL_AT}ms;
   }
 `;
 
@@ -228,13 +217,7 @@ const Pad = styled.circle`
   }
 
   ${Steps}[data-planted='true'] & {
-    transition-delay: ${PADS_FILL_AT.wide}ms;
-  }
-
-  @media ${ROOT_HIDDEN_QUERY} {
-    ${Steps}[data-planted='true'] & {
-      transition-delay: ${PADS_FILL_AT.phone}ms;
-    }
+    transition-delay: ${PADS_FILL_AT}ms;
   }
 `;
 
@@ -281,13 +264,7 @@ const StepName = styled.li`
 
   /* Once planted, each name turns bronze with its pad, not before */
   ${Steps}[data-planted='true'] & {
-    transition-delay: ${PADS_FILL_AT.wide}ms;
-  }
-
-  @media ${ROOT_HIDDEN_QUERY} {
-    ${Steps}[data-planted='true'] & {
-      transition-delay: ${PADS_FILL_AT.phone}ms;
-    }
+    transition-delay: ${PADS_FILL_AT}ms;
   }
 `;
 
@@ -635,11 +612,7 @@ export default function ContactWizard() {
         if (!planted) return;
         const pads = document.querySelector(`[${ROOT_END_ATTR}]`)?.getBoundingClientRect();
         const padsSeen = !!pads && pads.top + PAD_Y > 0 && pads.top + PAD_Y < window.innerHeight;
-        const rootDrawn = !window.matchMedia(ROOT_HIDDEN_QUERY).matches;
-        const timer = window.setTimeout(
-            () => setShowSuccessModal(true),
-            reduce || !padsSeen ? 0 : rootDrawn ? THANKS_AT.wide : THANKS_AT.phone
-        );
+        const timer = window.setTimeout(() => setShowSuccessModal(true), reduce || !padsSeen ? 0 : THANKS_AT);
         return () => window.clearTimeout(timer);
     }, [planted, reduce]);
 
