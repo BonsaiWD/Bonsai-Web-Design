@@ -59,10 +59,21 @@ const Logo = styled(Link)`
   letter-spacing: 0.05em;
   color: ${({ theme }) => theme.colors.text};
   text-transform: uppercase;
+  line-height: 1;
   position: relative;
   /* Override GlobalStyle's a { transition: all } so the focus ring appears at once */
   transition: none;
   ${focusRing}
+
+  /* "Web Design" set under the wordmark in small tracked bronze capitals, as in the footer (owner, 2026-10-31) */
+  span {
+    display: block;
+    margin-top: 6px;
+    font-family: ${({ theme }) => theme.fonts.caps};
+    font-size: 0.58rem;
+    letter-spacing: 0.34em;
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 const NavLinks = styled.div`
@@ -337,7 +348,9 @@ export default function Header() {
       <HeaderWrapper ref={headerRef} $hidden={hidden} $scrolled={scrolled}>
         <Container>
           <Nav>
-            <Logo href="/">Bonsai</Logo>
+            <Logo href="/">
+              Bonsai <span>Web Design</span>
+            </Logo>
             <NavLinks>
               {navItems.map((item) => (
                 <NavLink key={item.href} href={item.href} $wideOnly={item.href === CTA.href}>
