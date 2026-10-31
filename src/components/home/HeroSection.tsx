@@ -129,7 +129,7 @@ const entrance = (delayMs: number) => css`
 /*
  * Short windows: the hero grows to fit its CTAs instead of clipping them, and
  * the scroll cue is hidden. From 768px wide the centred content is about
- * 265px tall and the cue 88px tall, 40px from the bottom, so the cue clears
+ * 216px tall and the cue 88px tall, 40px from the bottom, so the cue clears
  * the button by at least 16px from 736px tall. Phones in portrait hold it all
  * in one screen, so they pin like desktop and the bonsai holds while it turns
  * to light (owner, 2026-10-31); held sideways (under 500px tall) they grow to
@@ -248,17 +248,6 @@ const Content = styled(Container)`
   display: flex;
   flex-direction: column;
   align-items: center;
-`;
-
-const PreTitle = styled.span`
-  font-family: ${({ theme }) => theme.fonts.main};
-  font-size: 0.9rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.gold};
-  margin-bottom: ${({ theme }) => theme.spacing.lg};
-  display: block;
-  ${entrance(0)}
 `;
 
 /*
@@ -597,8 +586,6 @@ export default function HeroSection() {
         <TextScrim />
 
         <Content>
-          <PreTitle>Est. 2022</PreTitle>
-
           <Tagline
             ref={headlineRef}
             onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
