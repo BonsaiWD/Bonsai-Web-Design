@@ -85,7 +85,7 @@ const bronzeCaps = css`
 const GLINT_AT = { quick: 600, intro: Math.round(INTRO.text + INTRO.textSettle * 0.4), next: 300 };
 
 /*
- * What the websites do, completing "Bespoke websites…" (owner, 2026-10-30),
+ * What the websites do, completing "We build bespoke websites…" (owner, 2026-10-30),
  * each led by "that" on the headline's second line, where they take turns in
  * a loop (the owner's choice), which waits while the pointer rests on the headline or the
  * hero is out of view, and stops with the pause button (WCAG 2.2.2). Reduced
@@ -603,7 +603,7 @@ export default function HeroSection() {
             onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
             onPointerLeave={() => setHeld(false)}
           >
-            Bespoke websites <VisuallyHidden>{SPOKEN}</VisuallyHidden>
+            We build bespoke websites <VisuallyHidden>{SPOKEN}</VisuallyHidden>
             <Statements aria-hidden="true">
               {STATEMENTS.map((words, i) => (
                 <em
