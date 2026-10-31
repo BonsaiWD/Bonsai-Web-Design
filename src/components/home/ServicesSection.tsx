@@ -3,7 +3,8 @@
 import styled from 'styled-components';
 import { Section, Container } from '../layout/Container';
 import { motion } from 'framer-motion';
-import { SiReact, SiFigma, SiShopify, SiNextdotjs } from 'react-icons/si';
+import { SiFigma, SiNextdotjs } from 'react-icons/si';
+import { BsBag, BsVectorPen } from 'react-icons/bs';
 import GradientText from '../common/GradientText';
 import { DUR, EASE_OUT, RISE, STAGGER } from '@/lib/motion';
 
@@ -160,27 +161,27 @@ interface Service {
 const services: Service[] = [
   {
     id: 1,
-    title: 'Experience Design',
-    description: 'Intuitive interfaces designed to captivate and convert. We blend aesthetics with functionality to create seamless user journeys.',
+    title: 'UI/UX Design',
+    description: 'Pages shaped around what your visitors came to do, prototyped in Figma and refined until reaching you feels effortless.',
     icon: <SiFigma />,
   },
   {
     id: 2,
-    title: 'Technical Development',
-    description: 'Robust, scalable architectures built with modern frameworks. Speed, security, and performance come as standard.',
+    title: 'Web Development',
+    description: 'Custom-built in Next.js, never from a template: fast, easy to find on Google, accessible to everyone, and ready to grow with you.',
     icon: <SiNextdotjs />,
   },
   {
     id: 3,
     title: 'Brand Identity',
-    description: 'Crafting visual languages that tell your story. From logos to typography, we build systems that resonate with your audience.',
-    icon: <SiReact />, // Using React icon as abstract symbol for "System"
+    description: 'A logo, palette and type that tell your story at a glance, with a simple guide that keeps everything you publish consistent.',
+    icon: <BsVectorPen />,
   },
   {
     id: 4,
     title: 'E-Commerce',
-    description: 'Seamless shopping experiences. From custom storefronts to secure payment integrations, we help you sell with style.',
-    icon: <SiShopify />,
+    description: 'Storefronts as considered as your products: a quick, secure checkout, and orders and inventory you can manage yourself.',
+    icon: <BsBag />,
   },
 ];
 
@@ -195,7 +196,7 @@ export default function ServicesSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <GradientText>Refined Digital Solutions</GradientText>
+            <GradientText>What We Grow</GradientText>
           </Title>
         </Header>
 
