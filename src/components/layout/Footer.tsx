@@ -78,8 +78,12 @@ const FooterContent = styled.div`
   }
 `;
 
-// The header's wordmark, with "Web Design" set under it in small tracked capitals
+// The header's wordmark, with "Web Design" centred under it in small tracked capitals (the indent gives
+// back the letter-spacing that trails its last letter)
 const Wordmark = styled.p`
+  display: inline-block;
+  text-align: center;
+  text-indent: 0.06em;
   font-family: ${({ theme }) => theme.fonts.heading};
   font-size: 1.6rem;
   line-height: 1;
@@ -91,6 +95,8 @@ const Wordmark = styled.p`
   span {
     display: block;
     margin-top: 8px;
+    padding-left: 0.34em;
+    text-indent: 0;
     font-family: ${({ theme }) => theme.fonts.caps};
     font-size: 0.66rem;
     letter-spacing: 0.34em;

@@ -61,14 +61,21 @@ const Logo = styled(Link)`
   text-transform: uppercase;
   line-height: 1;
   position: relative;
+  /* A lockup: the two lines centred on each other, each indented by the letter-spacing that trails it */
+  display: inline-block;
+  text-align: center;
+  text-indent: 0.05em;
   /* Override GlobalStyle's a { transition: all } so the focus ring appears at once */
   transition: none;
   ${focusRing}
 
-  /* "Web Design" set under the wordmark in small tracked bronze capitals, as in the footer (owner, 2026-10-31) */
+  /* "Web Design" set under the wordmark in small tracked bronze capitals, as in the footer (owner, 2026-10-31).
+     Letter-spacing also trails the last letter, so the indent gives it back and the line sits centred. */
   span {
     display: block;
     margin-top: 6px;
+    padding-left: 0.34em;
+    text-indent: 0;
     font-family: ${({ theme }) => theme.fonts.caps};
     font-size: 0.58rem;
     letter-spacing: 0.34em;
