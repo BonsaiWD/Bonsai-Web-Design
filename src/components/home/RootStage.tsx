@@ -285,7 +285,7 @@ function endFan(cx: number, top: number): Fork[] {
  */
 function measureGaps(stage: HTMLElement, sections: HTMLElement[], boxes: Box[], free: (p: P) => boolean): Geometry {
   const w = stage.clientWidth;
-  const h = stage.scrollHeight;
+  const h = stage.offsetHeight;
   const cx = w / 2;
   const stretches: P[][] = [];
   const forks: Fork[] = [];
@@ -332,7 +332,8 @@ function measureGaps(stage: HTMLElement, sections: HTMLElement[], boxes: Box[], 
 
 function measure(stage: HTMLElement): Geometry {
   const w = stage.clientWidth;
-  const h = stage.scrollHeight;
+  // The content's height: scrollHeight would include the drawing itself, which could then only grow
+  const h = stage.offsetHeight;
   const cx = w / 2;
   const gutter = clamp(w * 0.03, 20, 56);
   const sections = Array.from(stage.querySelectorAll<HTMLElement>(':scope > section'));
