@@ -226,7 +226,7 @@ export default function Footer() {
             <Wordmark>
               Bonsai <span>Web Design</span>
             </Wordmark>
-            <Tagline>Crafting timeless design and meaningful content for modern brands.</Tagline>
+            <Tagline>Custom websites, crafted with care.</Tagline>
           </div>
           <div>
             <Label>Contact</Label>

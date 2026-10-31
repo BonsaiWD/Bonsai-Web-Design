@@ -35,8 +35,11 @@ const italiana = Italiana({
 });
 
 export const metadata: Metadata = {
-  title: 'Bonsai Web Design | Premium Web Design Agency',
-  description: 'Crafting timeless design and meaningful content for modern brands.',
+  // What Google shows for the site: the words people search ("custom website design"), with the brand's
+  // "crafted with care" and the husband-and-wife team in the description (owner's wording, 2026-10-31)
+  title: 'Custom Website Design | Bonsai Web Design',
+  description:
+    'Custom websites and redesigns, crafted with care by a husband-and-wife design team. Start fresh, or build on the site you have.',
 };
 
 export default function RootLayout({
