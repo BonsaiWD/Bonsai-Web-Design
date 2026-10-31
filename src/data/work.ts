@@ -26,7 +26,8 @@ export interface Project {
 // Featured client: every property we've built for the Healthspan Collective
 export const featured: FeaturedClient = {
   name: 'Healthspan Collective',
-  tagline: 'Where evidence-based longevity meets community & culture.',
+  // A non-breaking hyphen (‑), so "evidence-based" never splits across two lines
+  tagline: 'Where evidence‑based longevity meets community & culture.',
   summary:
     'One longevity brand, five sites: its flagship home, an online academy, a community, and two live events.',
   properties: [
@@ -38,7 +39,7 @@ export const featured: FeaturedClient = {
   ],
 };
 
-// Further work, shown under the featured client. Longevity and performance only.
+// Further work, shown under the featured client
 export const projects: Project[] = [
   {
     title: 'AthleteXperience',
@@ -47,5 +48,28 @@ export const projects: Project[] = [
       'A mobile platform for youth and amateur athletes to log training, share highlights and get discovered by recruiters.',
     url: 'https://theathletexperience.com',
     status: 'In development',
+  },
+  {
+    title: 'Elias Arjan',
+    tags: ['Personal Brand', 'Speaker'],
+    description:
+      'The home of longevity speaker and futurist Elias Arjan: his mission of 100 healthy years, his keynotes and ventures, and a way to book him for your stage.',
+    url: 'https://eliasarjan.com',
+  },
+  {
+    title: 'Casa Verde',
+    tags: ['Vacation Rental', 'Booking Site'],
+    description:
+      'A booking site for a villa between the jungle and the ocean in Santa Teresa, Costa Rica: the property, a gallery, curated experiences and live availability.',
+    url: 'https://rental-property-demo.vercel.app',
+    status: 'Demo',
+  },
+  {
+    title: 'UPrompt',
+    tags: ['AI Tool', 'Web App'],
+    description:
+      'An AI prompt engineering app: write a rough idea, have it rebuilt into a sharp, effective prompt, then save it or refine it in a chat with your choice of model.',
+    url: 'https://uprompt.vercel.app',
+    status: 'Demo',
   },
 ];
