@@ -1,27 +1,16 @@
 'use client';
 
-import styled, { css, ThemeProvider, type DefaultTheme } from 'styled-components';
+import styled, { ThemeProvider } from 'styled-components';
 import { motion } from 'framer-motion';
 import { Fragment } from 'react';
 import { Section, Container } from '../layout/Container';
 import GradientText from '../common/GradientText';
 import { FiArrowUpRight } from 'react-icons/fi';
 import { featured, projects } from '@/data/work';
-import { theme as siteTheme } from '@/styles/theme';
+import { glassPane, glassTheme, lightField } from '@/styles/glass';
 
 const displayDomain = (url: string) => new URL(url).hostname.replace(/^www\./, '');
 const pad = (n: number) => String(n).padStart(2, '0');
-
-// The featured client and the further work each sit behind a pane of glass, smoked with the forest
-// green: the site's own palette, bone ink and bronze details, so they stay clear and legible while
-// the light behind shows through. The body text is a touch lighter than elsewhere, to hold up on the glass.
-const glass: DefaultTheme = {
-  ...siteTheme,
-  colors: {
-    ...siteTheme.colors,
-    textSecondary: '#AEB9AF',
-  },
-};
 
 // A theme colour at some strength, for hairlines and washes that follow whichever palette is in use
 const tint = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, transparent)`;
@@ -71,61 +60,14 @@ const SectionTitle = styled(motion.h2)`
 
 /* ---------- The glass ---------- */
 
-// A pane of glass and the light it looks through, revealed together
+// The featured client and the additional projects each sit behind a pane of smoked glass
+// (src/styles/glass.ts), and the pane and the light it looks through are revealed together
 const GlassStage = styled(motion.div)`
   position: relative;
 `;
 
-// What the glass looks through: a soft sage light and a little bronze warmth. It stays still, so
-// the pane costs nothing extra to scroll past.
 const LightField = styled.div`
-  position: absolute;
-  inset: -60px -24px;
-  background:
-    radial-gradient(38% 46% at 24% 42%, rgba(174, 196, 168, 0.32), transparent 70%),
-    radial-gradient(34% 44% at 80% 66%, rgba(200, 159, 129, 0.24), transparent 72%);
-  pointer-events: none;
-`;
-
-// The pane itself, shared by the featured client and the additional projects
-const glassPane = css`
-  position: relative;
-  border-radius: 28px;
-  /* Smoked forest glass: a little light caught across its upper half, over a deep green tint */
-  background:
-    linear-gradient(160deg, rgba(232, 240, 228, 0.1) 0%, rgba(232, 240, 228, 0.02) 42%, transparent 60%),
-    linear-gradient(160deg, rgba(34, 50, 40, 0.52) 0%, rgba(12, 18, 14, 0.62) 100%);
-  -webkit-backdrop-filter: blur(3px) saturate(160%);
-  backdrop-filter: blur(3px) saturate(160%);
-  /* The rim catching the light: brightest top-left, a fainter echo bottom-right, and the
-     faint glow inside a thick pane */
-  box-shadow:
-    inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.3),
-    inset -1px -1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 0 32px rgba(232, 240, 228, 0.07),
-    0 24px 60px -24px rgba(0, 0, 0, 0.7);
-  color: ${({ theme }) => theme.colors.text};
-  overflow: hidden;
-
-  /* A soft sheen across the upper left, as on curved glass */
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.09), transparent 55%);
-    pointer-events: none;
-  }
-
-  /* For visitors who ask for less transparency, a solid pane in the same greens */
-  @media (prefers-reduced-transparency: reduce) {
-    background: linear-gradient(160deg, #1d2b22 0%, #111813 100%);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  @media (max-width: 768px) {
-    border-radius: 20px;
-  }
+  ${lightField}
 `;
 
 /* ---------- Featured client ---------- */
@@ -577,7 +519,7 @@ export default function PortfolioSection() {
           </SectionTitle>
         </Header>
 
-        <ThemeProvider theme={glass}>
+        <ThemeProvider theme={glassTheme}>
           <FeaturedStage {...paneReveal}>
             <LightField aria-hidden="true" />
             <FeaturedPanel>

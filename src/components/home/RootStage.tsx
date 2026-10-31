@@ -13,6 +13,7 @@ import {
 } from 'framer-motion';
 import { useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT } from '@/lib/motion';
+import { GLINT_EASE } from '@/styles/bronze';
 import { mulberry32 } from './bonsai/bonsaiField';
 
 /*
@@ -21,7 +22,11 @@ import { mulberry32 } from './bonsai/bonsaiField';
  * then runs like a PCB trace: straight runs down the side gutters, 45°
  * bends, and horizontal crossings between sections through a via just above
  * each section. Along the way it forks like a root, each fork ending in a
- * small pad, and it ends at the contact section in a fan of traces.
+ * small pad. At the contact section it runs on down into the form, whose
+ * steps are its last fan of traces (ContactWizard draws them, at the element
+ * marked with ROOT_END_ATTR); without that mark it ends there in a fan of its own.
+ * When a project is sent, a glint runs down its last stretch into the form
+ * (PLANTED_EVENT).
  *
  * Organic roots, grown the same way as the hero's (a seeded random walk
  * that wanders, sinks and forks), sprout from it: where the hero's taproot
@@ -40,6 +45,9 @@ import { mulberry32 } from './bonsai/bonsaiField';
  * full, with no glow.
  */
 
+/** Where the root isn't drawn (phones). One media feature, so it can be combined with `and`. */
+export const ROOT_HIDDEN_QUERY = '(max-width: 767px)';
+
 const ease = `cubic-bezier(${EASE_OUT.join(', ')})`;
 
 const Stage = styled.div`
@@ -54,7 +62,7 @@ const Svg = styled.svg`
   z-index: -1;
   pointer-events: none;
 
-  @media (max-width: 767px) {
+  @media ${ROOT_HIDDEN_QUERY} {
     display: none;
   }
 `;
@@ -84,6 +92,15 @@ const RootletPath = styled.path`
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+`;
+
+// The glint that runs down the last stretch when a project is sent, bone-white like the hero's
+const Glint = styled.path`
+  fill: none;
+  stroke: ${({ theme }) => theme.colors.text};
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  opacity: 0;
 `;
 
 const Pad = styled.circle`
@@ -139,6 +156,31 @@ const HEAD = 70;
 
 /** The room the root keeps from the page's content, so it never runs through text. */
 const CLEAR = 12;
+
+/** The attribute that marks where the root ends inside the last section: it runs down to the top centre of that element. */
+export const ROOT_END_ATTR = 'data-root-end';
+
+/** The root's tip sits this far down the viewport as the page scrolls. */
+export const ROOT_TIP_AT = 0.72;
+
+/** Dispatched on window when a project is sent: a glint runs down the root's last stretch. */
+export const PLANTED_EVENT = 'bonsai:planted';
+
+/** How long that glint takes, and how far back up the root it starts (px). */
+export const ROOT_GLINT_MS = 900;
+const GLINT_RUN = 520;
+const GLINT = 90;
+
+/** An element's offset within an ancestor, by layout, so a transform mid-animation doesn't skew it. */
+function offsetWithin(el: HTMLElement, ancestor: HTMLElement): P {
+  let x = 0;
+  let y = 0;
+  for (let n: HTMLElement | null = el; n && n !== ancestor; n = n.offsetParent as HTMLElement | null) {
+    x += n.offsetLeft;
+    y += n.offsetTop;
+  }
+  return [x, y];
+}
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const fmt = ([x, y]: P) => `${x.toFixed(1)},${y.toFixed(1)}`;
@@ -260,12 +302,21 @@ function measure(stage: HTMLElement): Geometry {
     }
 
     if (i === sections.length - 1) {
-      // The end: a fan of traces spreading like roots, each ending in a pad.
-      for (const k of [-2, -1, 1, 2]) {
-        const a = Math.abs(k);
-        const dir = Math.sign(k);
-        const end: P = [cx + dir * (60 + 80 * a), top + 16 * a];
-        forks.push({ d: trace([[cx, top], [cx + dir * 16 * a, top + 16 * a], end], 8), from: top, to: top + 120 * a, end });
+      const mark = section.querySelector<HTMLElement>(`[${ROOT_END_ATTR}]`);
+      if (mark) {
+        // The end, where the section marks it: straight down into the form, which draws the last fan.
+        const [mx, my] = offsetWithin(mark, stage);
+        const ex = mx + mark.offsetWidth / 2;
+        if (Math.abs(ex - cx) > 1) pts.push([cx, my - 40 - Math.abs(ex - cx)], [ex, my - 40]);
+        pts.push([ex, my]);
+      } else {
+        // The end: a fan of traces spreading like roots, each ending in a pad.
+        for (const k of [-2, -1, 1, 2]) {
+          const a = Math.abs(k);
+          const dir = Math.sign(k);
+          const end: P = [cx + dir * (60 + 80 * a), top + 16 * a];
+          forks.push({ d: trace([[cx, top], [cx + dir * 16 * a, top + 16 * a], end], 8), from: top, to: top + 120 * a, end });
+        }
       }
       // And a wider spray of roots, as the root system ends.
       for (const side of [-1, 1, -1, 1]) {
@@ -309,6 +360,7 @@ export default function RootStage({ children }: { children: ReactNode }) {
   const tailRef = useRef<SVGPathElement>(null);
   const headRef = useRef<SVGPathElement>(null);
   const tipRef = useRef<SVGGElement>(null);
+  const glintRef = useRef<SVGPathElement>(null);
   const forkRefs = useRef<(SVGPathElement | null)[]>([]);
   const padRefs = useRef<(SVGCircleElement | null)[]>([]);
   const rootletRefs = useRef<(SVGPathElement | null)[]>([]);
@@ -320,7 +372,7 @@ export default function RootStage({ children }: { children: ReactNode }) {
 
   // The tip sits 72% of the way down the viewport. Its length is eased, so
   // a horizontal crossing (drawn over a few pixels of scroll) runs smoothly.
-  const { scrollYProgress, scrollY } = useScroll({ target: stageRef, offset: ['start 0.72', 'end 0.72'] });
+  const { scrollYProgress, scrollY } = useScroll({ target: stageRef, offset: [`start ${ROOT_TIP_AT}`, `end ${ROOT_TIP_AT}`] });
   const target = useMotionValue(0);
   const drawn = useSpring(target, { stiffness: 120, damping: 30, restDelta: 0.5 });
 
@@ -406,6 +458,7 @@ export default function RootStage({ children }: { children: ReactNode }) {
     for (const el of [mainRef.current, haloRef.current]) if (el) el.style.strokeDasharray = `${total} ${total}`;
     if (tailRef.current) tailRef.current.style.strokeDasharray = `${TAIL} ${total + TAIL}`;
     if (headRef.current) headRef.current.style.strokeDasharray = `${HEAD} ${total + HEAD}`;
+    if (glintRef.current) glintRef.current.style.strokeDasharray = `${GLINT} ${total + GLINT}`;
     if (reduce) {
       drawn.jump(total);
       render(total);
@@ -416,6 +469,26 @@ export default function RootStage({ children }: { children: ReactNode }) {
     // render and aim read the latest geometry through closures; rerun only on layout changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo, reduce]);
+
+  // When a project is sent, a glint runs down the root's last stretch and fades as it reaches the form.
+  useEffect(() => {
+    const onPlanted = () => {
+      const lk = lookup.current;
+      const el = glintRef.current;
+      if (!lk || !el) return;
+      el.animate(
+        [
+          { offset: 0, strokeDashoffset: `${GLINT - (lk.total - GLINT_RUN)}px`, opacity: 0 },
+          { offset: 0.2, opacity: 1 },
+          { offset: 0.85, opacity: 1 },
+          { offset: 1, strokeDashoffset: `${GLINT - lk.total}px`, opacity: 0 },
+        ],
+        { duration: ROOT_GLINT_MS, easing: GLINT_EASE },
+      );
+    };
+    window.addEventListener(PLANTED_EVENT, onPlanted);
+    return () => window.removeEventListener(PLANTED_EVENT, onPlanted);
+  }, []);
 
   return (
     <Stage ref={stageRef}>
@@ -502,6 +575,7 @@ export default function RootStage({ children }: { children: ReactNode }) {
               </g>
             </motion.g>
           )}
+          {!reduce && <Glint ref={glintRef} d={geo.main} />}
         </Svg>
       )}
     </Stage>
