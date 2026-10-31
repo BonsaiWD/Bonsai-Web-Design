@@ -3,8 +3,8 @@
 import styled from 'styled-components';
 import { Section, Container } from '../layout/Container';
 import { motion } from 'framer-motion';
-import { SiFigma, SiNextdotjs } from 'react-icons/si';
-import { BsBag, BsVectorPen } from 'react-icons/bs';
+import { SiNextdotjs } from 'react-icons/si';
+import { BsBag, BsVectorPen, BsWindowSidebar } from 'react-icons/bs';
 import GradientText from '../common/GradientText';
 import { DUR, EASE_OUT, RISE, STAGGER } from '@/lib/motion';
 
@@ -162,8 +162,8 @@ const services: Service[] = [
   {
     id: 1,
     title: 'UI/UX Design',
-    description: 'Pages shaped around what your visitors came to do, prototyped in Figma and refined until reaching you feels effortless.',
-    icon: <SiFigma />,
+    description: 'Pages shaped around what your visitors came to do, prototyped and refined until reaching you feels effortless.',
+    icon: <BsWindowSidebar />,
   },
   {
     id: 2,
