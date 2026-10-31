@@ -8,7 +8,7 @@ import { useMediaQuery, useReducedMotionSafe } from '@/lib/useMediaQuery';
 import { DUR, EASE_OUT, RISE } from '@/lib/motion';
 import BonsaiCanvas from './bonsai/BonsaiCanvas';
 import BonsaiStill from './bonsai/BonsaiStill';
-import { BONSAI_INTRO_QUERY, BONSAI_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
+import { BONSAI_QUERY, DISSOLVE_RUNWAY, INTRO } from './bonsai/timeline';
 
 /*
  * The hero entrance runs on CSS keyframes, not framer initial/animate, so the
@@ -119,7 +119,7 @@ const entrance = (delayMs: number) => css`
     animation: ${heroIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) ${delayMs}ms both;
   }
 
-  @media ${BONSAI_INTRO_QUERY} {
+  @media ${BONSAI_QUERY} {
     animation-name: ${heroSettle};
     animation-duration: ${SETTLE_S}s;
     animation-delay: ${INTRO.text + (delayMs / 100) * INTRO.textStep}ms;
@@ -236,7 +236,7 @@ const TextScrim = styled.div`
     transparent
   );
 
-  @media ${BONSAI_INTRO_QUERY} {
+  @media ${BONSAI_QUERY} {
     animation: ${fadeIn} ${SETTLE_S}s cubic-bezier(${EASE_OUT.join(', ')}) ${INTRO.text}ms both;
   }
 `;
@@ -326,7 +326,7 @@ const Tagline = styled.h1`
     }
 
     /* Where the bonsai plays, the first glint runs as the headline lands, with the tree's last growth */
-    @media ${BONSAI_INTRO_QUERY} {
+    @media ${BONSAI_QUERY} {
       em[data-active] {
         animation-delay: ${GLINT_AT.intro}ms;
       }
@@ -471,7 +471,7 @@ const PauseButton = styled.button`
     animation: ${fadeIn} ${DUR.hero}s cubic-bezier(${EASE_OUT.join(', ')}) 400ms both;
   }
 
-  @media ${BONSAI_INTRO_QUERY} {
+  @media ${BONSAI_QUERY} {
     animation-duration: ${SETTLE_S}s;
     animation-delay: ${INTRO.text + 3 * INTRO.textStep}ms;
   }

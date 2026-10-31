@@ -1,18 +1,14 @@
 import type { BonsaiSource } from './bonsaiField';
 
 /**
- * Where the growing bonsai plays: wherever motion is allowed, phones and
- * tablets included (owner, 2026-10-31). Reduced motion gets a still of the
- * finished tree. CSS and JS both read these strings.
+ * Where the growing bonsai plays, and the hero text waits for it, settling in
+ * as the growth finishes: wherever motion is allowed, phones and tablets
+ * included. The owner wants phones to load as desktop does, the glowing
+ * growth reading as the page loading (2026-10-31). Reduced motion gets a
+ * still of the finished tree and the text at once. CSS and JS both read this
+ * one string.
  */
 export const BONSAI_QUERY = '(prefers-reduced-motion: no-preference)';
-
-/**
- * Where the hero text also waits for the tree, arriving with its last
- * growth: wide screens with a mouse. On phones and tablets the text shows at
- * once and the tree grows behind it, so the headline paints early (LCP).
- */
-export const BONSAI_INTRO_QUERY = `${BONSAI_QUERY} and (min-width: 768px) and (hover: hover)`;
 
 /*
  * Pacing, as the owner has tuned it (2026-10-29): the whole intro 20%
