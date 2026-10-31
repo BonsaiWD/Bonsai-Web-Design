@@ -450,7 +450,7 @@ export default function AboutSection() {
               transition={{ duration: 0.8, delay: 0.3 }}
             >
               <IntroText>
-                With an eye for elegance and a passion for visual storytelling, Jenna brings a refined creative vision to every project. Her expertise in design aesthetics ensures each website captures the essence of your brand.
+                With an eye for elegance and a passion for visual storytelling, Jenna specializes in UI/UX design, bringing a refined creative vision to every project. Her expertise in design aesthetics ensures each website captures the essence of your brand.
               </IntroText>
             </BioContent>
           </MemberSection>
