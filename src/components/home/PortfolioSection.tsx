@@ -365,7 +365,7 @@ const WorkTitle = styled.h3`
   font-weight: 400;
   line-height: 1.1;
   color: ${({ theme }) => theme.colors.text};
-  transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 
   @media (max-width: 768px) {
     font-size: 1.75rem;
@@ -390,6 +390,7 @@ const WorkDescription = styled.p`
   line-height: 1.7;
   color: ${({ theme }) => theme.colors.textSecondary};
   margin-bottom: ${({ theme }) => theme.spacing.sm};
+  transition: color 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 `;
 
 const WorkFoot = styled.div`
@@ -442,31 +443,88 @@ const WorkRow = styled(motion.a)`
     border-bottom: none;
   }
 
-  /* Bronze wash that sweeps in from the left */
+  /*
+   * On hover a soft bronze light rises behind the row, warmest under its
+   * title, with no edges of its own, and a bronze hairline draws along its
+   * foot over the divider, fading at both ends like the hero's CTA. Nothing
+   * moves out of line: the title warms to bronze, the description brightens
+   * and the arrow lifts toward its corner.
+   */
   &::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, rgba(200, 159, 129, 0.09), rgba(200, 159, 129, 0) 70%);
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Sized to fade out before every edge of the row, so it never shows one */
+    background: radial-gradient(
+      34% 50% at 34% 50%,
+      rgba(200, 159, 129, 0.11),
+      rgba(200, 159, 129, 0.04) 60%,
+      transparent
+    );
+    opacity: 0;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: none;
   }
 
-  &:hover::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200, 159, 129, 0.6) 20% 80%, transparent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+
+  /* Hover only where there is a pointer to rest, so taps don't leave a row lit */
+  @media (hover: hover) {
+    &:hover::before {
+      opacity: 1;
+    }
+
+    &:hover::after {
+      transform: none;
+    }
+
+    &:hover ${WorkTitle} {
+      color: ${({ theme }) => theme.colors.primary};
+    }
+
+    &:hover ${WorkDescription} {
+      color: ${({ theme }) => `color-mix(in srgb, ${theme.colors.textSecondary}, ${theme.colors.text} 45%)`};
+    }
+
+    &:hover ${WorkArrow} {
+      opacity: 1;
+      transform: translate(3px, -3px);
+    }
+  }
+
   &:focus-visible::before {
-    transform: scaleX(1);
-  }
-
-  &:hover ${WorkTitle}, &:focus-visible ${WorkTitle} {
-    color: ${({ theme }) => theme.colors.primary};
-    transform: translateX(12px);
-  }
-
-  &:hover ${WorkArrow}, &:focus-visible ${WorkArrow} {
     opacity: 1;
-    transform: translate(3px, -3px);
+  }
+
+  &:focus-visible ${WorkTitle} {
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:focus-visible ${WorkArrow} {
+    opacity: 1;
+  }
+
+  /* Without motion the hairline and the arrow change in place */
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      transition: none;
+    }
+
+    &:hover ${WorkArrow} {
+      transform: none;
+    }
   }
 
   &:focus-visible {

@@ -34,6 +34,11 @@ export const lightField = css`
   background:
     radial-gradient(38% 46% at 24% 42%, rgba(174, 196, 168, 0.32), transparent 70%),
     radial-gradient(34% 44% at 80% 66%, rgba(200, 159, 129, 0.24), transparent 72%);
+  /* It fades out over the part that reaches past the pane, so its own box never shows as an edge */
+  mask-image:
+    linear-gradient(90deg, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent),
+    linear-gradient(transparent, #000 3.75rem, #000 calc(100% - 3.75rem), transparent);
+  mask-composite: intersect;
   pointer-events: none;
 `;
 
