@@ -20,6 +20,53 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Client portal
+
+Clients sign in at `/portal` with an emailed link (no passwords) and see their projects, stage and milestones. It runs on Neon Postgres through Drizzle ORM, with Better Auth for sign-in and Resend for the emails.
+
+### One-time setup
+
+1. In Vercel, open the project's **Storage** tab, create a **Neon** database on the free plan and connect it to this project. That adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
+2. Add `BETTER_AUTH_SECRET` to the project's environment variables (Production and Preview). Generate a value with `openssl rand -base64 32`.
+3. Pull the variables and create the tables:
+   ```bash
+   vercel env pull .env.local
+   npm run db:migrate
+   ```
+   Or paste `drizzle/0000_init_portal.sql` into the Neon console's SQL Editor.
+4. Add yourself as an admin (below), deploy, and sign in at `/portal`. Admins see every client's projects.
+
+If the Neon integration creates a database branch for each preview deployment, those branches copy production, so migrate production first.
+
+### Adding clients, projects and milestones
+
+Until the portal has its own admin screens, add rows in the Neon console (Tables or SQL Editor). Emails must be lowercase; the database rejects anything else.
+
+```sql
+-- You, as an admin
+insert into "user" (name, email, role) values ('Your name', 'you@bonsaiwebdesign.com', 'admin');
+
+-- A client and their project
+insert into "user" (name, email) values ('Jane Doe', 'jane@example.com');
+insert into project (client_id, name, summary, stage, target_launch)
+  select id, 'Website redesign', 'A five-page site with online booking.', 'design', '2027-03-01'
+  from "user" where email = 'jane@example.com';
+
+-- Milestones, listed in position order
+insert into milestone (project_id, title, status, due_date, position)
+  select id, 'Design direction', 'in_progress', '2026-12-01', 1
+  from project where name = 'Website redesign';
+```
+
+- Project `stage`: `discovery`, `design`, `development`, `review`, `launched`, `on_hold`
+- Milestone `status`: `upcoming`, `in_progress`, `waiting_on_client` (shown to the client as "Waiting on you"), `done`
+
+Only addresses already in the `user` table are sent a link; anyone else sees the same "check your email" reply and nothing is sent.
+
+### Local development
+
+With no `RESEND_API_KEY` in `.env.local`, `npm run dev` prints sign-in links to the terminal instead of emailing them. To change the schema, edit `src/db/schema.ts`, run `npm run db:generate`, commit the new file in `drizzle/`, then run `npm run db:migrate`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

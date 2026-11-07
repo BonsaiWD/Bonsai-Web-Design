@@ -159,6 +159,18 @@ const MailLink = styled.a`
   ${focusRing}
 `;
 
+// The address and the client portal, one under the other: centred on phones, left from tablets up
+const ContactLinks = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
+    align-items: flex-start;
+  }
+`;
+
 // The marks, evened out by eye: the wordmark and the letterform are drawn smaller in their boxes
 const PAYMENTS: { name: string; Icon: IconType; scale: number }[] = [
   { name: 'Bitcoin', Icon: SiBitcoin, scale: 1 },
@@ -230,7 +242,10 @@ export default function Footer() {
           </div>
           <div>
             <Label>Contact</Label>
-            <MailLink href="mailto:admin@bonsaiwebdesign.com">admin@bonsaiwebdesign.com</MailLink>
+            <ContactLinks>
+              <MailLink href="mailto:admin@bonsaiwebdesign.com">admin@bonsaiwebdesign.com</MailLink>
+              <MailLink href="/portal">Client portal</MailLink>
+            </ContactLinks>
           </div>
           <div>
             <Label>Accepted Payments</Label>

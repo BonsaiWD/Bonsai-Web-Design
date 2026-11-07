@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { z } from 'zod';
+import { escapeHtml } from '@/lib/escapeHtml';
 
 // Server-side copy of the contact form's rules; the client schema alone is not a guarantee.
 const inquirySchema = z.object({
@@ -13,15 +14,6 @@ const inquirySchema = z.object({
     description: z.string().trim().min(1).max(20000),
     timeline: z.string().trim().max(200).optional(),
 });
-
-function escapeHtml(value: string): string {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
 
 const INVALID_INPUT = 'Please check the form fields and try again.';
 
