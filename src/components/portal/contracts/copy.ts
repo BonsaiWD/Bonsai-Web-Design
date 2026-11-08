@@ -23,10 +23,10 @@ export function studioSignStatement(options: {
 }
 
 // What each kind of file in a contract's history is, from either side
-export function fileLabel(label: ContractFileLabel, perspective: 'client' | 'studio'): string {
+export function fileLabel(label: ContractFileLabel, perspective: 'client' | 'studio', requiresSignature = true): string {
   switch (label) {
     case 'original':
-      return 'Agreement';
+      return requiresSignature ? 'Agreement' : 'Document';
     case 'client_signed':
       return perspective === 'client' ? 'Your signed copy' : 'Signed copy from the client';
     case 'countersigned':
