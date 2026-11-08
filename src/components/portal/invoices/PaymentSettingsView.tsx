@@ -104,6 +104,11 @@ const DetailsInput = styled(Textarea)`
   min-height: 0;
   ${paymentDetail}
   font-size: 0.9375rem;
+
+  /* The prompt is not a detail: it stays in the portal's face */
+  &::placeholder {
+    font-family: ${({ theme }) => theme.fonts.main};
+  }
 `;
 
 const Unsaved = styled.span`
