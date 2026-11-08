@@ -648,9 +648,15 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
         createdAt: activity.createdAt,
         projectId: project.id,
         projectName: project.name,
+        clientName,
+        clientEmail: user.email,
+        // The card the email was about, while it still exists (kinds end in ":<deliverable id>")
+        deliverableTitle: deliverable.title,
       })
       .from(activity)
       .innerJoin(project, eq(project.id, activity.projectId))
+      .innerJoin(user, eq(user.id, project.clientId))
+      .leftJoin(deliverable, sql`${deliverable.id}::text = split_part(${activity.kind}, ':', 2)`)
       .where(
         and(
           like(activity.kind, 'deliverable%'),
@@ -697,13 +703,17 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       .slice(index + 1)
       .some((later) => later.emailStatus === 'sent' && later.emailTo === row.emailTo && deliverableIdOf(later.kind) === deliverableId);
     if (resolved) continue;
+    // Worded as the milestone alerts are: who it was for, and what it was about
+    const who = row.emailTo === row.clientEmail ? row.clientName : row.emailTo === STUDIO_EMAIL ? 'the studio' : row.emailTo;
     items.push({
       key: `deliverable-email:${row.id}`,
       projectId: row.projectId,
       projectName: row.projectName,
       tab: 'deliverables',
-      anchor: deliverableId ? deliverableAnchor(deliverableId) : undefined,
-      title: `An email to ${row.emailTo} could not be sent`,
+      anchor: deliverableId && row.deliverableTitle ? deliverableAnchor(deliverableId) : undefined,
+      title: row.deliverableTitle
+        ? `The email to ${who} about ${row.deliverableTitle} could not be sent`
+        : `The email to ${who} could not be sent`,
       detail: row.summary,
       since: row.createdAt.toISOString(),
       tone: 'alert',
