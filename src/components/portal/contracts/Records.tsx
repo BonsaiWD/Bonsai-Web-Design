@@ -187,20 +187,20 @@ export function ReturnedNotice({
           {studio ? `Sent back the signed copy ${clientName} uploaded on ` : "We couldn't use the signed copy you uploaded on "}
           <LocalTime value={returned.uploadedAt} />
         </RecordLine>
-        <MetaLine stackOnPhone>
-          {returned.filename}
-          <>
-            {studio ? 'Sent back' : 'Returned'}
-            {studio && returned.byName ? ` by ${returned.byName}` : ''} on <LocalTime value={returned.at} />
-          </>
-        </MetaLine>
+        <MetaLine>{returned.filename}</MetaLine>
         {returned.reason && (
           <NoteBlock>
             <h5>{studio ? `Your note to ${clientName}` : 'Our note'}</h5>
             <p>{returned.reason}</p>
           </NoteBlock>
         )}
-        <MetaLine>{studio ? `It waits for ${clientName}'s signature again.` : 'Sign it here, or upload a new signed copy.'}</MetaLine>
+        <MetaLine>
+          <>
+            {studio ? `Sent back${returned.byName ? ` by ${returned.byName}` : ''}` : 'We sent it back'} on{' '}
+            <LocalTime value={returned.at} />.{' '}
+            {studio ? `It waits for ${clientName}'s signature again.` : 'Sign it here, or upload a new signed copy.'}
+          </>
+        </MetaLine>
       </div>
     </Record>
   );
@@ -303,14 +303,14 @@ export function FileHistory({
                 <>
                   Uploaded by {uploader(entry, perspective, clientName)} on <LocalTime value={entry.uploadedAt} />
                 </>
-                {entry.returned && (
-                  <>
-                    Sent back{entry.returned.byName ? ` by ${entry.returned.byName}` : ''} on <LocalTime value={entry.returned.at} />
-                  </>
-                )}
                 {formatBytes(entry.sizeBytes)}
               </MetaLine>
-              {entry.returned?.reason && <HistoryNote>{entry.returned.reason}</HistoryNote>}
+              {entry.returned && (
+                <HistoryNote>
+                  Sent back{entry.returned.byName ? ` by ${entry.returned.byName}` : ''} on <LocalTime value={entry.returned.at} />
+                  {entry.returned.reason ? `: ${entry.returned.reason}` : '.'}
+                </HistoryNote>
+              )}
             </li>
           );
         })}
