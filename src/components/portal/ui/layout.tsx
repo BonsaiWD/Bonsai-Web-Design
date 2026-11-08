@@ -246,10 +246,9 @@ const MetaRow = styled.div<{ $size: 'meta' | 'lead'; $stackOnPhone: boolean }>`
   max-width: none;
   margin-left: -${({ $size }) => META_SLOT[$size]};
 
+  /* Each item is a flex item with ordinary inline content, so "Shared <time>" keeps its space */
   > span {
     position: relative;
-    display: inline-flex;
-    align-items: center;
     padding-left: ${({ $size }) => META_SLOT[$size]};
     min-width: 0;
     overflow-wrap: anywhere;

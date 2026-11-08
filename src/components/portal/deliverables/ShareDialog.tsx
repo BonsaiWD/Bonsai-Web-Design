@@ -22,6 +22,7 @@ import {
 import { UploadField } from '../files/UploadField';
 import { linkWarning } from './copy';
 import type { DeliverableView, MilestoneOption } from './types';
+import { versionName } from '@/lib/portal-format';
 
 const LINK_HINT =
   'Use a link that will not change: a Vercel deployment URL (not a branch alias), a Figma version link, or upload a PDF.';
@@ -250,7 +251,7 @@ export function ShareDialog({ dialog, context, deliverable, onShared, returnFocu
   return (
     <FormDialog
       dialog={dialog}
-      title={deliverable ? `Share version ${next} of ${deliverable.title}` : 'Share a deliverable'}
+      title={deliverable ? `Share ${versionName(deliverable.title, next)}` : 'Share a deliverable'}
       description={
         deliverable
           ? `Version ${next} becomes the one ${context.clientName} sees. Earlier versions stay in the record.`

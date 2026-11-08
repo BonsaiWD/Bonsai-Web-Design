@@ -22,6 +22,7 @@ import {
 import { approvalStatement, formatBytes, linkHost } from './copy';
 import { CardActions, InsetPanel } from './parts';
 import type { VersionView } from './types';
+import { versionName } from '@/lib/portal-format';
 
 function ShownFields({ projectId, version }: { projectId: string; version: VersionView }) {
   return (
@@ -166,7 +167,7 @@ export function ClientDecision({
 
       <FormDialog
         dialog={approve}
-        title={`Approve version ${version.version} of ${version.titleSnapshot}`}
+        title={`Approve ${versionName(version.titleSnapshot, version.version)}`}
         description={`Approving tells us this version is final, and we move on to ${milestoneTitle ? `the next step after ${milestoneTitle}` : 'the next step'}. If something needs changing, ask for changes instead and we'll share version ${nextVersion}.`}
         action={approveVersion}
         submitLabel={`Approve version ${version.version}`}
@@ -178,7 +179,7 @@ export function ClientDecision({
         <SignStatement
           summary={{
             lead: 'You are approving',
-            title: `Version ${version.version} of ${version.titleSnapshot}`,
+            title: versionName(version.titleSnapshot, version.version),
             details: reviewed ? <span>{reviewed}</span> : null,
           }}
           statement={statement}

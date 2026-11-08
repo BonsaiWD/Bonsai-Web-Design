@@ -588,7 +588,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             `Milestone: ${result.title}`,
             `Statement: "${result.statement}"`,
             `Initials: ${input.initials}`,
-            `Signed: ${formatUtcMoment(result.signedAt)}`,
+            `Time: ${formatUtcMoment(result.signedAt)}`,
         ];
 
         await recordActivity({
