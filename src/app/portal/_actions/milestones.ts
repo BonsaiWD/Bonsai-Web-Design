@@ -349,8 +349,8 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
         const input = parseForm(askSchema, formData);
         const projectId = actor.project.id;
         const clientName = actor.project.clientName || actor.project.clientEmail;
-
         const clientFirst = firstName(clientName) ?? clientName;
+
         const row = await getDb().transaction(async (tx) => {
             const [current] = await tx
                 .select({
