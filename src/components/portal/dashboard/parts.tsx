@@ -324,7 +324,16 @@ interface AttentionPanelProps {
 }
 
 // Things to act on first, then follow-ups that wait on the client, then a quieter list of news
-export function AttentionPanel({ id, title, items, today, showProject, calm, note, followUpTitle = 'To follow up with clients' }: AttentionPanelProps) {
+export function AttentionPanel({
+  id,
+  title,
+  items,
+  today,
+  showProject,
+  calm,
+  note,
+  followUpTitle = 'To follow up with clients',
+}: AttentionPanelProps) {
   // Counted with the client's to-do list, not as work for the reader
   const followUps = items.filter((item) => item.tone !== 'info' && item.blockedOn === 'client');
   const open = items.filter((item) => item.tone !== 'info' && item.blockedOn !== 'client');

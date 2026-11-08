@@ -109,6 +109,8 @@ export default function ClientDashboard({ firstName, eyebrow, today, attention, 
   // The client's own late dates come first in the headline; the next date prefers theirs too
   const overdue = deadlines.filter((item) => item.owner === 'client' && item.date < today);
   const upcoming = deadlines.find((item) => item.date >= today && item.owner === 'client') ?? deadlines.find((item) => item.date >= today);
+  const overdueText =
+    overdue.length === 1 ? `${overdue[0].title} is ${dueInfo(overdue[0].date, today).label}` : `${overdue.length} deadlines have passed`;
   const many = projects.length > 1;
   const greeting = firstName ? `Welcome back, ${firstName}` : 'Welcome back';
 
@@ -137,11 +139,7 @@ export default function ClientDashboard({ firstName, eyebrow, today, attention, 
             <span>
               {open.length === 0 ? 'Nothing needs you right now' : open.length === 1 ? '1 thing needs you' : `${open.length} things need you`}
             </span>
-            {overdue.length > 0 && (
-              <Overdue>
-                {overdue.length === 1 ? `${overdue[0].title} is ${dueInfo(overdue[0].date, today).label}` : `${overdue.length} deadlines have passed`}
-              </Overdue>
-            )}
+            {overdue.length > 0 && <Overdue>{overdueText}</Overdue>}
             {upcoming && (
               <span>
                 next deadline <time dateTime={upcoming.date}>{formatShortDate(upcoming.date)}</time>
