@@ -10,6 +10,8 @@ export const Inset = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${space[2]};
+  /* A client's reference (a 64-character transaction hash) wraps inside the box */
+  overflow-wrap: anywhere;
   padding: ${space[4]};
   border: 1px solid ${({ theme }) => tint(theme.colors.primary, 18)};
   background: ${({ theme }) => tint(theme.colors.background, 55)};

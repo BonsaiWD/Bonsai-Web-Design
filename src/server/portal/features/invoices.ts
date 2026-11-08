@@ -67,12 +67,21 @@ const CLIENT_EMAIL_KINDS = [KINDS.sent, KINDS.reminded, KINDS.notReceived, KINDS
 
 const NOT_RECEIVED_TAIL = ' has not arrived yet, so it is open again';
 
+// The client's reference comes before the tail, so one that contains the tail itself could
+// pass its own words off as the studio's note; it is kept without it
+function withoutTail(reference: string | null): string | null {
+  let text = reference;
+  while (text?.includes(NOT_RECEIVED_TAIL)) text = text.split(NOT_RECEIVED_TAIL).join(' ');
+  return text?.trim() || null;
+}
+
 export function notReceivedSummary(
   number: string,
   reported: { method: PaymentMethod | null; reference: string | null },
   note: string,
 ): string {
-  const how = reported.method ? ` (${METHOD_LABELS[reported.method]}${reported.reference ? `, ${reported.reference}` : ''})` : '';
+  const reference = withoutTail(reported.reference);
+  const how = reported.method ? ` (${METHOD_LABELS[reported.method]}${reference ? `, ${reference}` : ''})` : '';
   return summaryWithText(`The payment reported for ${number}${how}${NOT_RECEIVED_TAIL}`, 'Note', note);
 }
 

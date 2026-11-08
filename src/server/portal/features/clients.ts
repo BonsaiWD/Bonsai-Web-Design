@@ -164,6 +164,32 @@ function listNames(names: string[]): string {
 // the email to the new address says so rather than welcoming them to a portal they already use.
 export type InviteReason = 'new' | 'address_changed';
 
+export const EMAIL_CHANGED_KIND = 'client.email_changed';
+
+export const emailChangedSummary = (name: string, from: string, to: string) => `${name}'s email changed from ${from} to ${to}`;
+
+/*
+ * Which invite Send invite sends: the one Change email would have sent, until they sign in
+ * with the new address. Signing in proves an address (emailVerified) and a change unproves it,
+ * so an unproven address is a changed one when they have signed in before, or when one of
+ * their projects records the change to it. Anything else gets the first invite.
+ */
+export async function inviteReasonFor(client: {
+    id: string;
+    email: string;
+    emailVerified: boolean;
+    lastSignInAt: Date | null;
+}): Promise<InviteReason> {
+    if (client.emailVerified) return 'new';
+    if (client.lastSignInAt) return 'address_changed';
+    const changes = await getDb()
+        .select({ summary: activity.summary })
+        .from(activity)
+        .innerJoin(project, eq(project.id, activity.projectId))
+        .where(and(eq(project.clientId, client.id), eq(activity.kind, EMAIL_CHANGED_KIND)));
+    return changes.some((row) => row.summary.endsWith(` to ${client.email}`)) ? 'address_changed' : 'new';
+}
+
 export async function inviteEmail(
     client: { name: string | null; email: string },
     projectNames: string[],

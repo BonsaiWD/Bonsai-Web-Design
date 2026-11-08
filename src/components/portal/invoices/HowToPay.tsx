@@ -74,7 +74,6 @@ const DetailLabel = styled.span`
 const DetailValue = styled.span`
   ${type.body}
   ${paymentDetail}
-  font-size: 0.9375rem;
   color: ${({ theme }) => theme.colors.text};
   user-select: all;
 `;

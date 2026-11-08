@@ -285,7 +285,7 @@ export async function collectWaitingOnClients(context: FeatureContext): Promise<
 export const projectsFeature: PortalFeature = {
     // A project email (the "New project" note) that never arrived, flagged as every feature
     // flags them (failed-emails.ts). It said the project is in the portal, so any later email
-    // that reaches the same person on that project makes up for it.
+    // on that project that reaches the client makes up for it.
     async attention(context) {
         if (context.perspective !== 'studio') return [];
         const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.project, clearedBy: [''], subjectOf: () => 'project' });

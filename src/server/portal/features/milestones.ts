@@ -22,8 +22,8 @@ export { asksForInitials };
 
 /* ---------- Activity kinds ----------
    "milestone.<event>:<milestoneId>", like the other features' kinds, so a failed email can
-   link to its milestone and clear once a later email of the same kind reaches the same
-   person. Rows written before used "milestone_<event>" with no id; both match 'milestone%'. */
+   link to its milestone and clear once a later email about the same milestone reaches the
+   client. Rows written before used "milestone_<event>" with no id; both match 'milestone%'. */
 
 const KINDS = {
     added: 'milestone.added',

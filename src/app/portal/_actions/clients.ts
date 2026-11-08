@@ -12,11 +12,14 @@ import { recordActivity } from '@/server/portal/notify';
 import {
   clientProjectNames,
   displayName,
+  EMAIL_CHANGED_KIND,
+  emailChangedSummary,
   endAccess,
   INVITE_INTERVAL_MS,
   inviteEmail,
   type InviteReason,
   inviteKey,
+  inviteReasonFor,
   lockClient,
   renameActivitySubject,
   sendStandaloneEmail,
@@ -227,8 +230,8 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
             await recordActivity({
                 projectId,
                 actorId: actor.id,
-                kind: 'client.email_changed',
-                summary: `${result.name}'s email changed from ${result.previous} to ${input.email}`,
+                kind: EMAIL_CHANGED_KIND,
+                summary: emailChangedSummary(result.name, result.previous, input.email),
                 visibility: 'studio',
             });
         }
@@ -278,12 +281,14 @@ export async function inviteClient(_prev: ActionState, formData: FormData): Prom
         const input = parseForm(clientSchema, formData);
 
         const [client] = await getDb()
-            .select({ id: user.id, name: user.name, email: user.email })
+            .select({ id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified, lastSignInAt: user.lastSignInAt })
             .from(user)
             .where(and(eq(user.id, input.clientId), eq(user.role, 'client')));
         if (!client) throw new ActionError(NOT_FOUND);
 
-        const invite = await sendInvite(client);
+        // After Change email, the same invite it would have sent: never a welcome to a client
+        // who already uses the portal
+        const invite = await sendInvite(client, await inviteReasonFor(client));
         const who = client.name?.trim() || client.email;
         refresh();
         switch (invite.outcome) {

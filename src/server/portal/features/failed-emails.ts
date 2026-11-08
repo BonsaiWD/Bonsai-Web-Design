@@ -12,9 +12,10 @@ import { STUDIO_EMAIL } from '../notify';
  * - only emails to the client are flagged: one to the studio inbox is about something the
  *   studio already sees in the portal (a message, an upload), so the feed's badge is enough;
  * - a failure is listed for 14 days;
- * - it clears once a later email about the same thing on that project reaches the same
- *   address, or the client's address now (Email again, a reminder or a receipt, also after
- *   the studio corrected the address: reachedSameRecipient);
+ * - it clears once a later email about the same thing on that project went out to the client
+ *   (Email again, a reminder or a receipt, also after the studio corrected the address or
+ *   moved the project): reachedClient. That reads each row as it was sent, not the client's
+ *   address now, so changing the address again cannot bring a cleared failure back;
  * - the feature drops it once it no longer matters (the item was deleted, signed, removed);
  * - the title reads "The email to <who> about <what> could not be sent" (failedEmailTitle).
  */
@@ -41,16 +42,17 @@ interface Options {
   // Prefixes of the activity kinds whose failures are flagged: the feature's FLAGGED_EMAIL_KINDS
   kinds: readonly string[];
   // What an email is about, read from its kind. A failure clears once a later email about the
-  // same thing reaches the same recipient; null means "this kind only".
+  // same thing reaches the client; null means "this kind only".
   subjectOf: (kind: string) => string | null;
   // Prefixes of further kinds whose emails also clear a failure ('' for any email at all)
   clearedBy?: readonly string[];
 }
 
-// Whether a later email went to whoever a failed one was for: the same address, or the
-// client's current address (the failed one went to an address the studio has since corrected)
-export function reachedSameRecipient(laterTo: string | null, failedTo: string | null, clientEmail: string): boolean {
-  return laterTo !== null && (laterTo === failedTo || laterTo === clientEmail);
+// Whether a later email reached the project's client: it went out, and not to the studio's
+// inbox. The address it went to is whichever the client had then; a failed email to an older
+// address is settled by it as well, since the item has now reached the client.
+export function reachedClient(later: { emailTo: string | null; emailStatus: string | null }): boolean {
+  return later.emailStatus === 'sent' && later.emailTo !== null && later.emailTo !== STUDIO_EMAIL;
 }
 
 export function failedEmailTitle(who: string, about: string | null | undefined): string {
@@ -92,8 +94,7 @@ export async function failedEmails(context: FeatureContext, options: Options): P
     if (row.emailStatus !== 'failed' || !row.emailTo || row.emailTo === STUDIO_EMAIL || !flagged(row.kind)) continue;
     const subject = options.subjectOf(row.kind);
     const cleared = rows.slice(index + 1).some((later) => {
-      if (later.emailStatus !== 'sent' || later.projectId !== row.projectId) return false;
-      if (!reachedSameRecipient(later.emailTo, row.emailTo, row.clientEmail)) return false;
+      if (later.projectId !== row.projectId || !reachedClient(later)) return false;
       return subject === null ? later.kind === row.kind : options.subjectOf(later.kind) === subject;
     });
     if (cleared) continue;

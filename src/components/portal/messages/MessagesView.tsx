@@ -144,9 +144,10 @@ export default function MessagesView(props: MessagesViewProps) {
                   <Notice key={item.id} tone="alert">
                     <span>
                       An email to {item.to} about a message on <LocalTime value={item.at} /> could not be sent.{' '}
+                      {/* An address that is not the client's now was corrected since, or the project moved */}
                       {item.to === props.clientEmail
                         ? `${clientName} can still read it here; your next message will email them again.`
-                        : `${clientName} has since changed address; your next message emails them at ${props.clientEmail}.`}
+                        : `Your next message emails ${clientName} at ${props.clientEmail}.`}
                     </span>
                   </Notice>
                 ))}
