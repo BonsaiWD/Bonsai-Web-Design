@@ -10,9 +10,10 @@ import type {
   ContractStatus,
   ContractView,
   Perspective,
+  ReturnedInfo,
 } from '@/components/portal/contracts/types';
 import type { EmailContent } from '@/lib/email';
-import { firstName } from '@/lib/portal-format';
+import { firstName, formatUtcMoment } from '@/lib/portal-format';
 import { isUuid, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
 import { STUDIO_EMAIL } from '../notify';
@@ -38,11 +39,14 @@ const KINDS = {
   deleted: 'contract.deleted',
   // "contract.copy_returned:<contractId>:<contractFileId>": the studio sent a signed copy back
   returned: 'contract.copy_returned',
+  // "contract.copy_returned_note:<contractId>:<contractFileId>": the note emailed with it, on
+  // the studio's record only
+  returnedNote: 'contract.copy_returned_note',
 } as const;
 
 // The emails that ask the client to sign (a sent-back copy asks again); a failure here is
-// worth flagging to the studio
-const ASKING = [KINDS.added, KINDS.replaced, KINDS.reminded, KINDS.returned];
+// worth flagging to the studio. (Earlier sent-back rows carried the email themselves.)
+const ASKING = [KINDS.added, KINDS.replaced, KINDS.reminded, KINDS.returned, KINDS.returnedNote];
 
 export function contractKind(event: keyof typeof KINDS, contractId: string): string {
   return `${KINDS[event]}:${contractId}`;
@@ -57,12 +61,18 @@ export const contractAnchor = (contractId: string) => `contract-${contractId}`;
 
 /* A signed copy the studio sends back keeps its rows: its file is marked removed, so it no
    longer downloads for the client or counts as a signature anywhere, and the studio's history
-   still shows it. The reason travels in the activity summary, as the schema has no column. */
+   still shows it. The reason travels in an activity summary, as the schema has no column: a
+   studio-only row, so the timeline every viewer reads (including a later client, should the
+   project move) says only that it was sent back. */
 
 const REASON_MARKER = '. Reason: ';
 
-export function returnedSummary(title: string, reason: string): string {
-  return `Sent back the signed copy of ${title}${REASON_MARKER}${reason}`;
+export function returnedNoteSummary(clientName: string, title: string, reason: string): string {
+  return `Emailed ${clientName} why we sent back the signed copy of ${title}${REASON_MARKER}${reason}`;
+}
+
+export function returnedKind(event: 'returned' | 'returnedNote', contractId: string, contractFileId: string): string {
+  return `${KINDS[event]}:${contractId}:${contractFileId}`;
 }
 
 function reasonFromSummary(summary: string): string | null {
@@ -88,8 +98,10 @@ const uploader = alias(user, 'uploader');
 const signer = alias(user, 'signer');
 const returner = alias(user, 'returner');
 
+// clientId is the project's client now: after a move to another client, a copy the previous
+// client uploaded is theirs, not the new client's
 export async function loadContracts(
-  forProject: Pick<PortalProject, 'id' | 'clientEmail'>,
+  forProject: Pick<PortalProject, 'id' | 'clientEmail' | 'clientId'>,
   perspective: Perspective,
 ): Promise<ContractView[]> {
   const db = getDb();
@@ -120,7 +132,9 @@ export async function loadContracts(
         sizeBytes: file.sizeBytes,
         sha256: file.sha256,
         contentType: file.contentType,
+        uploadedBy: contractFile.uploadedBy,
         uploaderName: uploader.name,
+        uploaderEmail: uploader.email,
         uploaderRole: uploader.role,
         removedAt: file.removedAt,
       })
@@ -166,28 +180,48 @@ export async function loadContracts(
           .orderBy(desc(activity.createdAt))
       : Promise.resolve([]),
   ]);
-  // Why the studio sent a signed copy back: the client was emailed it, so both sides see it
+  // Why the studio sent a signed copy back: the client who uploaded it was emailed it, so the
+  // card shows it to them (never to a later client) and to the studio
   const returnRows = fileRows.some((row) => row.removedAt)
     ? await db
         .select({ kind: activity.kind, summary: activity.summary, createdAt: activity.createdAt, byName: returner.name })
         .from(activity)
         .leftJoin(returner, eq(returner.id, activity.actorId))
-        .where(and(eq(activity.projectId, forProject.id), like(activity.kind, `${KINDS.returned}:%`)))
+        .where(
+          and(
+            eq(activity.projectId, forProject.id),
+            or(like(activity.kind, `${KINDS.returned}:%`), like(activity.kind, `${KINDS.returnedNote}:%`)),
+          ),
+        )
     : [];
-  const returns = new Map(
-    returnRows.map((row) => [
-      row.kind.split(':')[2],
-      { at: row.createdAt.toISOString(), reason: reasonFromSummary(row.summary), byName: studio ? row.byName || null : null },
-    ]),
-  );
+  const returns = new Map<string, ReturnedInfo>();
+  for (const row of returnRows) {
+    const key = row.kind.split(':')[2];
+    const earlier = returns.get(key);
+    returns.set(key, {
+      at: earlier?.at ?? row.createdAt.toISOString(),
+      // The note row has it; the status row (and rows written before the split) may not
+      reason: reasonFromSummary(row.summary) ?? earlier?.reason ?? null,
+      byName: studio ? row.byName || earlier?.byName || null : null,
+    });
+  }
 
   const filesByContract = new Map<string, ContractFileView[]>();
   const returnedByContract = new Map<string, NonNullable<ContractView['returnedCopy']>>();
   for (const row of fileRows) {
     const returned = row.removedAt ? (returns.get(row.id) ?? { at: row.removedAt.toISOString(), reason: null, byName: null }) : null;
-    // Rows arrive newest first, so the first one sent back is the latest
-    if (returned && row.label === 'client_signed' && !returnedByContract.has(row.contractId)) {
-      returnedByContract.set(row.contractId, { filename: row.filename, uploadedAt: row.createdAt.toISOString(), ...returned });
+    const side: ContractFileView['side'] =
+      row.uploaderRole === 'admin' ? 'studio' : row.uploadedBy === forProject.clientId ? 'client' : 'former';
+    // Rows arrive newest first, so the first one sent back is the latest. The client hears only
+    // about their own: a copy a previous client uploaded, and the note sent with it, stay theirs.
+    if (returned && row.label === 'client_signed' && (studio || side === 'client') && !returnedByContract.has(row.contractId)) {
+      returnedByContract.set(row.contractId, {
+        filename: row.filename,
+        uploadedAt: row.createdAt.toISOString(),
+        ...returned,
+        uploadedByName: studio ? row.uploaderName || row.uploaderEmail || null : null,
+        former: side === 'former',
+      });
     }
     // The client can no longer download a copy that was sent back; the notice tells them why
     if (returned && !studio) continue;
@@ -201,7 +235,7 @@ export async function loadContracts(
       sha256: row.sha256,
       previewable: INLINE_TYPES.has(row.contentType),
       uploadedAt: row.createdAt.toISOString(),
-      side: row.uploaderRole === 'admin' ? 'studio' : 'client',
+      side,
       // Which of the two of us uploaded it matters to the studio only
       uploadedByName: studio ? row.uploaderName || null : null,
       current: false,
@@ -317,7 +351,8 @@ export async function lockContract(tx: Tx, projectId: string, contractId: string
 
 export type LockedContract = NonNullable<Awaited<ReturnType<typeof lockContract>>>;
 
-// The newest original is the document the client reads and signs
+// The newest original is the document the client reads and signs. `replaced` says an earlier
+// original came before it, which a client may have printed and signed on paper.
 export async function currentOriginal(tx: Tx | Db, contractId: string) {
   const [row] = await tx
     .select({
@@ -325,13 +360,18 @@ export async function currentOriginal(tx: Tx | Db, contractId: string) {
       fileId: file.id,
       filename: file.filename,
       sha256: file.sha256,
+      uploadedAt: contractFile.createdAt,
+      // Counted before the limit: every original the contract has had
+      originals: sql<number>`count(*) over ()`.mapWith(Number),
     })
     .from(contractFile)
     .innerJoin(file, eq(file.id, contractFile.fileId))
     .where(and(eq(contractFile.contractId, contractId), eq(contractFile.label, 'original')))
     .orderBy(desc(contractFile.createdAt), desc(contractFile.id))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+  const { originals, ...original } = row;
+  return { ...original, replaced: originals > 1 };
 }
 
 /* ---------- Email throttle ----------
@@ -536,14 +576,23 @@ export function recordedSignatureEmail(input: {
   };
 }
 
+// The line that tells the studio what to check a signed copy against. The server can't read a
+// scan, and a paper copy has no fingerprint, so when the document was replaced the studio is
+// told so in words: a copy printed before then is of the earlier version.
+function signedCopyCheck(original: { filename: string; sha256: string; uploadedAt: Date; replaced: boolean }): string {
+  const document = `${original.filename} (SHA-256 ${original.sha256.slice(0, 12)}…)`;
+  return original.replaced
+    ? `This document was replaced on ${formatUtcMoment(original.uploadedAt)}, so a copy printed before then is of the earlier version. Check the scan is of the new one, ${document}, before countersigning.`
+    : `Check it is a signed copy of ${document}, the version in the portal when they uploaded it.`;
+}
+
 export function signedCopyEmail(input: {
   clientName: string;
   title: string;
   filename: string;
   sha256: string;
-  // The document in the portal when they uploaded it: the server can't read a scan, so the
-  // studio compares the two before countersigning
-  original: { filename: string; sha256: string };
+  // The document in the portal when they uploaded it
+  original: { filename: string; sha256: string; uploadedAt: Date; replaced: boolean };
   note: string | null;
   url: string;
 }): { subject: string; content: EmailContent } {
@@ -554,7 +603,7 @@ export function signedCopyEmail(input: {
       paragraphs: [
         `File: ${input.filename}`,
         `SHA-256: ${input.sha256}`,
-        `Check it is a signed copy of ${input.original.filename} (SHA-256 ${input.original.sha256.slice(0, 12)}…), the version in the portal when they uploaded it.`,
+        signedCopyCheck(input.original),
         "Then upload the countersigned copy. If it isn't right, send it back from the contract with a note, and they can sign again.",
       ],
       quote: input.note ?? undefined,
@@ -675,6 +724,12 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
         projectId: project.id,
         projectName: project.name,
         uploaderName: sql<string>`coalesce(nullif(${uploader.name}, ''), ${uploader.email})`,
+        // The document was replaced, so the copy may be of the earlier version; worth saying
+        // until the studio has countersigned
+        checkVersion: sql<boolean>`(
+          (SELECT count(*) FROM contract_file o WHERE o.contract_id = ${contract.id} AND o.label = 'original') > 1
+          AND NOT EXISTS (SELECT 1 FROM contract_file c WHERE c.contract_id = ${contract.id} AND c.label = 'countersigned')
+        )`,
       })
       .from(contractFile)
       .innerJoin(contract, eq(contract.id, contractFile.contractId))
@@ -736,6 +791,9 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       tab: 'contracts',
       anchor: contractAnchor(row.contractId),
       title: `${row.uploaderName} uploaded a signed copy of ${row.title}`,
+      ...(row.checkVersion
+        ? { detail: 'We replaced this document after first sharing it. Check the scan is of the new version before countersigning.' }
+        : {}),
       since: row.createdAt.toISOString(),
       tone: 'info',
     });

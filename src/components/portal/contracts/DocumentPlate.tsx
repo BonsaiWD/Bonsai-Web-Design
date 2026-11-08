@@ -125,7 +125,7 @@ export function DocumentPlate({ contract, perspective }: { contract: ContractVie
           <div>
             <FileGlyph filename={entry.filename} />
             <Body>
-              <Kind>{fileLabel(entry.label, perspective, contract.requiresSignature)}</Kind>
+              <Kind>{fileLabel(entry.label, perspective, contract.requiresSignature, entry.side)}</Kind>
               <strong>{entry.filename}</strong>
               <small>{detail(entry, perspective)}</small>
             </Body>

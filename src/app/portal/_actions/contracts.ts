@@ -21,7 +21,8 @@ import {
   recordedSignatureEmail,
   releaseEmailSlot,
   returnedCopyEmail,
-  returnedSummary,
+  returnedKind,
+  returnedNoteSummary,
   signedCopyEmail,
   signedEmails,
   type LockedContract,
@@ -792,7 +793,11 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
         );
       }
       if (!locked.original || locked.original.fileId !== input.shownFileId) {
-        throw new ActionError('We replaced this document since you opened it. Download the new version, sign that one, then upload it.');
+        // The client's card still shows the old version: refresh it, so the new one is there to download
+        refresh(projectId);
+        throw new ActionError(
+          'We replaced this document since you opened it. The new version is on this page now: download it, sign that one, then upload it.',
+        );
       }
     };
 
@@ -802,7 +807,8 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
 
     // Counted before the bytes are stored, and given back if nothing comes of the upload
     const quota = upload ? await claimUploadQuota(actor.user.id, upload.size) : null;
-    let result: { duplicate: boolean; title: string; filename: string; sha256: string; original: { filename: string; sha256: string } | null };
+    type Original = { filename: string; sha256: string; uploadedAt: Date; replaced: boolean };
+    let result: { duplicate: boolean; title: string; filename: string; sha256: string; original: Original | null };
     try {
       result = await withUpload(actor, upload, async (tx, stored) => {
         // Before any other lock: the project may have moved to another client since projectActor
@@ -833,7 +839,15 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
           title: locked.title,
           filename: stored?.filename ?? '',
           sha256: stored?.sha256 ?? '',
-          original: locked.original ? { filename: locked.original.filename, sha256: locked.original.sha256 } : null,
+          // Which version the copy is of, and whether an earlier one came before it
+          original: locked.original
+            ? {
+                filename: locked.original.filename,
+                sha256: locked.original.sha256,
+                uploadedAt: locked.original.uploadedAt,
+                replaced: locked.original.replaced,
+              }
+            : null,
         };
       });
     } catch (error) {
@@ -929,12 +943,22 @@ export async function returnSignedCopy(_prev: ActionState, formData: FormData): 
       reason: input.reason,
       url: await contractUrl(projectId, input.contractId),
     });
+    // The change, for every timeline; the note, by email to the client and on the studio's
+    // record only, so it never shows in the timeline a later client of the project reads
+    await recordActivity({
+      projectId,
+      actorId: actor.user.id,
+      kind: returnedKind('returned', input.contractId, input.contractFileId),
+      summary: `Sent back the signed copy of ${result.title}`,
+      target: 'contracts',
+    });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: `${contractKind('returned', input.contractId)}:${input.contractFileId}`,
-      summary: returnedSummary(result.title, input.reason),
+      kind: returnedKind('returnedNote', input.contractId, input.contractFileId),
+      summary: returnedNoteSummary(clientName, result.title, input.reason),
       target: 'contracts',
+      visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
     });
     return done(

@@ -182,7 +182,7 @@ export function StudioActions({
     )
   ) : contract.signedCopy ? (
     <>
-      {clientName} uploaded a signed copy on <LocalTime value={contract.signedCopy.uploadedAt} />
+      {contract.signedCopy.uploadedByName || clientName} uploaded a signed copy on <LocalTime value={contract.signedCopy.uploadedAt} />
     </>
   ) : null;
 

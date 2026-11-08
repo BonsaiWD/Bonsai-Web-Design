@@ -354,6 +354,34 @@ export async function releaseEmailSlot(versionId: string): Promise<void> {
   await getDb().delete(rateLimit).where(eq(rateLimit.key, throttleKey(versionId)));
 }
 
+// Whether an email about this version (its share, or a reminder) ever reached the client, so
+// the next one is worded as a reminder only when it is one. Rows name the deliverable, not the
+// version, so the version's own share time bounds them, as on the card's "last emailed" line.
+export async function emailedAboutVersion(input: {
+  projectId: string;
+  deliverableId: string;
+  versionId: string;
+  to: string;
+}): Promise<boolean> {
+  const [row] = await getDb()
+    .select({ id: activity.id })
+    .from(activity)
+    .where(
+      and(
+        eq(activity.projectId, input.projectId),
+        eq(activity.emailTo, input.to),
+        eq(activity.emailStatus, 'sent'),
+        inArray(activity.kind, [activityKind('shared', input.deliverableId), activityKind('reminded', input.deliverableId)]),
+        gte(
+          activity.createdAt,
+          sql`(SELECT ${deliverableVersion.sharedAt} FROM ${deliverableVersion} WHERE ${deliverableVersion.id} = ${input.versionId})`,
+        ),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 /* ---------- Emails ---------- */
 
 // "2026-11-08 19:30 UTC": receipts state one unambiguous time
