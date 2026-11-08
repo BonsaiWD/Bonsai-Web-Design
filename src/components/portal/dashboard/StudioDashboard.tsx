@@ -421,7 +421,6 @@ export default function StudioDashboard({
                 id="dashboard-activity"
                 title="Recent activity"
                 items={activity}
-                perspective="studio"
                 showProject
                 empty="Nothing has happened yet. Changes, decisions and emails are logged here."
                 note="Across every project, studio-only entries included"

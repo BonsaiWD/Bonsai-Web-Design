@@ -27,6 +27,7 @@ import {
   Textarea,
   type,
   useDialog,
+  useHeldWhileOpen,
   VisuallyHidden,
   type ActionState,
   type Announce,
@@ -70,9 +71,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
   const panelRef = useRef<HTMLDivElement>(null);
   const awaiting = contract.status === 'awaiting';
   // The dialog acts on the document as it was opened, and stays mounted to report its result
-  const [held, setHeld] = useState(contract.original);
-  if (contract.original && contract.original !== held && !sign.open) setHeld(contract.original);
-  const original = held;
+  const original = useHeldWhileOpen(contract.original, sign.open);
   // The open panel follows the document now on the card, with a fresh form and a word on why
   const current = contract.original;
   if (uploadOpen && uploadFor && current && current.fileId !== uploadFor) {

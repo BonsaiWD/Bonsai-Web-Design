@@ -1,5 +1,4 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, like, ne, notExists, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
@@ -11,20 +10,20 @@ import {
   milestone,
   milestoneSignoff,
   project,
-  rateLimit,
   user,
   type MilestoneStatus,
   type VersionStatus,
 } from '@/db/schema';
 import type { DeliverableView, MilestoneOption, Perspective, VersionView } from '@/components/portal/deliverables/types';
 import type { EmailContent } from '@/lib/email';
-import { firstName, formatDate } from '@/lib/portal-format';
-import { isUuid, type PortalProject, type Tx } from '../access';
+import { firstName, formatDate, formatUtcMoment } from '@/lib/portal-format';
+import { type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { failedEmails, failedEmailTitle } from './failed-emails';
 import { milestoneKind } from './milestones';
 import { STUDIO_EMAIL } from '../notify';
 import { INLINE_TYPES } from '../storage';
+import { kindItemId, kindMaker } from '../kinds';
 
 /* ---------- Activity kinds ----------
    Activity rows carry the deliverable's id in their kind ("deliverable.shared:<id>"), so the
@@ -43,14 +42,7 @@ const KINDS = {
   deleted: 'deliverable.deleted',
 } as const;
 
-export function activityKind(event: keyof typeof KINDS, deliverableId: string): string {
-  return `${KINDS[event]}:${deliverableId}`;
-}
-
-function deliverableIdOf(kind: string): string | null {
-  const id = kind.split(':')[1];
-  return isUuid(id) ? id : null;
-}
+export const deliverableKind = kindMaker(KINDS);
 
 export const deliverableAnchor = (deliverableId: string) => `deliverable-${deliverableId}`;
 
@@ -216,7 +208,7 @@ export async function loadDeliverables(
     let studioExtras: DeliverableView['studio'];
     if (studio) {
       const mine = current
-        ? emails.filter((row) => deliverableIdOf(row.kind) === item.id && row.createdAt.toISOString() >= current.sharedAt)
+        ? emails.filter((row) => kindItemId(row.kind) === item.id && row.createdAt.toISOString() >= current.sharedAt)
         : [];
       const lastSent = mine.find((row) => row.emailStatus === 'sent');
       const decided = [...versions]
@@ -417,35 +409,10 @@ export async function recheckMilestone(
 }
 
 /* ---------- Email throttle ----------
-   At most one email to the client per version every 10 minutes. The claim is a single
-   conditional upsert, so two clicks at once cannot both send. */
+   At most one email to the client per version every 10 minutes (claimRateSlot). */
 
-const EMAIL_GAP_MS = 10 * 60 * 1000;
-const throttleKey = (versionId: string) => `portal:deliverable-email:${versionId}`;
-
-export async function claimEmailSlot(versionId: string): Promise<{ ok: true } | { ok: false; waitMinutes: number }> {
-  const db = getDb();
-  const key = throttleKey(versionId);
-  const now = Date.now();
-  const claimed = await db
-    .insert(rateLimit)
-    .values({ id: randomUUID(), key, count: 1, lastRequest: now })
-    .onConflictDoUpdate({
-      target: rateLimit.key,
-      set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-      setWhere: sql`${rateLimit.lastRequest} <= ${now - EMAIL_GAP_MS}`,
-    })
-    .returning({ id: rateLimit.id });
-  if (claimed.length) return { ok: true };
-  const [row] = await db.select({ lastRequest: rateLimit.lastRequest }).from(rateLimit).where(eq(rateLimit.key, key));
-  const last = row?.lastRequest ?? now;
-  return { ok: false, waitMinutes: Math.max(1, Math.ceil((last + EMAIL_GAP_MS - now) / 60_000)) };
-}
-
-// An email that did not go out should not block the next try
-export async function releaseEmailSlot(versionId: string): Promise<void> {
-  await getDb().delete(rateLimit).where(eq(rateLimit.key, throttleKey(versionId)));
-}
+export const VERSION_EMAIL_GAP_MS = 10 * 60 * 1000;
+export const versionEmailKey = (versionId: string) => `portal:deliverable-email:${versionId}`;
 
 // Whether an email about this version (its share, or a reminder) ever reached the client, so
 // the next one is worded as a reminder only when it is one. Rows name the deliverable, not the
@@ -464,7 +431,7 @@ export async function emailedAboutVersion(input: {
         eq(activity.projectId, input.projectId),
         eq(activity.emailTo, input.to),
         eq(activity.emailStatus, 'sent'),
-        inArray(activity.kind, [activityKind('shared', input.deliverableId), activityKind('reminded', input.deliverableId)]),
+        inArray(activity.kind, [deliverableKind('shared', input.deliverableId), deliverableKind('reminded', input.deliverableId)]),
         gte(
           activity.createdAt,
           sql`(SELECT ${deliverableVersion.sharedAt} FROM ${deliverableVersion} WHERE ${deliverableVersion.id} = ${input.versionId})`,
@@ -476,11 +443,6 @@ export async function emailedAboutVersion(input: {
 }
 
 /* ---------- Emails ---------- */
-
-// "2026-11-08 19:30 UTC": receipts state one unambiguous time
-export function utcStamp(value: Date): string {
-  return `${value.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-}
 
 export function reviewedItem(linkUrl: string | null, filename: string | null): string {
   if (linkUrl && filename) return `${linkUrl} and the file ${filename}`;
@@ -565,7 +527,7 @@ export function approvalEmails(input: DecisionEmailInput) {
       content: {
         heading: `${input.clientName} approved ${input.title}`,
         paragraphs: [
-          `Version ${input.version}, signed as ${signed} at ${utcStamp(input.at)}.`,
+          `Version ${input.version}, signed as ${signed} at ${formatUtcMoment(input.at)}.`,
           `Statement: ${input.statement}`,
           `Reviewed: ${reviewed}`,
         ],
@@ -581,7 +543,7 @@ export function approvalEmails(input: DecisionEmailInput) {
           'This is your copy of the sign-off recorded in your portal.',
           `Statement: ${input.statement}`,
           `Signed as: ${signed}`,
-          `Time: ${utcStamp(input.at)}`,
+          `Time: ${formatUtcMoment(input.at)}`,
           `What you reviewed: ${reviewed}`,
         ],
         quote: input.note ?? undefined,
@@ -599,7 +561,7 @@ export function changesEmails(input: DecisionEmailInput & { nextVersion: number 
       subject: `${input.clientName} asked for changes on ${input.title}`,
       content: {
         heading: `${input.clientName} asked for changes on ${input.title}`,
-        paragraphs: [`Version ${input.version}, sent by ${input.signerEmail} at ${utcStamp(input.at)}.`, `Reviewed: ${reviewed}`],
+        paragraphs: [`Version ${input.version}, sent by ${input.signerEmail} at ${formatUtcMoment(input.at)}.`, `Reviewed: ${reviewed}`],
         quote: input.note ?? undefined,
         action: { label: 'Open it in the portal', url: input.url },
       } satisfies EmailContent,
@@ -609,7 +571,7 @@ export function changesEmails(input: DecisionEmailInput & { nextVersion: number 
       content: {
         heading: `We have your notes on ${input.title}`,
         paragraphs: [
-          `Thanks. Here is a copy of what you sent about version ${input.version}, at ${utcStamp(input.at)}.`,
+          `Thanks. Here is a copy of what you sent about version ${input.version}, at ${formatUtcMoment(input.at)}.`,
           `We'll email you when version ${input.nextVersion} is ready.`,
         ],
         quote: input.note ?? undefined,
@@ -625,7 +587,7 @@ export function recordedApprovalEmail(input: DecisionEmailInput & { recordedBy: 
     content: {
       heading: `We recorded your approval of ${input.title}`,
       paragraphs: [
-        `${input.recordedBy} recorded that you approved version ${input.version} of ${input.title} outside the portal, at ${utcStamp(input.at)}.`,
+        `${input.recordedBy} recorded that you approved version ${input.version} of ${input.title} outside the portal, at ${formatUtcMoment(input.at)}.`,
         `What was approved: ${reviewedItem(input.linkUrl, input.filename)}`,
         'Our note is below. The record is in your portal with the rest of the project.',
       ],
@@ -723,7 +685,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
           projectScope(context),
         ),
       ),
-    failedEmails(context, { kinds: ['deliverable'], subjectOf: deliverableIdOf }),
+    failedEmails(context, { kinds: ['deliverable'], subjectOf: kindItemId }),
   ]);
 
   const items: AttentionItem[] = [];

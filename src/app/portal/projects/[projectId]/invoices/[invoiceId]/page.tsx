@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 import InvoiceView from '@/components/portal/invoices/InvoiceView';
 import { getProjectForViewer, getViewer, requireProject } from '@/server/portal/access';
 import { featureContext } from '@/server/portal/collect';
-import { loadEnabledPaymentMethods, loadInvoice, STUDIO_NAME } from '@/server/portal/features/invoices';
-import { STUDIO_EMAIL } from '@/server/portal/notify';
+import { loadEnabledPaymentMethods, loadInvoice } from '@/server/portal/features/invoices';
+import { STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 
 type Params = Promise<{ projectId: string; invoiceId: string }>;
 

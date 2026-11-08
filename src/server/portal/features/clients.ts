@@ -1,5 +1,4 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { and, asc, count, eq, gt, inArray, like, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { activity, project, rateLimit, session, user, verification } from '@/db/schema';
@@ -138,39 +137,13 @@ export async function endAccess(tx: Tx, clientId: string, emails: string[]): Pro
 }
 
 /* ---------- Invites ----------
-   At most one invite per client every 10 minutes, claimed with one conditional upsert so two
-   clicks at once cannot both send. The row's time is also "last invited" on the page. */
+   At most one invite per client every 10 minutes (claimRateSlot). The slot's time is also
+   "last invited" on the page. */
 
 export const INVITE_INTERVAL_MS = 10 * 60 * 1000;
 
 export function inviteKey(clientId: string): string {
     return `portal:invite:${clientId}`;
-}
-
-export async function claimInviteSlot(clientId: string): Promise<{ ok: true } | { ok: false; waitMinutes: number }> {
-    const db = getDb();
-    const key = inviteKey(clientId);
-    const now = Date.now();
-    const claimed = await db
-        .insert(rateLimit)
-        .values({ id: randomUUID(), key, count: 1, lastRequest: now })
-        .onConflictDoUpdate({
-            target: rateLimit.key,
-            set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-            setWhere: sql`${rateLimit.lastRequest} <= ${now - INVITE_INTERVAL_MS}`,
-        })
-        .returning({ id: rateLimit.id });
-    if (claimed.length) return { ok: true };
-    const [row] = await db.select({ lastRequest: rateLimit.lastRequest }).from(rateLimit).where(eq(rateLimit.key, key));
-    const last = row?.lastRequest ?? now;
-    return { ok: false, waitMinutes: Math.max(1, Math.ceil((last + INVITE_INTERVAL_MS - now) / 60_000)) };
-}
-
-// An invite that did not go out should neither block the next try nor read as sent
-export async function releaseInviteSlot(clientId: string): Promise<void> {
-    await getDb()
-        .delete(rateLimit)
-        .where(eq(rateLimit.key, inviteKey(clientId)));
 }
 
 export async function clientProjectNames(clientId: string): Promise<string[]> {

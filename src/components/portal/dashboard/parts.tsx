@@ -464,14 +464,14 @@ const Flags = styled.div`
 interface ActivityPanelProps {
   id: string;
   title: string;
+  // The server names the actor in the reader's terms (the studio, You), so the panel needs no perspective
   items: ActivityView[];
-  perspective: Perspective;
   showProject: boolean;
   empty: string;
   note?: ReactNode;
 }
 
-export function ActivityPanel({ id, title, items, perspective, showProject, empty, note }: ActivityPanelProps) {
+export function ActivityPanel({ id, title, items, showProject, empty, note }: ActivityPanelProps) {
   return (
     <ListPanel aria-labelledby={id}>
       <PanelTitle id={id} title={title} note={note} />
@@ -485,7 +485,7 @@ export function ActivityPanel({ id, title, items, perspective, showProject, empt
               <div>
                 <Summary>{item.href ? <Link href={item.href}>{item.summary}</Link> : item.summary}</Summary>
                 <MetaLine>
-                  {item.actorIsViewer ? 'You' : (item.actorName ?? (perspective === 'client' ? 'Bonsai Web Design' : 'The portal'))}
+                  {item.actorIsViewer ? 'You' : (item.actorName ?? 'The portal')}
                   <LocalTime value={item.at} />
                   {showProject && item.projectName}
                 </MetaLine>

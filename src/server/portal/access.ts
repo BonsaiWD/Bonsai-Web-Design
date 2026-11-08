@@ -135,6 +135,12 @@ export interface ProjectActor {
     isClient: boolean;
 }
 
+// Studio actions on a project: the signed-in user must be an admin, and the project must exist
+export async function studioProjectActor(projectId: unknown): Promise<ProjectActor> {
+    await adminActor();
+    return projectActor(projectId);
+}
+
 export async function projectActor(projectId: unknown, options: { clientOnly?: boolean } = {}): Promise<ProjectActor> {
     const portalUser = await actionUser();
     const found = typeof projectId === 'string' ? await loadProject(projectId, portalUser) : null;
@@ -145,8 +151,9 @@ export async function projectActor(projectId: unknown, options: { clientOnly?: b
     return { user: portalUser, project: found, isAdmin: isAdmin(portalUser), isClient };
 }
 
-// A transaction handle, for helpers that take part in an action's transaction
-export type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
+// The database, and a transaction handle for helpers that take part in an action's transaction
+export type Db = ReturnType<typeof getDb>;
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /*
  * Call first inside every client decision transaction (sign-offs, approvals, signatures,

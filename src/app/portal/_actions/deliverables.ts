@@ -11,10 +11,9 @@ import { plural, todayIso } from '@/lib/portal-format';
 import { adminActor, assertStillClient, projectActor, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
-  activityKind,
+  deliverableKind,
   approvalEmails,
   changesEmails,
-  claimEmailSlot,
   currentVersion,
   deliverableAnchor,
   emailedAboutVersion,
@@ -22,13 +21,15 @@ import {
   lockMilestones,
   recheckMilestone,
   recordedApprovalEmail,
-  releaseEmailSlot,
   shareEmail,
   syncMilestone,
+  VERSION_EMAIL_GAP_MS,
+  versionEmailKey,
 } from '@/server/portal/features/deliverables';
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
+import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * Every export here is an endpoint anyone can call with any arguments, so each one starts by
@@ -37,13 +38,6 @@ import { storeUpload } from '@/server/portal/storage';
  */
 
 const NOT_FOUND = 'This could not be found. Reload the page and try again.';
-
-// fields.checkbox fails on an unticked box under Zod 4 (a missing key reads as "nonoptional");
-// optional() before the transform lets the key be absent
-const checkbox = z
-  .union([z.literal('on'), z.literal('true')])
-  .optional()
-  .transform((value) => value !== undefined);
 
 // Parses the form and adds checks the schema cannot express, so every problem shows at once
 function parseWithChecks<S extends z.ZodType>(schema: S, formData: FormData, extra: Record<string, string>): z.infer<S> {
@@ -183,10 +177,10 @@ const shareSchema = z.object({
   expectedVersion: z.coerce.number().int().min(0).max(100_000),
   linkUrl: fields.optionalHttpsUrl,
   note: fields.optionalText('the note', 4000),
-  needsApproval: checkbox,
+  needsApproval: fields.checkbox,
   reviewBy: fields.optionalDate,
   milestoneId: optionalUuid,
-  emailClient: checkbox,
+  emailClient: fields.checkbox,
 });
 
 const newDeliverableFields = {
@@ -327,7 +321,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
 
     refresh(projectId);
     const clientName = clientNameOf(actor);
-    const kind = activityKind('shared', input.deliverableId);
+    const kind = deliverableKind('shared', input.deliverableId);
     // Worded as the attention items and dashboards word a version: "<title> (version N)"
     const summary = `Shared ${shared.title} (version ${shared.version})`;
     if (!input.emailClient) {
@@ -336,7 +330,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     }
 
     // Starts the 10-minute gap before "Email again" can send another
-    await claimEmailSlot(input.versionId);
+    const slot = await claimRateSlot(versionEmailKey(input.versionId), VERSION_EMAIL_GAP_MS);
     const { subject, content } = shareEmail({
       projectName: actor.project.name,
       clientName: actor.project.clientName,
@@ -355,7 +349,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
       target: 'deliverables',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    if (emailStatus !== 'sent') await releaseEmailSlot(input.versionId);
+    if (emailStatus !== 'sent') await releaseRateSlot(slot);
     return done(
       `${summary}.${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`,
     );
@@ -405,7 +399,7 @@ export async function editDeliverable(_prev: ActionState, formData: FormData): P
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('edited', input.deliverableId),
+      kind: deliverableKind('edited', input.deliverableId),
       summary: `Updated the details of ${input.title}`,
       target: 'deliverables',
       visibility: 'studio',
@@ -445,7 +439,7 @@ export async function fixVersionLink(_prev: ActionState, formData: FormData): Pr
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('linkFixed', result.deliverableId),
+      kind: deliverableKind('linkFixed', result.deliverableId),
       summary: `Updated the link for ${result.title} (version ${result.version.version})`,
       target: 'deliverables',
     });
@@ -477,7 +471,7 @@ export async function withdrawVersion(_prev: ActionState, formData: FormData): P
       await tx.execute(sql`
         UPDATE activity SET visibility = 'studio'
         WHERE project_id = ${projectId}
-          AND kind IN (${activityKind('shared', locked.deliverableId)}, ${activityKind('linkFixed', locked.deliverableId)})
+          AND kind IN (${deliverableKind('shared', locked.deliverableId)}, ${deliverableKind('linkFixed', locked.deliverableId)})
           AND created_at >= ${version.sharedAt}
           AND created_at < coalesce(
             (SELECT min(shared_at) FROM deliverable_version WHERE deliverable_id = ${locked.deliverableId} AND version > ${version.version}),
@@ -493,7 +487,7 @@ export async function withdrawVersion(_prev: ActionState, formData: FormData): P
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('withdrawn', result.deliverableId),
+      kind: deliverableKind('withdrawn', result.deliverableId),
       summary: `Withdrew ${result.title} (version ${result.version.version})`,
       target: 'deliverables',
       visibility: 'studio',
@@ -521,7 +515,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
       return found;
     });
 
-    const slot = await claimEmailSlot(input.versionId);
+    const slot = await claimRateSlot(versionEmailKey(input.versionId), VERSION_EMAIL_GAP_MS);
     if (!slot.ok) {
       throw new ActionError(
         `${clientName} was emailed about this version a few minutes ago. You can send another in ${plural(slot.waitMinutes, 'minute')}.`,
@@ -549,7 +543,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('reminded', locked.deliverableId),
+      kind: deliverableKind('reminded', locked.deliverableId),
       summary: `Emailed ${clientName}${again ? ' again' : ''} about ${locked.title} (version ${version.version})`,
       target: 'deliverables',
       visibility: 'studio',
@@ -557,7 +551,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
     });
     refresh(projectId);
     if (emailStatus === 'sent') return done(`Emailed ${clientName}${again ? ' again' : ''}.`);
-    await releaseEmailSlot(input.versionId);
+    await releaseRateSlot(slot);
     if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName).trim());
     throw new ActionError(`The email to ${clientName} could not be sent. It is flagged on your dashboard; try again in a minute.`);
   });
@@ -624,7 +618,7 @@ export async function recordApproval(_prev: ActionState, formData: FormData): Pr
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: admin.id,
-      kind: activityKind('approved', result.deliverableId),
+      kind: deliverableKind('approved', result.deliverableId),
       summary: `Recorded ${clientName}'s approval of ${result.title} (version ${result.version.version}), given outside the portal`,
       target: 'deliverables',
       email: { to: actor.project.clientEmail, subject, content },
@@ -683,7 +677,7 @@ export async function deleteDeliverable(_prev: ActionState, formData: FormData):
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('deleted', input.deliverableId),
+      kind: deliverableKind('deleted', input.deliverableId),
       summary: `Deleted ${title}`,
       target: 'deliverables',
       visibility: 'studio',
@@ -698,7 +692,7 @@ const approveSchema = z.object({
   projectId: fields.uuid,
   versionId: fields.uuid,
   ...shown,
-  confirm: checkbox,
+  confirm: fields.checkbox,
   signedName: fields
     .requiredText('your full name', 120)
     .pipe(z.string().min(2, { error: 'Enter your full name, as you would sign it.' })),
@@ -772,7 +766,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
       recordActivity({
         projectId,
         actorId: actor.user.id,
-        kind: activityKind('approved', result.deliverableId),
+        kind: deliverableKind('approved', result.deliverableId),
         summary: `${clientName} approved ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         email: { to: STUDIO_EMAIL, replyTo: actor.user.email, ...emails.studio },
@@ -780,7 +774,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
       recordActivity({
         projectId,
         actorId: actor.user.id,
-        kind: activityKind('receipt', result.deliverableId),
+        kind: deliverableKind('receipt', result.deliverableId),
         summary: `Receipt emailed to ${clientName}: approval of ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         visibility: 'studio',
@@ -872,7 +866,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
       recordActivity({
         projectId,
         actorId: actor.user.id,
-        kind: activityKind('changes', result.deliverableId),
+        kind: deliverableKind('changes', result.deliverableId),
         summary: `${clientName} asked for changes on ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         email: { to: STUDIO_EMAIL, replyTo: actor.user.email, ...emails.studio },
@@ -880,7 +874,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
       recordActivity({
         projectId,
         actorId: actor.user.id,
-        kind: activityKind('receipt', result.deliverableId),
+        kind: deliverableKind('receipt', result.deliverableId),
         summary: `Receipt emailed to ${clientName}: changes requested on ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         visibility: 'studio',

@@ -1,5 +1,4 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { cache } from 'react';
 import { and, asc, desc, eq, inArray, isNotNull, like, ne, or, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
@@ -16,14 +15,11 @@ import type {
 } from '@/components/portal/invoices/types';
 import { projectHref } from '@/components/portal/tabs';
 import type { EmailContent } from '@/lib/email';
-import { firstName, formatDate, formatMoney } from '@/lib/portal-format';
-import { adminActor, isUuid, projectActor, type Tx } from '../access';
+import { firstName, formatDate, formatMoney, formatUtcMoment } from '@/lib/portal-format';
+import { isUuid } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
-import { portalOrigin } from '../notify';
-
-type Db = ReturnType<typeof getDb>;
-
-export const STUDIO_NAME = 'Bonsai Web Design';
+import { portalOrigin, STUDIO_NAME } from '../notify';
+import { kindMaker } from '../kinds';
 
 /* ---------- Shared by the pages, the provider and the actions ---------- */
 
@@ -38,12 +34,6 @@ export function invoicePath(projectId: string, invoiceId: string): string {
 
 export async function invoiceUrl(projectId: string, invoiceId: string): Promise<string> {
   return `${await portalOrigin()}${invoicePath(projectId, invoiceId)}`;
-}
-
-// Studio actions on a project: the signed-in user must be an admin, and the project must exist
-export async function studioProjectActor(projectId: unknown) {
-  await adminActor();
-  return projectActor(projectId);
 }
 
 /* ---------- Activity kinds ----------
@@ -63,42 +53,18 @@ const KINDS = {
   voided: 'invoice.voided',
 } as const;
 
-export function activityKind(event: keyof typeof KINDS, invoiceId: string): string {
-  return `${KINDS[event]}:${invoiceId}`;
-}
+export const invoiceKind = kindMaker(KINDS);
 
 // Emails that go to the client; the newest one failing is flagged for the studio
 const CLIENT_EMAIL_KINDS = [KINDS.sent, KINDS.reminded, KINDS.notReceived, KINDS.paid];
 
 /* ---------- Email throttle ----------
-   One email to the client per invoice every ten minutes, so a double click or an eager
-   reminder cannot flood their inbox. Kept in the rate_limit table so it holds across instances. */
+   One email to the client per invoice every ten minutes (claimRateSlot), so a double click or
+   an eager reminder cannot flood their inbox. */
 
 export const EMAIL_INTERVAL_MS = 10 * 60 * 1000;
 
-const emailSlotKey = (invoiceId: string) => `portal:invoice-email:${invoiceId}`;
-
-export async function claimEmailSlot(invoiceId: string, db: Db | Tx = getDb()): Promise<boolean> {
-  const now = Date.now();
-  const claimed = await db
-    .insert(rateLimit)
-    .values({ id: randomUUID(), key: emailSlotKey(invoiceId), count: 1, lastRequest: now })
-    .onConflictDoUpdate({
-      target: rateLimit.key,
-      set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-      setWhere: sql`${rateLimit.lastRequest} < ${now - EMAIL_INTERVAL_MS}`,
-    })
-    .returning({ id: rateLimit.id });
-  return claimed.length > 0;
-}
-
-// An email that did not go out should not block the next try
-export async function releaseEmailSlot(invoiceId: string): Promise<void> {
-  await getDb()
-    .delete(rateLimit)
-    .where(eq(rateLimit.key, emailSlotKey(invoiceId)))
-    .catch(() => undefined);
-}
+export const invoiceEmailKey = (invoiceId: string) => `portal:invoice-email:${invoiceId}`;
 
 /* ---------- Totals ---------- */
 
@@ -210,7 +176,7 @@ export const loadInvoice = cache(async (projectId: string, invoiceId: string, pe
       .from(activity)
       .where(and(eq(activity.projectId, projectId), like(activity.kind, `invoice.%:${row.id}`)))
       .orderBy(desc(activity.createdAt)),
-    db.select({ lastRequest: rateLimit.lastRequest }).from(rateLimit).where(eq(rateLimit.key, emailSlotKey(row.id))),
+    db.select({ lastRequest: rateLimit.lastRequest }).from(rateLimit).where(eq(rateLimit.key, invoiceEmailKey(row.id))),
   ]);
   const lastClientEmail = history.find((entry) => entry.emailTo && CLIENT_EMAIL_KINDS.some((kind) => entry.kind.startsWith(`${kind}:`)));
   const nextEmail = slot ? slot.lastRequest + EMAIL_INTERVAL_MS : 0;
@@ -266,21 +232,6 @@ export async function loadPaymentSettings(): Promise<{ methods: PaymentMethodVie
 }
 
 /* ---------- Emails ---------- */
-
-// "Nov 8, 2026, 3:04 PM UTC": emails cannot know the reader's time zone, so they say UTC
-const utcMoment = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'UTC',
-  timeZoneName: 'short',
-});
-
-export function formatUtc(value: Date): string {
-  return utcMoment.format(value);
-}
 
 interface InvoiceFacts {
   number: string;
@@ -346,7 +297,7 @@ export function paymentReportedEmail(facts: InvoiceFacts & { reporter: string; r
         `Amount: ${formatMoney(facts.totalCents)}`,
         `Method: ${METHOD_LABELS[facts.method]}`,
         `Reference: ${facts.reference ?? 'none given'}`,
-        `Reported: ${formatUtc(facts.at)}`,
+        `Reported: ${formatUtcMoment(facts.at)}`,
         'Check that it has arrived, then mark the invoice paid in the portal to send their receipt.',
       ],
       action: { label: 'Open the invoice', url: facts.url },

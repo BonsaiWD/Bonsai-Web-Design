@@ -10,7 +10,6 @@ import { firstName } from '@/lib/portal-format';
 import { isUuid, projectActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
-  claimThreadEmail,
   clientMessageEmail,
   INTERNAL_NOTE_KIND,
   markThreadRead,
@@ -18,22 +17,17 @@ import {
   MESSAGE_MAX_LENGTH,
   messageAnchor,
   normalizeBody,
-  releaseThreadEmail,
   studioMessageEmail,
+  threadEmailSlot,
 } from '@/server/portal/features/messages';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
+import { releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * Every export here is an endpoint anyone can call with any arguments, so each one starts by
  * checking who is asking. The form sends the project, a client-made id and the person's own
  * words; the author and their side of the conversation come from the session.
  */
-
-// fields.checkbox fails on an unticked box under Zod 4 (a missing key reads as "nonoptional")
-const checkbox = z
-  .union([z.literal('on'), z.literal('true')])
-  .optional()
-  .transform((value) => value !== undefined);
 
 const sendSchema = z.object({
   projectId: fields.uuid,
@@ -48,7 +42,7 @@ const sendSchema = z.object({
         .min(1, { error: 'Write a message first.' })
         .max(MESSAGE_MAX_LENGTH, { error: `Messages can be up to ${MESSAGE_MAX_LENGTH.toLocaleString('en-US')} characters. Split this one in two.` }),
     ),
-  internal: checkbox,
+  internal: fields.checkbox,
 });
 
 const CLIENT_SENT = "Sent. We'll reply here and email you when we do.";
@@ -86,7 +80,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     }
 
     refresh(projectId);
-    const authorName = actor.user.name.trim() || (fromStudio ? 'Bonsai Web Design' : actor.user.email);
+    const authorName = actor.user.name.trim() || (fromStudio ? STUDIO_NAME : actor.user.email);
 
     if (input.internal) {
       await recordActivity({
@@ -106,11 +100,11 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     const activityBase = { projectId, actorId: actor.user.id, kind: MESSAGE_KIND, summary: `${authorName} sent a message`, target: 'messages' };
 
     // The message is saved: from here a database hiccup may cost the email, never the message
-    const claimed = await claimThreadEmail(projectId, to).catch((error) => {
+    const slot = await threadEmailSlot(projectId, to).catch((error) => {
       console.error('[portal messages] email throttle', error);
-      return true;
+      return null;
     });
-    if (!claimed) {
+    if (slot && !slot.ok) {
       // Emailed about this conversation a few minutes ago: the message waits in the portal
       await recordActivity(activityBase);
       return done(
@@ -125,7 +119,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
       ? studioMessageEmail({ authorName, clientName: actor.project.clientName, projectName: actor.project.name, body: input.body, url })
       : clientMessageEmail({ clientName, projectName: actor.project.name, body: input.body, url });
     const { emailStatus } = await recordActivity({ ...activityBase, email: { to, ...email } });
-    if (emailStatus !== 'sent') await releaseThreadEmail(projectId, to).catch(() => undefined);
+    if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
 
     if (!fromStudio) return done(CLIENT_SENT);
     return done(emailStatus === 'sent' ? `Sent. We emailed ${clientFirst}.` : `Sent.${emailNote(emailStatus, clientFirst)}`);

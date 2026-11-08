@@ -10,18 +10,19 @@ import { projectActor, type ProjectActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
   claimUpload,
-  claimUploadEmail,
   claimUploadQuota,
   fileAnchor,
   fileKind,
   refundUploadQuota,
   releaseUpload,
-  releaseUploadEmail,
   sharedSummary,
+  UPLOAD_EMAIL_GAP_MS,
+  uploadEmailKey,
   type QuotaClaim,
 } from '@/server/portal/features/files';
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 import { storeUpload } from '@/server/portal/storage';
+import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * The shared files library. Either side may upload; a file can be removed from the list by
@@ -30,12 +31,6 @@ import { storeUpload } from '@/server/portal/storage';
  */
 
 const NOT_FOUND = 'This file could not be found. Reload the page and try again.';
-
-// fields.checkbox rejects an unticked box under Zod 4; optional() lets the key be absent
-const checkbox = z
-  .union([z.literal('on'), z.literal('true')])
-  .optional()
-  .transform((value) => value !== undefined);
 
 function refresh(projectId: string) {
   revalidatePath(projectHref(projectId), 'layout');
@@ -50,7 +45,7 @@ const uploadSchema = z.object({
   uploadId: fields.uuid,
   note: fields.optionalText('the note', 1000),
   // The studio chooses; a client's upload always tells the studio
-  emailOther: checkbox,
+  emailOther: fields.checkbox,
 });
 
 export async function uploadProjectFile(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -102,11 +97,11 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
 
     if (!studio) {
       // One email per project every 10 minutes; later uploads wait in the feed and on the dashboard
-      const emailing = await claimUploadEmail(projectId).catch((error) => {
+      const slot = await claimRateSlot(uploadEmailKey(projectId), UPLOAD_EMAIL_GAP_MS).catch((error) => {
         console.error('[portal files] upload email throttle', error);
-        return true;
+        return null;
       });
-      if (!emailing) {
+      if (slot && !slot.ok) {
         await recordActivity(activity);
         return done(thanks);
       }
@@ -125,7 +120,7 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
           },
         },
       });
-      if (emailStatus !== 'sent') await releaseUploadEmail(projectId);
+      if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
       return done(thanks);
     }
 

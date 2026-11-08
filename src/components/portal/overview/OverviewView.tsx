@@ -228,7 +228,6 @@ export default function OverviewView({
             id="overview-activity"
             title="Recent activity"
             items={activity}
-            perspective={perspective}
             showProject={false}
             empty={studio ? 'Nothing has happened on this project yet.' : 'Updates on your project will appear here.'}
             note={studio ? 'Studio-only entries included' : undefined}

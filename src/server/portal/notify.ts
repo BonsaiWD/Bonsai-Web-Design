@@ -92,6 +92,21 @@ export async function recordActivity(input: ActivityInput): Promise<{ emailStatu
     return { emailStatus };
 }
 
+/*
+ * Text with no column of its own (an uploader's note, why a signed copy was sent back) travels
+ * at the end of its activity summary: "<summary>. Note: <text>". `after` anchors the search
+ * to what the summary says first, in case that (a filename) contains the marker itself.
+ */
+export function summaryWithText(summary: string, label: 'Note' | 'Reason', text: string | null): string {
+    return text ? `${summary}. ${label}: ${text}` : summary;
+}
+
+export function textFromSummary(summary: string, label: 'Note' | 'Reason', after = ''): string | null {
+    const marker = `${after}. ${label}: `;
+    const at = summary.indexOf(marker);
+    return at >= 0 ? summary.slice(at + marker.length) || null : null;
+}
+
 // Appended to a success message when the email part failed
 export function emailNote(status: 'sent' | 'failed' | 'skipped' | null, who = 'the client'): string {
     if (status === 'failed') return ` The email to ${who} could not be sent; it is flagged on your dashboard.`;

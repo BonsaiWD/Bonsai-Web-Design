@@ -24,6 +24,17 @@ export function useDialog() {
   return { open, openDialog, closeDialog, triggerRef };
 }
 
+/*
+ * A value as it was when a dialog opened, held while the dialog stays open. The dialog acts on
+ * what the person saw (the server refuses it if that has changed), and a dialog whose own
+ * success removes the value stays mounted to report the result.
+ */
+export function useHeldWhileOpen<T>(value: T, open: boolean): T {
+  const [held, setHeld] = useState(value);
+  if (!open && held !== value) setHeld(value);
+  return open ? held : value;
+}
+
 const Shell = styled.dialog`
   width: min(36rem, calc(100vw - 2rem));
   max-height: min(100dvh - 2rem, 48rem);
