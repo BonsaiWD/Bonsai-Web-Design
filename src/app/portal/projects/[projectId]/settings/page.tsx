@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import ProjectSettingsView from '@/components/portal/admin/ProjectSettingsView';
-import { Notice } from '@/components/portal/ui';
+import StudioOnlyNotice from '@/components/portal/admin/StudioOnlyNotice';
 import { getViewer, requireProject } from '@/server/portal/access';
 import { loadClientOptions } from '@/server/portal/features/clients';
 import { loadProjectSettings } from '@/server/portal/features/projects';
@@ -14,15 +14,9 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   const viewer = await getViewer();
   // Clients have no settings tab: to them it is a page that does not exist
   if (!viewer.isAdmin) notFound();
-  if (viewer.previewingAsClient) {
-    return (
-      <Notice>
-        <p>
-          Project settings belong to the studio view, so your client never sees this page. Switch back to the studio view to change them.
-        </p>
-      </Notice>
-    );
-  }
+  // The same notice as the other studio-only pages, with the way back; the project frame
+  // above already names the project
+  if (viewer.previewingAsClient) return <StudioOnlyNotice />;
 
   const [settings, clients] = await Promise.all([loadProjectSettings(project.id), loadClientOptions()]);
   if (!settings) notFound();
