@@ -309,7 +309,8 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     refresh(projectId);
     const clientName = clientNameOf(actor);
     const kind = activityKind('shared', input.deliverableId);
-    const summary = `Shared version ${shared.version} of ${shared.title}`;
+    // Worded as the attention items and dashboards word a version: "<title> (version N)"
+    const summary = `Shared ${shared.title} (version ${shared.version})`;
     if (!input.emailClient) {
       await recordActivity({ projectId, actorId: actor.user.id, kind, summary, target: 'deliverables' });
       return done(`Shared version ${shared.version} of ${shared.title}. No email was sent.`);
@@ -717,7 +718,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: activityKind('approved', result.deliverableId),
-        summary: `${clientName} approved version ${result.version.version} of ${result.title}`,
+        summary: `${clientName} approved ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         email: { to: STUDIO_EMAIL, replyTo: actor.user.email, ...emails.studio },
       }),
@@ -725,7 +726,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: activityKind('receipt', result.deliverableId),
-        summary: `Emailed ${clientName} a receipt for approving version ${result.version.version} of ${result.title}`,
+        summary: `Receipt emailed to ${clientName}: approval of ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },
@@ -816,7 +817,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: activityKind('changes', result.deliverableId),
-        summary: `${clientName} asked for changes on version ${result.version.version} of ${result.title}`,
+        summary: `${clientName} asked for changes on ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         email: { to: STUDIO_EMAIL, replyTo: actor.user.email, ...emails.studio },
       }),
@@ -824,7 +825,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: activityKind('receipt', result.deliverableId),
-        summary: `Emailed ${clientName} a copy of their notes on version ${result.version.version} of ${result.title}`,
+        summary: `Receipt emailed to ${clientName}: changes requested on ${result.title} (version ${result.version.version})`,
         target: 'deliverables',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },

@@ -584,7 +584,8 @@ export async function reportPayment(_prev: ActionState, formData: FormData): Pro
       projectId,
       actorId: actor.user.id,
       kind: activityKind('reported', result.row.id),
-      summary: `${name} reported paying ${result.row.number} by ${METHOD_LABELS[input.method]}`,
+      // The words of the studio's attention item and email: "<client> reported a payment on BWD-0003"
+      summary: `${name} reported a payment on ${result.row.number} by ${METHOD_LABELS[input.method]}`,
       target: 'invoices',
       email: { to: STUDIO_EMAIL, subject, content },
     });

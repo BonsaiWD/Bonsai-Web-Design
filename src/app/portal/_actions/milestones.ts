@@ -592,7 +592,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             projectId,
             actorId: actor.user.id,
             kind: 'milestone_signoff_receipt',
-            summary: `Sign-off receipt for ${result.title} emailed to ${name}`,
+            summary: `Receipt emailed to ${name}: sign-off of ${result.title}`,
             target: 'milestones',
             // The client already sees their sign-off on the timeline; this row tracks the email
             visibility: 'studio',

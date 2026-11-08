@@ -738,7 +738,7 @@ export async function signContract(_prev: ActionState, formData: FormData): Prom
         projectId,
         actorId: actor.user.id,
         kind: contractKind('receipt', input.contractId),
-        summary: `Emailed ${clientName} a receipt for signing ${result.title}`,
+        summary: `Receipt emailed to ${clientName}: signature on ${result.title}`,
         target: 'contracts',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },

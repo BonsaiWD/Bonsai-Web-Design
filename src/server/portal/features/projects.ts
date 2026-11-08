@@ -310,13 +310,20 @@ export const projectsFeature: PortalFeature = {
         }));
     },
 
-    // Target launches of projects still under way; a launched or paused project has none
+    // Target launches of projects still under way; a launched or paused project has none. A
+    // milestone still to do on the same day (usually "Launch") already lists that date, so the
+    // launch is left out rather than shown twice.
     async deadlines(context) {
         const rows = await getDb()
             .select({ id: project.id, name: project.name, targetLaunch: project.targetLaunch })
             .from(project)
             .where(
-                and(projectScope(context), notInArray(project.stage, ['launched', 'on_hold']), sql`${project.targetLaunch} IS NOT NULL`),
+                and(
+                    projectScope(context),
+                    notInArray(project.stage, ['launched', 'on_hold']),
+                    sql`${project.targetLaunch} IS NOT NULL`,
+                    sql`NOT EXISTS (SELECT 1 FROM milestone m WHERE m.project_id = ${project.id} AND m.status <> 'done' AND m.due_date = ${project.targetLaunch})`,
+                ),
             );
         return rows.map((row) => ({
             key: `project-launch:${row.id}`,
