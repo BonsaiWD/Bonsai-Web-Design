@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiPlus } from 'react-icons/fi';
 import { firstName, plural } from '@/lib/portal-format';
-import { Button, EmptyState, H2, ListPanel, MetaText, PanelHeader, space, Stack, useDialog, VisuallyHidden } from '../ui';
+import { Button, EmptyState, H2, ListPanel, MetaText, PanelHeader, space, Stack, useDialog, useUnsavedChanges, VisuallyHidden } from '../ui';
 import AddMilestoneDialog from './AddMilestoneDialog';
 import MilestoneItem from './MilestoneItem';
 import { Timeline } from './styles';
@@ -37,7 +37,8 @@ export default function MilestonesView({
   // Set when the empty state's button opens the add dialog: that button is gone afterwards
   const addingFirst = useRef(false);
 
-  // Rows with edits not yet saved; leaving the page with any of them asks first
+  // Rows with edits not yet saved (open or collapsed); leaving the page with any of them,
+  // by reload, tab, breadcrumb or shell link, asks first
   const [dirtyIds, setDirtyIds] = useState<ReadonlySet<string>>(() => new Set());
   const onDirtyChange = useCallback((id: string, dirty: boolean) => {
     setDirtyIds((current) => {
@@ -48,17 +49,7 @@ export default function MilestonesView({
       return next;
     });
   }, []);
-  const anyDirty = dirtyIds.size > 0;
-  useEffect(() => {
-    if (!anyDirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      // Older browsers only show the prompt when returnValue is set
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [anyDirty]);
+  useUnsavedChanges(dirtyIds.size > 0);
 
   // One polite announcement for list-level changes. The count alternates a trailing space,
   // so the same words said twice ("Moved to 2 of 5.") are still read out.

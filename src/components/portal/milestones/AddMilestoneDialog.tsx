@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { addMilestone } from '@/app/portal/_actions/milestones';
 import { ActionForm, Button, Dialog, FormActions, FormMessage, FormStack, SubmitButton } from '../ui';
+import { UnsavedFormGuard } from '../deliverables/parts';
 import { FreshFields, PendingReporter } from './formParts';
 import MilestoneFields from './MilestoneFields';
 
@@ -32,6 +33,7 @@ function AddForm({ projectId, clientFirst, onAdded, onCancel, onPendingChange, b
   return (
     <ActionForm action={addMilestone} onSuccess={(state) => onAdded(state.message)}>
       <PendingReporter onChange={onPendingChange} />
+      <UnsavedFormGuard />
       <FormStack>
         <FreshFields>
           <MilestoneFields saved={EMPTY} clientFirst={clientFirst} />

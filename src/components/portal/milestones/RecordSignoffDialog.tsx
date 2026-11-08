@@ -3,6 +3,7 @@
 import { recordSignoff } from '@/app/portal/_actions/milestones';
 import { ActionForm, Button, Dialog, Field, FormActions, FormMessage, FormStack, Notice, Select, SubmitButton, Textarea } from '../ui';
 import { RECORD_METHODS } from './labels';
+import { UnsavedFormGuard } from '../deliverables/parts';
 import { FreshFields, PendingReporter } from './formParts';
 
 interface RecordSignoffDialogProps {
@@ -43,6 +44,7 @@ export default function RecordSignoffDialog({
     >
       <ActionForm action={recordSignoff} onSuccess={(state) => onRecorded(state.message)}>
         <PendingReporter onChange={onPendingChange} />
+        <UnsavedFormGuard />
         <FormStack>
           <FreshFields>
             <Field label="How did they confirm?" name="method" saved="email">

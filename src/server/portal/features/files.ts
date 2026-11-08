@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, gte, isNull, like, lt, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, like, lt, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
 import { activity, file, project, rateLimit, user } from '@/db/schema';
@@ -8,6 +8,7 @@ import type { ProjectFileView } from '@/components/portal/files/types';
 import { isUuid } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
 import { INLINE_TYPES } from '../storage';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Activity ----------
    The file table has no column for the note an uploader writes, so it travels in the
@@ -192,9 +193,41 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
   });
 }
 
+// Failed emails about shared files, flagged as every feature flags them (failed-emails.ts).
+// One about a file that has since been removed no longer matters.
+async function failedEmailItems(context: FeatureContext): Promise<AttentionItem[]> {
+  const emails = await failedEmails(context, { kinds: ['file.'], subjectOf: fileIdOf });
+  const ids = [...new Set(emails.map((row) => row.subject).filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return [];
+  const files = await getDb()
+    .select({ id: file.id, filename: file.filename })
+    .from(file)
+    .where(and(inArray(file.id, ids), isNull(file.removedAt)));
+  const names = new Map(files.map((row) => [row.id, row.filename]));
+  const items: AttentionItem[] = [];
+  for (const row of emails) {
+    const filename = row.subject ? names.get(row.subject) : undefined;
+    if (!row.subject || !filename) continue;
+    items.push({
+      key: `file-email:${row.id}`,
+      projectId: row.projectId,
+      projectName: row.projectName,
+      tab: 'files',
+      anchor: fileAnchor(row.subject),
+      title: failedEmailTitle(row.who, filename),
+      detail: row.summary,
+      since: row.createdAt.toISOString(),
+      tone: 'alert',
+    });
+  }
+  return items;
+}
+
 export const filesFeature: PortalFeature = {
   async attention(context) {
-    return context.perspective === 'studio' ? studioAttention(context) : [];
+    if (context.perspective !== 'studio') return [];
+    const [shared, failed] = await Promise.all([studioAttention(context), failedEmailItems(context)]);
+    return [...shared, ...failed];
   },
   // Files carry no due dates
   deadlines: async () => [],

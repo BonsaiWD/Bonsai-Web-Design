@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { file, project } from '@/db/schema';
+import { deliverableVersion, file, project } from '@/db/schema';
 import { getPortalSession, isAdmin, isUuid } from '@/server/portal/access';
 import { INLINE_TYPES, readStoredFile, safeFilename } from '@/server/portal/storage';
 
@@ -24,7 +24,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
         })
         .from(file)
         .innerJoin(project, eq(project.id, file.projectId))
-        .where(and(eq(file.id, fileId), admin ? undefined : eq(project.clientId, session.user.id)))
+        .where(
+            and(
+                eq(file.id, fileId),
+                admin ? undefined : eq(project.clientId, session.user.id),
+                // A deliverable file is the client's only while its version is: once the studio
+                // withdraws that version, an old link or download stops working for them
+                admin
+                    ? undefined
+                    : sql`(${file.purpose} <> 'deliverable' OR EXISTS (
+                        SELECT 1 FROM ${deliverableVersion}
+                        WHERE ${deliverableVersion.fileId} = ${file.id} AND ${deliverableVersion.status} <> 'withdrawn'
+                    ))`,
+            ),
+        )
         .limit(1);
     // A removed file stays available to the studio, which may need it for the record
     if (!row || (row.removedAt && !admin)) return notFound();

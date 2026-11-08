@@ -98,6 +98,27 @@ const Steps = styled.ol`
   }
 `;
 
+// A name and a wait, not a single figure: label above, value under it, both left-aligned,
+// and the day count kept with its unit
+const StackedEntry = styled.div`
+  && {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${space[1]};
+  }
+
+  && dd {
+    text-align: left;
+  }
+
+  span {
+    display: block;
+    ${type.meta}
+    ${type.figures}
+    white-space: nowrap;
+  }
+`;
+
 const Tips = styled.ul`
   margin: 0;
   padding: 0;
@@ -127,7 +148,7 @@ export interface DeliverablesViewProps {
   deliverables: DeliverableView[];
   milestones: MilestoneOption[];
   acceptedExtensions: string;
-  maxUploadMb: number;
+  maxUploadBytes: number;
 }
 
 function orderWithin(group: GroupKey, items: DeliverableView[]): DeliverableView[] {
@@ -215,12 +236,13 @@ function Summary({ deliverables, perspective, today }: { deliverables: Deliverab
             <dd>{delivered}</dd>
           </div>
           {oldest && (
-            <div>
+            <StackedEntry>
               <dt>Waiting longest</dt>
               <dd>
-                {oldest.title}, {waitingDays < 1 ? 'shared today' : plural(waitingDays, 'day')}
+                {oldest.title}
+                <span>{waitingDays < 1 ? 'Shared today' : `Waiting ${plural(waitingDays, 'day')}`}</span>
               </dd>
-            </div>
+            </StackedEntry>
           )}
         </DataList>
       </Stack>
@@ -288,7 +310,7 @@ export default function DeliverablesView(props: DeliverablesViewProps) {
     clientName: props.clientName,
     milestones: props.milestones,
     acceptedExtensions: props.acceptedExtensions,
-    maxUploadMb: props.maxUploadMb,
+    maxUploadBytes: props.maxUploadBytes,
   };
 
   const entries = GROUP_ORDER[perspective].flatMap((group) => {
@@ -369,7 +391,7 @@ export default function DeliverablesView(props: DeliverablesViewProps) {
 
         <Aside aria-label={studio ? 'Deliverables summary and tips' : 'Deliverables summary and how reviews work'}>
           {deliverables.length > 0 && <Summary deliverables={deliverables} perspective={perspective} today={props.today} />}
-          {studio ? <StudioGuide maxUploadMb={props.maxUploadMb} /> : <ClientGuide />}
+          {studio ? <StudioGuide maxUploadMb={Math.floor(props.maxUploadBytes / (1024 * 1024))} /> : <ClientGuide />}
         </Aside>
       </Split>
 

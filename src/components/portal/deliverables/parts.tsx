@@ -22,6 +22,7 @@ import {
   type,
   useDialog,
   useFormStatusState,
+  useUnsavedChanges,
   type ActionState,
   type FormAction,
 } from '@/components/portal/ui';
@@ -294,6 +295,43 @@ export function DisclosureSummary({ children, count }: { children: ReactNode; co
   );
 }
 
+/* ---------- Unsaved edits ---------- */
+
+/*
+ * Put inside an ActionForm: once something is typed or chosen in the form, leaving the page
+ * (a tab, a portal link, a reload) asks first, until the form succeeds or unmounts (a dialog
+ * closing). After a failed submit the form still holds unsaved text, so it stays guarded.
+ * `active` lets a form that is only collapsed, not discarded, stop guarding while hidden.
+ */
+export function UnsavedFormGuard({ active = true }: { active?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [touched, setTouched] = useState(false);
+  const { state } = useFormStatusState();
+  const [seenAt, setSeenAt] = useState(state?.at);
+  if (state?.at !== seenAt) {
+    setSeenAt(state?.at);
+    if (state?.ok) setTouched(false);
+  }
+  useUnsavedChanges(touched && active);
+
+  useEffect(() => {
+    const form = ref.current?.closest('form');
+    if (!form) return;
+    const onEdit = (event: Event) => {
+      const target = event.target as HTMLInputElement | null;
+      if (target && target.type !== 'hidden') setTouched(true);
+    };
+    form.addEventListener('input', onEdit);
+    form.addEventListener('change', onEdit);
+    return () => {
+      form.removeEventListener('input', onEdit);
+      form.removeEventListener('change', onEdit);
+    };
+  }, []);
+
+  return <span ref={ref} hidden />;
+}
+
 /* ---------- Forms in dialogs ---------- */
 
 // Tells the dialog while its form is submitting, so Escape cannot close it mid-way
@@ -353,6 +391,7 @@ export function FormDialog({
         }}
       >
         <ReportPending onChange={setBusy} />
+        <UnsavedFormGuard />
         <FormStack>
           {children}
           <FormActions>

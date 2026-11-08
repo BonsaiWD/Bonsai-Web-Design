@@ -19,13 +19,12 @@ import {
 import type { DeliverableView, MilestoneOption, Perspective, VersionView } from '@/components/portal/deliverables/types';
 import type { EmailContent } from '@/lib/email';
 import { firstName, formatDate } from '@/lib/portal-format';
-import { isUuid, type PortalProject } from '../access';
+import { isUuid, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
+import { failedEmails, failedEmailTitle } from './failed-emails';
+import { milestoneKind } from './milestones';
 import { STUDIO_EMAIL } from '../notify';
 import { INLINE_TYPES } from '../storage';
-
-type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /* ---------- Activity kinds ----------
    Activity rows carry the deliverable's id in their kind ("deliverable.shared:<id>"), so the
@@ -262,10 +261,45 @@ export async function loadMilestoneOptions(projectId: string): Promise<Milestone
 }
 
 /* ---------- Milestone sync ----------
-   Runs inside the deliverable's transaction. An initialled milestone is part of the signed
-   record, so deliverables never move it. */
+   Runs inside the deliverable's transaction, after the deliverable is locked. An initialled
+   milestone is part of the signed record, so deliverables never move it.
+   A deliverable that leaves a milestone's work (a version withdrawn, the deliverable deleted,
+   or linked elsewhere) re-checks the milestone only if the milestone could have been waiting
+   on it: a review still open, or an approval. Anything else (a handoff, a draft) never put the
+   milestone where it is, so a status the studio set by hand stays as it is. */
 
-type MilestoneEvent = 'shared' | 'changes' | 'approved' | 'withdrawn';
+type MilestoneEvent = 'shared' | 'changes' | 'approved';
+
+// The deliverable's newest version that was not withdrawn, as it stood before the change
+export interface CurrentVersion {
+  status: VersionStatus;
+  needsApproval: boolean;
+}
+
+// Locks the milestones a change touches in id order before any of them is synced, as a
+// milestone delete or move does, so two requests never wait on each other in a circle
+// Returns the ids found in the project, so a milestone from elsewhere can be refused.
+export async function lockMilestones(tx: Tx, projectId: string, ids: (string | null | undefined)[]): Promise<string[]> {
+  const wanted = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  if (wanted.length === 0) return [];
+  const rows = await tx
+    .select({ id: milestone.id })
+    .from(milestone)
+    .where(and(eq(milestone.projectId, projectId), inArray(milestone.id, wanted)))
+    .orderBy(asc(milestone.id))
+    .for('update');
+  return rows.map((row) => row.id);
+}
+
+// The event that brings a milestone in line with a deliverable newly linked to it: an open
+// review waits on the client, an approval counts towards finishing it, anything else is not
+// something the milestone waits for
+export function eventForLinked(current: CurrentVersion | null): MilestoneEvent | null {
+  if (!current?.needsApproval) return null;
+  if (current.status === 'in_review') return 'shared';
+  if (current.status === 'approved') return 'approved';
+  return null;
+}
 
 // The newest non-withdrawn version of every deliverable linked to the milestone
 async function linkedCurrentVersions(tx: Tx, milestoneId: string) {
@@ -279,17 +313,36 @@ async function linkedCurrentVersions(tx: Tx, milestoneId: string) {
     .innerJoin(deliverable, eq(deliverable.id, deliverableVersion.deliverableId))
     .where(and(eq(deliverable.milestoneId, milestoneId), ne(deliverableVersion.status, 'withdrawn')))
     .orderBy(asc(deliverableVersion.deliverableId), desc(deliverableVersion.version));
-  const current = new Map<string, { status: VersionStatus; needsApproval: boolean }>();
+  const current = new Map<string, CurrentVersion>();
   for (const row of rows) if (!current.has(row.deliverableId)) current.set(row.deliverableId, row);
   return [...current.values()];
 }
 
-export async function syncMilestone(
-  tx: Tx,
-  projectId: string,
-  milestoneId: string,
-  event: MilestoneEvent,
-): Promise<MilestoneStatus | null> {
+export async function currentVersion(tx: Tx, deliverableId: string): Promise<CurrentVersion | null> {
+  const [row] = await tx
+    .select({ status: deliverableVersion.status, needsApproval: deliverableVersion.needsApproval })
+    .from(deliverableVersion)
+    .where(and(eq(deliverableVersion.deliverableId, deliverableId), ne(deliverableVersion.status, 'withdrawn')))
+    .orderBy(desc(deliverableVersion.version))
+    .limit(1);
+  return row ?? null;
+}
+
+// The studio's last word on the milestone's status was "Ask for sign-off", not a status set
+// by hand since: the initials were asked for in their own right
+async function signoffAsked(tx: Tx, projectId: string, milestoneId: string): Promise<boolean> {
+  const asked = milestoneKind('signoff_requested', milestoneId);
+  const [last] = await tx
+    .select({ kind: activity.kind })
+    .from(activity)
+    .where(and(eq(activity.projectId, projectId), inArray(activity.kind, [asked, milestoneKind('status', milestoneId)])))
+    .orderBy(desc(activity.createdAt))
+    .limit(1);
+  return last?.kind === asked;
+}
+
+// Locks the milestone and reads what it is now; null when it is signed off (or gone)
+async function lockOpenMilestone(tx: Tx, projectId: string, milestoneId: string) {
   // Locked first, so two approvals landing together cannot both miss that the other is done
   const [row] = await tx
     .select({ status: milestone.status, requiresSignoff: milestone.requiresSignoff })
@@ -302,25 +355,65 @@ export async function syncMilestone(
     .from(milestoneSignoff)
     .where(eq(milestoneSignoff.milestoneId, milestoneId))
     .limit(1);
-  if (signed) return null;
+  return signed ? null : row;
+}
 
+async function setMilestoneStatus(tx: Tx, milestoneId: string, from: MilestoneStatus, next: MilestoneStatus | null) {
+  if (!next || next === from) return null;
+  await tx.update(milestone).set({ status: next }).where(eq(milestone.id, milestoneId));
+  return next;
+}
+
+export async function syncMilestone(
+  tx: Tx,
+  projectId: string,
+  milestoneId: string,
+  event: MilestoneEvent,
+): Promise<MilestoneStatus | null> {
+  const row = await lockOpenMilestone(tx, projectId, milestoneId);
+  if (!row) return null;
   let next: MilestoneStatus | null = null;
   if (event === 'shared') next = 'waiting_on_client';
   else if (event === 'changes') next = 'in_progress';
-  else {
+  else if (row.status !== 'done') {
+    // Approvals finish the milestone, unless the client still has to initial it off. They
+    // never reopen a step the studio already marked done.
     const linked = await linkedCurrentVersions(tx, milestoneId);
-    if (event === 'approved') {
-      const pending = linked.some((version) => version.needsApproval && version.status !== 'approved');
-      // Approvals finish the milestone, unless the client still has to initial it off
-      if (!pending) next = row.requiresSignoff ? 'waiting_on_client' : 'done';
-    } else if (row.status === 'waiting_on_client' && !row.requiresSignoff && !linked.some((version) => version.status === 'in_review')) {
-      // Nothing is left for the client to review, so the milestone is back with the studio
-      next = 'in_progress';
-    }
+    const open = linked.some((version) => version.needsApproval && version.status !== 'approved');
+    if (!open) next = row.requiresSignoff ? 'waiting_on_client' : 'done';
   }
-  if (!next || next === row.status) return null;
-  await tx.update(milestone).set({ status: next }).where(eq(milestone.id, milestoneId));
-  return next;
+  return setMilestoneStatus(tx, milestoneId, row.status, next);
+}
+
+// A deliverable left the milestone's work; `left` is its current version from before
+export async function recheckMilestone(
+  tx: Tx,
+  projectId: string,
+  milestoneId: string,
+  left: CurrentVersion | null,
+): Promise<MilestoneStatus | null> {
+  if (!left?.needsApproval) return null;
+  const row = await lockOpenMilestone(tx, projectId, milestoneId);
+  if (!row || row.status !== 'waiting_on_client') return null;
+  // Only an open review, or an approval on a step that then waited for initials, can be why
+  // the milestone waits on the client
+  if (left.status !== 'in_review' && !(left.status === 'approved' && row.requiresSignoff)) return null;
+  const linked = await linkedCurrentVersions(tx, milestoneId);
+  // Another review is still open, so the milestone still waits on the client
+  if (linked.some((version) => version.status === 'in_review')) return null;
+  const needing = linked.filter((version) => version.needsApproval);
+  let next: MilestoneStatus;
+  if (needing.length > 0 && needing.every((version) => version.status === 'approved')) {
+    // Everything that asked for approval has it: the step is finished, or waits for initials
+    next = row.requiresSignoff ? 'waiting_on_client' : 'done';
+  } else if (needing.length === 0 && row.requiresSignoff && (await signoffAsked(tx, projectId, milestoneId))) {
+    // Nothing is left to approve, but the studio asked for the initials themselves
+    next = 'waiting_on_client';
+  } else {
+    // Sent back, being redone, or nothing left that was approved: back with the studio
+    next = 'in_progress';
+  }
+  return setMilestoneStatus(tx, milestoneId, row.status, next);
 }
 
 /* ---------- Email throttle ----------
@@ -602,29 +695,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
           projectScope(context),
         ),
       ),
-    db
-      .select({
-        id: activity.id,
-        kind: activity.kind,
-        summary: activity.summary,
-        emailTo: activity.emailTo,
-        emailStatus: activity.emailStatus,
-        createdAt: activity.createdAt,
-        projectId: project.id,
-        projectName: project.name,
-      })
-      .from(activity)
-      .innerJoin(project, eq(project.id, activity.projectId))
-      .where(
-        and(
-          like(activity.kind, 'deliverable%'),
-          isNotNull(activity.emailTo),
-          inArray(activity.emailStatus, ['sent', 'failed']),
-          gte(activity.createdAt, sql`now() - interval '14 days'`),
-          projectScope(context),
-        ),
-      )
-      .orderBy(asc(activity.createdAt)),
+    failedEmails(context, { kinds: ['deliverable'], subjectOf: deliverableIdOf }),
   ]);
 
   const items: AttentionItem[] = [];
@@ -653,21 +724,26 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       tone: 'info',
     });
   }
-  // A failed email stays flagged until a later one about the same deliverable reaches that address
-  for (const [index, row] of emails.entries()) {
-    if (row.emailStatus !== 'failed') continue;
-    const deliverableId = deliverableIdOf(row.kind);
-    const resolved = emails
-      .slice(index + 1)
-      .some((later) => later.emailStatus === 'sent' && later.emailTo === row.emailTo && deliverableIdOf(later.kind) === deliverableId);
-    if (resolved) continue;
+  // Failed emails, flagged as every feature flags them (failed-emails.ts). One about a
+  // deliverable that was deleted since no longer matters.
+  const ids = [...new Set(emails.map((row) => row.subject).filter((id): id is string => Boolean(id)))];
+  const titles = new Map(
+    ids.length
+      ? (await db.select({ id: deliverable.id, title: deliverable.title }).from(deliverable).where(inArray(deliverable.id, ids))).map(
+          (row) => [row.id, row.title],
+        )
+      : [],
+  );
+  for (const row of emails) {
+    const title = row.subject ? titles.get(row.subject) : undefined;
+    if (!row.subject || !title) continue;
     items.push({
       key: `deliverable-email:${row.id}`,
       projectId: row.projectId,
       projectName: row.projectName,
       tab: 'deliverables',
-      anchor: deliverableId ? deliverableAnchor(deliverableId) : undefined,
-      title: `An email to ${row.emailTo} could not be sent`,
+      anchor: deliverableAnchor(row.subject),
+      title: failedEmailTitle(row.who, title),
       detail: row.summary,
       since: row.createdAt.toISOString(),
       tone: 'alert',

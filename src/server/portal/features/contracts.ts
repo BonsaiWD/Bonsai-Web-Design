@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, isNotNull, like, ne, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, like, ne, notExists, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
 import { activity, contract, contractFile, contractSignature, file, project, rateLimit, user } from '@/db/schema';
@@ -17,6 +17,7 @@ import { isUuid, type PortalProject } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
 import { STUDIO_EMAIL } from '../notify';
 import { INLINE_TYPES } from '../storage';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 type Db = ReturnType<typeof getDb>;
 export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -583,26 +584,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
           projectScope(context),
         ),
       ),
-    db
-      .select({
-        id: activity.id,
-        kind: activity.kind,
-        emailTo: activity.emailTo,
-        emailStatus: activity.emailStatus,
-        createdAt: activity.createdAt,
-      })
-      .from(activity)
-      .innerJoin(project, eq(project.id, activity.projectId))
-      .where(
-        and(
-          or(...ASKING.map((kind) => like(activity.kind, `${kind}:%`))),
-          isNotNull(activity.emailTo),
-          inArray(activity.emailStatus, ['sent', 'failed']),
-          gte(activity.createdAt, sql`now() - interval '14 days'`),
-          projectScope(context),
-        ),
-      )
-      .orderBy(asc(activity.createdAt)),
+    failedEmails(context, { kinds: ['contract.'], subjectOf: contractIdOf }),
     awaitingContracts(context),
   ]);
 
@@ -632,26 +614,34 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
     });
   }
 
-  // A failed "please sign" email stays flagged while the contract still waits, until a later
-  // one about the same contract reaches that address ("Email again" on the card)
-  const waiting = new Map(awaiting.map((row) => [row.id, row]));
-  for (const [index, row] of emails.entries()) {
-    if (row.emailStatus !== 'failed') continue;
-    const contractId = contractIdOf(row.kind);
-    const open = contractId ? waiting.get(contractId) : undefined;
-    if (!open) continue;
-    const resolved = emails
-      .slice(index + 1)
-      .some((later) => later.emailStatus === 'sent' && later.emailTo === row.emailTo && contractIdOf(later.kind) === contractId);
-    if (resolved) continue;
+  // Failed emails, flagged as every feature flags them (failed-emails.ts). One about a
+  // contract that was deleted no longer matters, and nor does a "please sign" email once the
+  // contract is signed.
+  const waiting = new Set(awaiting.map((row) => row.id));
+  const ids = [...new Set(emails.map((row) => row.subject).filter((id): id is string => Boolean(id)))];
+  const contracts = new Map(
+    ids.length
+      ? (
+          await db
+            .select({ id: contract.id, title: contract.title, requiresSignature: contract.requiresSignature })
+            .from(contract)
+            .where(inArray(contract.id, ids))
+        ).map((row) => [row.id, row])
+      : [],
+  );
+  for (const row of emails) {
+    const about = row.subject ? contracts.get(row.subject) : undefined;
+    if (!about) continue;
+    const asking = ASKING.some((kind) => row.kind.startsWith(`${kind}:`));
+    if (asking && about.requiresSignature && !waiting.has(about.id)) continue;
     items.push({
       key: `contract-email:${row.id}`,
-      projectId: open.projectId,
-      projectName: open.projectName,
+      projectId: row.projectId,
+      projectName: row.projectName,
       tab: 'contracts',
-      anchor: contractAnchor(open.id),
-      title: `The email asking ${open.clientName} to sign ${open.title} could not be sent`,
-      detail: `Sent to ${row.emailTo}. Use "Email again" on the contract to retry.`,
+      anchor: contractAnchor(about.id),
+      title: failedEmailTitle(row.who, about.title),
+      detail: asking && waiting.has(about.id) ? `Sent to ${row.emailTo}. Use "Email again" on the contract to retry.` : row.summary,
       since: row.createdAt.toISOString(),
       tone: 'alert',
     });

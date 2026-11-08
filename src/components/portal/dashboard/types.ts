@@ -30,6 +30,8 @@ export interface NextMilestoneView {
   dueDate: string | null;
   requiresSignoff: boolean;
   signed: boolean;
+  // A linked deliverable is still in review, which comes before any initials
+  reviewPending: boolean;
 }
 
 export interface ProjectCardView {

@@ -1,12 +1,14 @@
 import 'server-only';
-import { and, asc, desc, eq, gte, inArray, like, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
-import { activity, deliverable, deliverableVersion, milestone, milestoneSignoff, project, rateLimit, user } from '@/db/schema';
+import { deliverable, deliverableVersion, milestone, milestoneSignoff, project, rateLimit, user } from '@/db/schema';
+import { asksForInitials } from '@/components/portal/milestones/signoff';
 import type { LinkedDeliverable, MilestoneView, SignoffRecord } from '@/components/portal/milestones/types';
-import { daysBetween } from '@/lib/portal-format';
-import { adminActor, projectActor } from '../access';
+import { daysBetween, firstName } from '@/lib/portal-format';
+import { adminActor, isUuid, projectActor, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -14,6 +16,24 @@ import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContex
 export const milestoneVersion = sql<string>`to_char(${milestone.updatedAt} at time zone 'UTC', 'YYYYMMDDHH24MISSUS')`;
 
 export { signoffStatement } from '@/components/portal/milestones/statement';
+export { asksForInitials };
+
+/* ---------- Activity kinds ----------
+   "milestone.<event>:<milestoneId>", like the other features' kinds, so a failed email can
+   link to its milestone and clear once a later email of the same kind reaches the same
+   person. Rows written before used "milestone_<event>" with no id; both match 'milestone%'. */
+
+export type MilestoneEvent = 'added' | 'status' | 'due' | 'deleted' | 'signoff_requested' | 'signoff_recorded' | 'signoff' | 'signoff_receipt';
+
+export function milestoneKind(event: MilestoneEvent, milestoneId: string): string {
+    return `milestone.${event}:${milestoneId}`;
+}
+
+function parseKind(kind: string): { event: string; milestoneId: string | null } {
+    const current = /^milestone\.([a-z_]+):(.*)$/.exec(kind);
+    if (current) return { event: current[1], milestoneId: isUuid(current[2]) ? current[2] : null };
+    return { event: kind.replace(/^milestone_?/, ''), milestoneId: null };
+}
 
 export const SIGNOFF_METHODS = {
     email: 'by email',
@@ -35,6 +55,31 @@ export function signoffAskKey(milestoneId: string): string {
 }
 
 export const SIGNOFF_ASK_INTERVAL_MS = 10 * 60 * 1000;
+
+// Gives back an ask whose email did not go out, so Remind works straight away and "Emailed
+// <time>" keeps pointing at the last email that really went. Only the claim this request
+// made is touched.
+export async function releaseSignoffAsk(milestoneId: string, claimedAt: number, previousAt: number | null): Promise<void> {
+    const mine = and(eq(rateLimit.key, signoffAskKey(milestoneId)), eq(rateLimit.lastRequest, claimedAt));
+    if (previousAt === null) await getDb().delete(rateLimit).where(mine);
+    else await getDb().update(rateLimit).set({ lastRequest: previousAt, count: sql`greatest(${rateLimit.count} - 1, 1)` }).where(mine);
+}
+
+// The first linked deliverable whose newest version is still in review, if any: that review
+// comes before the client's initials
+export async function pendingReview(tx: Tx, milestoneId: string): Promise<string | null> {
+    const [row] = await tx
+        .select({ title: deliverable.title })
+        .from(deliverable)
+        .innerJoin(
+            deliverableVersion,
+            and(eq(deliverableVersion.deliverableId, deliverable.id), eq(deliverableVersion.version, deliverable.latestVersion)),
+        )
+        .where(and(eq(deliverable.milestoneId, milestoneId), eq(deliverableVersion.status, 'in_review')))
+        .orderBy(asc(deliverable.createdAt))
+        .limit(1);
+    return row?.title ?? null;
+}
 
 // "Nov 8, 2026, 3:04 PM UTC": emails cannot know the reader's time zone, so they say UTC
 const utcMoment = new Intl.DateTimeFormat('en-US', {
@@ -166,6 +211,19 @@ async function loadLinkedDeliverables(projectId: string): Promise<Map<string, Li
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+// For a query over milestones: the title of the first linked deliverable whose newest
+// version is still in review, or null. Every screen that asks for initials reads this.
+export function linkedReviewTitle() {
+    return sql<string | null>`(
+        SELECT ${deliverable.title} FROM ${deliverable}
+        JOIN ${deliverableVersion} ON ${deliverableVersion.deliverableId} = ${deliverable.id}
+            AND ${deliverableVersion.version} = ${deliverable.latestVersion}
+        WHERE ${deliverable.milestoneId} = ${milestone.id} AND ${deliverableVersion.status} = 'in_review'
+        ORDER BY ${deliverable.createdAt}
+        LIMIT 1
+    )`;
+}
+
 async function scopedMilestones(context: FeatureContext) {
     return getDb()
         .select({
@@ -182,13 +240,9 @@ async function scopedMilestones(context: FeatureContext) {
             signoffId: milestoneSignoff.id,
             signoffSource: milestoneSignoff.source,
             signedAt: milestoneSignoff.signedAt,
-            // The deliverable card asks for that review, so the milestone need not ask too
-            reviewPending: sql<boolean>`EXISTS (
-                SELECT 1 FROM ${deliverable}
-                JOIN ${deliverableVersion} ON ${deliverableVersion.deliverableId} = ${deliverable.id}
-                    AND ${deliverableVersion.version} = ${deliverable.latestVersion}
-                WHERE ${deliverable.milestoneId} = ${milestone.id} AND ${deliverableVersion.status} = 'in_review'
-            )`,
+            // A linked deliverable still in review: its card asks for that review, and the
+            // milestone waits for it before asking for anything itself
+            reviewTitle: linkedReviewTitle(),
         })
         .from(milestone)
         .innerJoin(project, eq(project.id, milestone.projectId))
@@ -198,7 +252,21 @@ async function scopedMilestones(context: FeatureContext) {
         .orderBy(asc(project.name), asc(milestone.position));
 }
 
+type ScopedMilestone = Awaited<ReturnType<typeof scopedMilestones>>[number];
+
 const anchorOf = (id: string) => `milestone-${id}`;
+
+const initialsDue = (row: ScopedMilestone) =>
+    asksForInitials({ requiresSignoff: row.requiresSignoff, signed: Boolean(row.signoffId), status: row.status, reviewPending: row.reviewTitle !== null });
+
+// What a milestone that is waiting on the client is waiting for, in the studio's words
+function waitingDetail(row: ScopedMilestone): string {
+    const client = row.clientName || row.clientEmail;
+    const first = firstName(row.clientName) ?? client;
+    if (row.reviewTitle) return `Waiting on ${first} to review ${row.reviewTitle}`;
+    if (initialsDue(row)) return `Waiting on ${first} to initial`;
+    return `Waiting on ${client}`;
+}
 
 async function attention(context: FeatureContext): Promise<AttentionItem[]> {
     const rows = await scopedMilestones(context);
@@ -207,25 +275,22 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
 
     if (context.perspective === 'client') {
         for (const row of rows) {
-            const base = { projectId: row.projectId, projectName: row.projectName, tab: 'milestones' as const, anchor: anchorOf(row.id) };
-            if (row.requiresSignoff && !row.signoffId) {
-                items.push({
-                    ...base,
-                    key: `milestone-signoff:${row.id}`,
-                    title: `Initial ${row.title} to sign it off`,
-                    due: row.dueDate,
-                    since: row.updatedAt.toISOString(),
-                    tone: overdue(row.dueDate) ? 'alert' : 'action',
-                });
-            } else if (row.status === 'waiting_on_client' && !row.reviewPending) {
-                items.push({
-                    ...base,
-                    key: `milestone-waiting:${row.id}`,
-                    title: `${row.title} is waiting on you`,
-                    due: row.dueDate,
-                    since: row.updatedAt.toISOString(),
-                    tone: overdue(row.dueDate) ? 'alert' : 'action',
-                });
+            // Only steps waiting on the client ask for anything, and a linked review asks first
+            // (the deliverable card covers it, so one step never asks twice)
+            if (row.status !== 'waiting_on_client' || row.reviewTitle) continue;
+            const base = {
+                projectId: row.projectId,
+                projectName: row.projectName,
+                tab: 'milestones' as const,
+                anchor: anchorOf(row.id),
+                due: row.dueDate,
+                since: row.updatedAt.toISOString(),
+                tone: overdue(row.dueDate) ? ('alert' as const) : ('action' as const),
+            };
+            if (initialsDue(row)) {
+                items.push({ ...base, key: `milestone-signoff:${row.id}`, title: `Add your initials to sign off ${row.title}` });
+            } else {
+                items.push({ ...base, key: `milestone-waiting:${row.id}`, title: `${row.title} is waiting on you` });
             }
         }
         return items;
@@ -236,13 +301,15 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
         const base = { projectId: row.projectId, projectName: row.projectName, tab: 'milestones' as const, anchor: anchorOf(row.id) };
         const client = row.clientName || row.clientEmail;
         if (row.status !== 'done' && overdue(row.dueDate)) {
+            const waiting = row.status === 'waiting_on_client';
             items.push({
                 ...base,
                 key: `milestone-overdue:${row.id}`,
                 title: `${row.title} is past its due date`,
-                detail: row.status === 'waiting_on_client' ? `Waiting on ${client}` : undefined,
                 due: row.dueDate,
                 tone: 'alert',
+                // A step waiting on the client is a follow-up for the studio, not its own work
+                ...(waiting ? { detail: waitingDetail(row), blockedOn: 'client' as const } : {}),
             });
         }
         if (row.signoffId && row.signoffSource === 'client' && row.signedAt && row.signedAt >= recent) {
@@ -256,27 +323,29 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
         }
     }
 
-    // A sign-off request or receipt that never arrived, so the studio can follow up
-    const failed = await getDb()
-        .select({
-            id: activity.id,
-            summary: activity.summary,
-            emailTo: activity.emailTo,
-            createdAt: activity.createdAt,
-            projectId: project.id,
-            projectName: project.name,
-        })
-        .from(activity)
-        .innerJoin(project, eq(project.id, activity.projectId))
-        .where(and(projectScope(context), like(activity.kind, 'milestone%'), eq(activity.emailStatus, 'failed'), gte(activity.createdAt, recent)))
-        .orderBy(desc(activity.createdAt));
-    for (const row of failed) {
+    items.push(...(await failedEmailItems(context, rows)));
+    return items;
+}
+
+// Sign-off requests, copies and receipts that never arrived, flagged as every feature flags
+// them (failed-emails.ts). A request no longer matters once the milestone is signed off or
+// deleted; rows from before kinds carried the milestone's id match on their kind alone.
+async function failedEmailItems(context: FeatureContext, milestones: ScopedMilestone[]): Promise<AttentionItem[]> {
+    const emails = await failedEmails(context, { kinds: ['milestone'], subjectOf: (kind) => parseKind(kind).milestoneId });
+    const byId = new Map(milestones.map((row) => [row.id, row]));
+    const items: AttentionItem[] = [];
+    for (const row of emails) {
+        const { event, milestoneId } = parseKind(row.kind);
+        const target = milestoneId ? byId.get(milestoneId) : undefined;
+        if (milestoneId && !target) continue;
+        if (event === 'signoff_requested' && target?.signoffId) continue;
         items.push({
             key: `milestone-email:${row.id}`,
             projectId: row.projectId,
             projectName: row.projectName,
             tab: 'milestones',
-            title: `An email to ${row.emailTo ?? 'the client'} could not be sent`,
+            ...(target ? { anchor: anchorOf(target.id) } : {}),
+            title: failedEmailTitle(row.who, target?.title),
             detail: row.summary,
             since: row.createdAt.toISOString(),
             tone: 'alert',
@@ -298,8 +367,10 @@ async function deadlines(context: FeatureContext): Promise<DeadlineItem[]> {
             title: row.title,
             date: row.dueDate as string,
             kind: 'milestone' as const,
-            // Waiting for the client's go-ahead or initials puts the date in their hands
-            owner: row.status === 'waiting_on_client' || (row.requiresSignoff && !row.signoffId) ? ('client' as const) : ('studio' as const),
+            // The date is the client's only while the step waits on them for something the
+            // milestone itself asks (initials, or what the studio set it waiting for). While a
+            // linked review is open, that review's own date is theirs and this one stays ours.
+            owner: row.status === 'waiting_on_client' && !row.reviewTitle ? ('client' as const) : ('studio' as const),
         }));
 }
 

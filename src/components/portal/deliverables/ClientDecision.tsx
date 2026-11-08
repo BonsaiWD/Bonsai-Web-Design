@@ -22,7 +22,7 @@ import {
   type ActionState,
 } from '@/components/portal/ui';
 import { approvalStatement, formatBytes, linkHost } from './copy';
-import { CardActions, FormDialog, InsetPanel, type Announce } from './parts';
+import { CardActions, FormDialog, InsetPanel, UnsavedFormGuard, type Announce } from './parts';
 import type { VersionView } from './types';
 
 // What exactly is being approved, restated inside the dialog
@@ -157,6 +157,9 @@ export function ClientDecision({
             decided(state);
           }}
         >
+          {/* Cancel only collapses the notes (they are still there on reopening), so they
+              stop guarding the page while hidden */}
+          <UnsavedFormGuard active={changesOpen && reviewing} />
           <FormStack>
             <Field
               label="What would you like changed?"

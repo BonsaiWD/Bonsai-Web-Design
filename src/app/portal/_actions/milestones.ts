@@ -5,16 +5,19 @@ import { revalidatePath } from 'next/cache';
 import { and, asc, eq, max, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
-import { milestone, milestoneSignoff, milestoneStatus, project, rateLimit, user, type MilestoneStatus } from '@/db/schema';
+import { deliverable, milestone, milestoneSignoff, milestoneStatus, project, rateLimit, user, type MilestoneStatus } from '@/db/schema';
 import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate } from '@/lib/portal-format';
-import { projectActor } from '@/server/portal/access';
+import { assertStillClient, projectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import {
     formatUtc,
+    milestoneKind,
     milestoneVersion,
+    pendingReview,
+    releaseSignoffAsk,
     SIGNOFF_ASK_INTERVAL_MS,
     SIGNOFF_METHODS,
     signoffAskKey,
@@ -62,8 +65,6 @@ async function milestoneUrl(projectId: string, milestoneId: string) {
     return `${await portalOrigin()}${projectHref(projectId, 'milestones', `milestone-${milestoneId}`)}`;
 }
 
-type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
-
 // Positions 1..n in the current order, without touching updated_at: a reorder is not an
 // edit, so it must not make someone's open edit form look stale
 async function renumber(tx: Tx, rows: { id: string; position: number }[]) {
@@ -76,16 +77,20 @@ async function renumber(tx: Tx, rows: { id: string; position: number }[]) {
     }
 }
 
-// Locks the project's milestones in display order, so concurrent moves and deletes queue up.
-// A move only needs "no key update", which still lets other features insert rows pointing at
-// a milestone; a delete takes the full lock, so a sign-off cannot land between check and delete.
+// Locks the project's milestones, so concurrent moves and deletes queue up, then reads their
+// order in a separate statement. Postgres sorts a locking SELECT before it waits for the locks,
+// so a request that queued behind another move would get its rows in the old order; the
+// second read sees what the first committed. Locks are taken in id order, as the deliverable
+// actions take theirs, so the two never wait on each other in a circle. A move only needs
+// "no key update", which still lets other features insert rows pointing at a milestone; a
+// delete takes the full lock, so a sign-off cannot land between check and delete.
 async function lockOrder(tx: Tx, projectId: string, strength: 'update' | 'no key update') {
+    await tx.select({ id: milestone.id }).from(milestone).where(eq(milestone.projectId, projectId)).orderBy(asc(milestone.id)).for(strength);
     return tx
         .select({ id: milestone.id, title: milestone.title, position: milestone.position })
         .from(milestone)
         .where(eq(milestone.projectId, projectId))
-        .orderBy(asc(milestone.position), asc(milestone.createdAt))
-        .for(strength);
+        .orderBy(asc(milestone.position), asc(milestone.createdAt));
 }
 
 function statusSummary(milestoneTitle: string, next: MilestoneStatus, clientName: string): string {
@@ -155,7 +160,7 @@ export async function addMilestone(_prev: ActionState, formData: FormData): Prom
             await recordActivity({
                 projectId,
                 actorId: actor.user.id,
-                kind: 'milestone_added',
+                kind: milestoneKind('added', input.id),
                 summary: `New milestone: ${input.title}`,
                 target: 'milestones',
             });
@@ -229,7 +234,7 @@ export async function updateMilestone(_prev: ActionState, formData: FormData): P
             await recordActivity({
                 projectId,
                 actorId: actor.user.id,
-                kind: 'milestone_status',
+                kind: milestoneKind('status', input.id),
                 summary: statusSummary(input.title, input.status, clientName),
                 target: 'milestones',
             });
@@ -238,7 +243,7 @@ export async function updateMilestone(_prev: ActionState, formData: FormData): P
             await recordActivity({
                 projectId,
                 actorId: actor.user.id,
-                kind: 'milestone_due',
+                kind: milestoneKind('due', input.id),
                 summary: input.dueDate ? `${input.title} is now due ${formatDate(input.dueDate)}` : `${input.title} no longer has a due date`,
                 target: 'milestones',
             });
@@ -287,6 +292,15 @@ export async function deleteMilestone(_prev: ActionState, formData: FormData): P
         const projectId = actor.project.id;
 
         const deletedTitle = await getDb().transaction(async (tx) => {
+            // The delete unlinks these deliverables (ON DELETE SET NULL), which locks them.
+            // Deliverable actions lock the deliverable before its milestone, so take them
+            // first too; the other way round, a decision landing now could deadlock with us.
+            await tx
+                .select({ id: deliverable.id })
+                .from(deliverable)
+                .where(and(eq(deliverable.milestoneId, input.id), eq(deliverable.projectId, projectId)))
+                .orderBy(asc(deliverable.id))
+                .for('update');
             const rows = await lockOrder(tx, projectId, 'update');
             const row = rows.find((candidate) => candidate.id === input.id);
             if (!row) throw new ActionError(NOT_FOUND);
@@ -315,7 +329,7 @@ export async function deleteMilestone(_prev: ActionState, formData: FormData): P
         await recordActivity({
             projectId,
             actorId: actor.user.id,
-            kind: 'milestone_deleted',
+            kind: milestoneKind('deleted', input.id),
             summary: `Deleted milestone ${deletedTitle}`,
             target: 'milestones',
             visibility: 'studio',
@@ -327,7 +341,9 @@ export async function deleteMilestone(_prev: ActionState, formData: FormData): P
 
 /* ---------- Studio: ask for and record sign-offs ---------- */
 
-const askSchema = z.object({ id: fields.uuid, projectId: fields.uuid });
+// confirmReopen comes from the two-step confirm a finished milestone shows, so a button
+// rendered before the step was marked done cannot reopen it in one click
+const askSchema = z.object({ id: fields.uuid, projectId: fields.uuid, confirmReopen: checkbox });
 
 export async function askForSignoff(_prev: ActionState, formData: FormData): Promise<ActionState> {
     return runAction(formData, async () => {
@@ -335,10 +351,17 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
         const input = parseForm(askSchema, formData);
         const projectId = actor.project.id;
         const clientName = actor.project.clientName || actor.project.clientEmail;
+        const clientFirst = firstName(clientName) ?? clientName;
 
         const row = await getDb().transaction(async (tx) => {
             const [current] = await tx
-                .select({ id: milestone.id, title: milestone.title, dueDate: milestone.dueDate, requiresSignoff: milestone.requiresSignoff })
+                .select({
+                    id: milestone.id,
+                    title: milestone.title,
+                    dueDate: milestone.dueDate,
+                    status: milestone.status,
+                    requiresSignoff: milestone.requiresSignoff,
+                })
                 .from(milestone)
                 .where(and(eq(milestone.id, input.id), eq(milestone.projectId, projectId)))
                 .for('update');
@@ -348,9 +371,23 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                 .from(milestoneSignoff)
                 .where(eq(milestoneSignoff.milestoneId, current.id));
             if (signed) throw new ActionError(`${current.title} is already signed off.`);
+            if (current.status === 'done' && !input.confirmReopen) {
+                throw new ActionError(`${current.title} is done now. Reload the page; asking again will move it back to Waiting on client.`);
+            }
+            // The client cannot initial while a linked review is open, so an email now would
+            // ask for something they cannot do yet
+            const review = await pendingReview(tx, current.id);
+            if (review) {
+                throw new ActionError(`${clientFirst} is still reviewing ${review}. Once it's approved, ${clientFirst} is asked to initial ${current.title}.`);
+            }
 
             // At most one request email per milestone every ten minutes, so a double click or
-            // an eager reminder cannot flood the client's inbox
+            // an eager reminder cannot flood the client's inbox. The previous time is kept, so
+            // the claim can be given back if this email does not go out.
+            const [previous] = await tx
+                .select({ lastRequest: rateLimit.lastRequest })
+                .from(rateLimit)
+                .where(eq(rateLimit.key, signoffAskKey(current.id)));
             const now = Date.now();
             const claimed = await tx
                 .insert(rateLimit)
@@ -362,21 +399,21 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                 })
                 .returning({ id: rateLimit.id });
             if (claimed.length === 0) {
-                throw new ActionError(`${firstName(clientName) ?? clientName} was emailed about this in the last 10 minutes. Give it a little while before sending a reminder.`);
+                throw new ActionError(`${clientFirst} was emailed about this in the last 10 minutes. Give it a little while before sending a reminder.`);
             }
 
             await tx
                 .update(milestone)
                 .set({ requiresSignoff: true, status: 'waiting_on_client' })
                 .where(eq(milestone.id, current.id));
-            return current;
+            return { ...current, claimedAt: now, previousAskAt: previous?.lastRequest ?? null };
         });
 
         const greeting = firstName(actor.project.clientName);
         const { emailStatus } = await recordActivity({
             projectId,
             actorId: actor.user.id,
-            kind: 'milestone_signoff_requested',
+            kind: milestoneKind('signoff_requested', row.id),
             summary: `Sign-off requested for ${row.title}`,
             target: 'milestones',
             email: {
@@ -394,8 +431,9 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                 },
             },
         });
+        if (emailStatus !== 'sent') await releaseSignoffAsk(row.id, row.claimedAt, row.previousAskAt);
         refresh(projectId);
-        const verb = row.requiresSignoff ? 'Reminded' : 'Asked';
+        const verb = row.requiresSignoff && row.status === 'waiting_on_client' ? 'Reminded' : 'Asked';
         return done(`${verb} ${clientName} to initial ${row.title}.${emailNote(emailStatus, clientName)}`);
     });
 }
@@ -456,7 +494,7 @@ export async function recordSignoff(_prev: ActionState, formData: FormData): Pro
         const { emailStatus } = await recordActivity({
             projectId,
             actorId: actor.user.id,
-            kind: 'milestone_signoff_recorded',
+            kind: milestoneKind('signoff_recorded', input.id),
             summary: `Sign-off for ${record.title} recorded by the studio (${SIGNOFF_METHODS[input.method]})`,
             target: 'milestones',
             email: {
@@ -510,8 +548,9 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
         const meta = await requestMeta();
 
         const result = await getDb().transaction(async (tx) => {
+            await assertStillClient(tx, actor);
             const [current] = await tx
-                .select({ id: milestone.id, title: milestone.title, requiresSignoff: milestone.requiresSignoff })
+                .select({ id: milestone.id, title: milestone.title, status: milestone.status, requiresSignoff: milestone.requiresSignoff })
                 .from(milestone)
                 .where(and(eq(milestone.id, input.id), eq(milestone.projectId, projectId)))
                 .for('update');
@@ -529,6 +568,12 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             if (already?.source === 'client' && already.signerId === actor.user.id) return { repeat: true as const, title: current.title };
             if (already) throw new ActionError(`${current.title} is already signed off.`);
             if (!current.requiresSignoff) throw new ActionError(`${current.title} no longer needs your sign-off. Reload the page to see the latest.`);
+            // Initials are asked for once the step is waiting on the client, after any linked review
+            if (current.status !== 'waiting_on_client') {
+                throw new ActionError(`${current.title} isn't ready for your sign-off yet. We'll email you when it is.`);
+            }
+            const review = await pendingReview(tx, current.id);
+            if (review) throw new ActionError(`Review ${review} first. Once you've approved it, you can initial ${current.title}.`);
             if (current.title !== input.shownTitle) {
                 throw new ActionError(`This milestone was just renamed to ${current.title}. Reload the page, check it, then initial it again.`);
             }
@@ -574,7 +619,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
         await recordActivity({
             projectId,
             actorId: actor.user.id,
-            kind: 'milestone_signoff',
+            kind: milestoneKind('signoff', input.id),
             summary: `${name} initialled ${result.title}`,
             target: 'milestones',
             email: {
@@ -591,7 +636,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
         const receipt = await recordActivity({
             projectId,
             actorId: actor.user.id,
-            kind: 'milestone_signoff_receipt',
+            kind: milestoneKind('signoff_receipt', input.id),
             summary: `Sign-off receipt for ${result.title} emailed to ${name}`,
             target: 'milestones',
             // The client already sees their sign-off on the timeline; this row tracks the email
