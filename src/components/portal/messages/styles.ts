@@ -37,6 +37,17 @@ export const ThreadBody = styled.div`
   }
 `;
 
+export const FailedEmails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${space[3]};
+  padding: 0 ${space[6]} ${space[6]};
+
+  @media (max-width: ${PHONE}) {
+    padding: 0 ${space[4]} ${space[5]};
+  }
+`;
+
 export const EarlierNote = styled.p`
   ${type.meta}
   ${type.figures}
@@ -349,7 +360,7 @@ export const KeyHint = styled.span`
   ${type.meta}
   white-space: nowrap;
 
-  @media (hover: none) {
+  @media (hover: none), (max-width: ${PHONE}) {
     display: none;
   }
 
@@ -383,9 +394,11 @@ export const PreviewNote = styled.p`
 
 /* ---------- Aside ---------- */
 
+// One column beside the thread on laptops; below it, panels share a row where they fit
 export const Aside = styled.aside`
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  align-items: start;
   gap: ${space[5]};
   min-width: 0;
 `;

@@ -63,7 +63,7 @@ export function StudioAside({ clientName, clientFirst, clientEmail, clientCompan
           </Facts>
           <Meta>
             <Figures>
-              {plural(total, 'message')} · {plural(info.internalCount, 'internal note')}
+              {plural(Math.max(0, total - info.internalCount), 'message')} · {plural(info.internalCount, 'internal note')}
             </Figures>
           </Meta>
         </Stack>

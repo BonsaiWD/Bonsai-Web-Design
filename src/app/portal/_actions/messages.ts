@@ -51,6 +51,8 @@ const sendSchema = z.object({
   internal: checkbox,
 });
 
+const CLIENT_SENT = "Sent. We'll reply here and email you when we do.";
+
 function refresh(projectId: string) {
   // The layout holds the tab badges; the dashboard lists unread conversations
   revalidatePath(projectHref(projectId), 'layout');
@@ -79,7 +81,8 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
         .from(message)
         .where(and(eq(message.id, input.id), eq(message.projectId, projectId), eq(message.authorId, actor.user.id)));
       if (!existing) throw new ActionError('This message could not be sent. Reload the page and try again.');
-      return done(existing.internal ? 'Saved as an internal note.' : 'Sent.');
+      if (existing.internal) return done('Saved as an internal note. Only the studio can see it.');
+      return done(fromStudio ? 'Sent.' : CLIENT_SENT);
     }
 
     refresh(projectId);
@@ -102,13 +105,18 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     const to = fromStudio ? actor.project.clientEmail : STUDIO_EMAIL;
     const activityBase = { projectId, actorId: actor.user.id, kind: MESSAGE_KIND, summary: `${authorName} sent a message`, target: 'messages' };
 
-    if (!(await claimThreadEmail(projectId, to))) {
+    // The message is saved: from here a database hiccup may cost the email, never the message
+    const claimed = await claimThreadEmail(projectId, to).catch((error) => {
+      console.error('[portal messages] email throttle', error);
+      return true;
+    });
+    if (!claimed) {
       // Emailed about this conversation a few minutes ago: the message waits in the portal
       await recordActivity(activityBase);
       return done(
         fromStudio
           ? `Sent. ${clientFirst} had an email about this conversation in the last 10 minutes, so we didn't send another.`
-          : "Sent. We'll reply here and email you when we do.",
+          : CLIENT_SENT,
       );
     }
 
@@ -117,9 +125,9 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
       ? studioMessageEmail({ authorName, clientName: actor.project.clientName, projectName: actor.project.name, body: input.body, url })
       : clientMessageEmail({ clientName, projectName: actor.project.name, body: input.body, url });
     const { emailStatus } = await recordActivity({ ...activityBase, email: { to, ...email } });
-    if (emailStatus !== 'sent') await releaseThreadEmail(projectId, to);
+    if (emailStatus !== 'sent') await releaseThreadEmail(projectId, to).catch(() => undefined);
 
-    if (!fromStudio) return done("Sent. We'll reply here and email you when we do.");
+    if (!fromStudio) return done(CLIENT_SENT);
     return done(emailStatus === 'sent' ? `Sent. We emailed ${clientFirst}.` : `Sent.${emailNote(emailStatus, clientFirst)}`);
   });
 }

@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { markMessagesRead, sendMessage } from '@/app/portal/_actions/messages';
 import { projectHref } from '@/components/portal/tabs';
 import { firstName } from '@/lib/portal-format';
-import { H2, LocalTime, Meta, Notice, SectionHeader, Split, Stack, type ActionState } from '@/components/portal/ui';
+import { H2, LocalTime, Meta, Notice, SectionHeader, Split, type ActionState } from '@/components/portal/ui';
 import { ClientAside, StudioAside } from './Aside';
 import { Composer, ComposerPreview } from './Composer';
-import { ThreadPanel } from './styles';
+import { FailedEmails, ThreadPanel } from './styles';
 import { Thread } from './Thread';
 import type { MessagesViewProps, MessageView } from './types';
 
@@ -87,12 +87,10 @@ export default function MessagesView(props: MessagesViewProps) {
   // A message just sent stays in view as it lands
   const lastShown = messages[messages.length - 1];
   const lastKey = lastShown && lastShown.side === perspective ? lastShown.id : null;
-  const firstRender = useRef(true);
+  const previousKey = useRef(lastKey);
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
+    if (previousKey.current === lastKey) return;
+    previousKey.current = lastKey;
     if (lastKey) endRef.current?.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
   }, [lastKey]);
 
@@ -122,44 +120,46 @@ export default function MessagesView(props: MessagesViewProps) {
       </SectionHeader>
 
       <Split>
-        <Stack $gap={5}>
-          {failed.map((item) => (
-            <Notice key={item.id} tone="alert">
-              <p>
-                An email to {item.to} about a message on <LocalTime value={item.at} /> could not be sent.{' '}
-                {item.to === props.clientEmail
-                  ? `${clientFirst} can still read it here; your next message will email them again.`
-                  : 'The message is in the thread below.'}
-              </p>
-            </Notice>
-          ))}
-
-          <ThreadPanel aria-label={studio ? `Conversation with ${props.clientName}` : 'Conversation with the studio'}>
-            <Thread
-              messages={messages}
-              perspective={perspective}
-              viewerId={viewerId}
-              now={props.now}
-              dividerId={divider.id}
-              dividerCount={divider.count}
-              total={thread.total}
-              limited={thread.limited}
-              showAllHref={`${projectHref(projectId, 'messages')}?all=1`}
-              emptyText={
-                studio
-                  ? `Start the conversation with ${clientFirst}. They get an email with your message and a link back here.`
-                  : "Write to us about anything on the project. We'll reply here and email you when we do."
-              }
-            />
-            <div ref={endRef}>
-              {props.canWrite ? (
-                <Composer projectId={projectId} perspective={perspective} clientFirst={clientFirst} maxLength={maxLength} action={send} />
-              ) : (
-                <ComposerPreview clientName={props.clientName} />
-              )}
-            </div>
-          </ThreadPanel>
-        </Stack>
+        <ThreadPanel aria-label={studio ? `Conversation with ${props.clientName}` : 'Conversation with the studio'}>
+          <Thread
+            messages={messages}
+            perspective={perspective}
+            viewerId={viewerId}
+            now={props.now}
+            dividerId={divider.id}
+            dividerCount={divider.count}
+            total={thread.total}
+            limited={thread.limited}
+            showAllHref={`${projectHref(projectId, 'messages')}?all=1`}
+            emptyText={
+              studio
+                ? `Start the conversation with ${clientFirst}. They get an email with your message and a link back here.`
+                : "Write to us about anything on the project. We'll reply here and email you when we do."
+            }
+          />
+          <div ref={endRef}>
+            {/* Beside the composer, where the next message is the way to try again */}
+            {failed.length > 0 && (
+              <FailedEmails>
+                {failed.map((item) => (
+                  <Notice key={item.id} tone="alert">
+                    <span>
+                      An email to {item.to} about a message on <LocalTime value={item.at} /> could not be sent.{' '}
+                      {item.to === props.clientEmail
+                        ? `${clientFirst} can still read it here; your next message will email them again.`
+                        : 'The message is in the thread above.'}
+                    </span>
+                  </Notice>
+                ))}
+              </FailedEmails>
+            )}
+            {props.canWrite ? (
+              <Composer projectId={projectId} perspective={perspective} clientFirst={clientFirst} maxLength={maxLength} action={send} />
+            ) : (
+              <ComposerPreview clientName={props.clientName} />
+            )}
+          </div>
+        </ThreadPanel>
 
         {props.studio ? (
           <StudioAside

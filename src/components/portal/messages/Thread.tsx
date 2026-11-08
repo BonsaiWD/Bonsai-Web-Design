@@ -76,7 +76,8 @@ function groupThread(messages: MessageView[], options: { timeZone: string; viewe
         key: m.id,
         // The viewer's side of the conversation sits on the right
         own: m.side === options.perspective,
-        you: m.authorId === options.viewerId,
+        // Not while the studio previews the client's view: there, studio messages read as the client sees them
+        you: m.authorId === options.viewerId && m.side === options.perspective,
         side: m.side,
         internal: m.internal,
         authorName: m.authorName,
