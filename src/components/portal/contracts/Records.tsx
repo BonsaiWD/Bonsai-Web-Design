@@ -1,0 +1,343 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import styled from 'styled-components';
+import { FiCheck, FiCornerUpLeft, FiUpload } from 'react-icons/fi';
+import { formatBytes } from '@/components/portal/deliverables/copy';
+import { Disclosure, DisclosureSummary, NoteBlock } from '@/components/portal/deliverables/parts';
+import { LocalTime, MetaLine, PHONE, space, TextAnchor, tint, type, VisuallyHidden } from '@/components/portal/ui';
+import { fileHref } from '../files/parts';
+import { fileLabel, wasReplaced } from './copy';
+import type { ContractFileView, ContractView, Perspective } from './types';
+
+/* ---------- The signature on a contract ---------- */
+
+const Record = styled.div`
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: ${space[3]} ${space[4]};
+  padding: ${space[4]} ${space[5]};
+  background: ${({ theme }) => tint(theme.colors.primary, 6)};
+
+  > svg {
+    margin-top: 0.2em;
+    font-size: 1.125rem;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: ${space[3]};
+    min-width: 0;
+  }
+
+  @media (max-width: ${PHONE}) {
+    padding: ${space[4]};
+  }
+`;
+
+const RecordLine = styled.p`
+  ${type.body}
+  ${type.figures}
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+// Label and value side by side on wide screens, stacked on phones
+const RecordList = styled.dl`
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: ${space[2]} ${space[5]};
+  margin: ${space[3]} 0 0;
+  padding-bottom: ${space[2]};
+
+  dt {
+    ${type.meta}
+  }
+
+  dd {
+    ${type.meta}
+    ${type.figures}
+    margin: 0;
+    color: ${({ theme }) => theme.colors.text};
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+  }
+
+  @media (max-width: ${PHONE}) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: ${space[1]};
+
+    dd + dt {
+      margin-top: ${space[2]};
+    }
+  }
+`;
+
+function Entry({ label, children }: { label: string; children: ReactNode }) {
+  if (children === null || children === undefined || children === '' || children === false) return null;
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </>
+  );
+}
+
+export function SignatureRecord({
+  contract,
+  perspective,
+  clientName,
+}: {
+  contract: ContractView;
+  perspective: Perspective;
+  clientName: string;
+}) {
+  const studio = perspective === 'studio';
+  const signature = contract.signature;
+
+  // Signed on paper and uploaded, with no portal signature
+  if (!signature) {
+    const copy = contract.signedCopy;
+    if (!copy || !contract.requiresSignature) return null;
+    // A paper copy has no fingerprint: if the document was replaced, the studio checks by eye
+    // that the scan is of the new version before countersigning
+    const newVersion = studio && contract.status === 'signed' && wasReplaced(contract) ? contract.original : null;
+    return (
+      <Record>
+        <FiUpload aria-hidden="true" />
+        <div>
+          <RecordLine>
+            {studio
+              ? `${copy.uploadedByName || (copy.side === 'former' ? 'A previous client' : clientName)} uploaded a signed copy on `
+              : copy.side === 'former'
+                ? 'A previous client uploaded a signed copy on '
+                : 'You uploaded a signed copy on '}
+            <LocalTime value={copy.uploadedAt} />
+          </RecordLine>
+          {newVersion && (
+            <NoteBlock>
+              <h5>Check the version</h5>
+              <p>
+                We replaced the document on <LocalTime value={newVersion.uploadedAt} />. Check {copy.filename} is a signed copy of the new
+                version, {newVersion.filename}, before countersigning: a copy printed before then is of the earlier one.
+              </p>
+            </NoteBlock>
+          )}
+        </div>
+      </Record>
+    );
+  }
+
+  const byClient = signature.source === 'client';
+  const who = signature.byName || clientName;
+  return (
+    <Record>
+      <FiCheck aria-hidden="true" />
+      <div>
+        {byClient ? (
+          <>
+            <RecordLine>
+              Signed by {studio ? who : 'you'} on <LocalTime value={signature.signedAt} />
+            </RecordLine>
+            <MetaLine>
+              {signature.signedName && <>Signed as “{signature.signedName}”</>}
+              {studio && signature.signerEmail}
+            </MetaLine>
+          </>
+        ) : (
+          <>
+            <RecordLine>
+              Signature recorded by {studio && signature.byName ? signature.byName : 'the studio'} on{' '}
+              <LocalTime value={signature.signedAt} />
+            </RecordLine>
+            <MetaLine>Signed outside the portal</MetaLine>
+          </>
+        )}
+        {signature.note && (
+          <NoteBlock>
+            <h5>{byClient ? (studio ? 'Their note' : 'Your note') : 'How it was signed'}</h5>
+            <p>{signature.note}</p>
+          </NoteBlock>
+        )}
+        <Disclosure>
+          <DisclosureSummary>Signature record</DisclosureSummary>
+          <RecordList>
+            <Entry label="Statement">{signature.statement}</Entry>
+            <Entry label="Signed name">{signature.signedName}</Entry>
+            <Entry label="Signed">
+              <LocalTime value={signature.signedAt} />
+              {byClient ? ', in the portal' : ', recorded by the studio'}
+            </Entry>
+            <Entry label="Document">{signature.filename}</Entry>
+            <Entry label="SHA-256">{signature.sha256}</Entry>
+            <Entry label="Email">{signature.signerEmail}</Entry>
+            <Entry label="IP address">{signature.ipAddress}</Entry>
+            <Entry label="Browser">{signature.userAgent}</Entry>
+          </RecordList>
+        </Disclosure>
+      </div>
+    </Record>
+  );
+}
+
+/* ---------- A signed copy the studio sent back ---------- */
+
+export function ReturnedNotice({
+  contract,
+  perspective,
+  clientName,
+}: {
+  contract: ContractView;
+  perspective: Perspective;
+  clientName: string;
+}) {
+  const returned = contract.returnedCopy;
+  if (!returned) return null;
+  const studio = perspective === 'studio';
+  // Who uploaded it, for the studio: the client then, who may not be the client now
+  const uploader = returned.uploadedByName || (returned.former ? 'a previous client' : clientName);
+  const waits = returned.former ? `${clientName} hasn't signed it yet.` : `It waits for ${clientName}'s signature again.`;
+  return (
+    <Record>
+      <FiCornerUpLeft aria-hidden="true" />
+      <div>
+        <RecordLine>
+          {studio ? `Sent back the signed copy ${uploader} uploaded on ` : "We couldn't use the signed copy you uploaded on "}
+          <LocalTime value={returned.uploadedAt} />
+        </RecordLine>
+        <MetaLine stackOnPhone>
+          {returned.filename}
+          {studio && returned.former && `Uploaded before the project moved to ${clientName}`}
+        </MetaLine>
+        {returned.reason && (
+          <NoteBlock>
+            <h5>{studio ? `Your note to ${uploader}` : 'Our note'}</h5>
+            <p>{returned.reason}</p>
+          </NoteBlock>
+        )}
+        <MetaLine>
+          <>
+            {studio ? `Sent back${returned.byName ? ` by ${returned.byName}` : ''}` : 'We sent it back'} on{' '}
+            <LocalTime value={returned.at} />.{' '}
+            {studio ? waits : 'Sign it here, or upload a new signed copy.'}
+          </>
+        </MetaLine>
+      </div>
+    </Record>
+  );
+}
+
+/* ---------- Every file the contract has had ---------- */
+
+const HistoryList = styled.ol`
+  list-style: none;
+  margin: ${space[3]} 0 0;
+  padding: 0;
+
+  > li {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${space[1]};
+    padding: ${space[3]} 0;
+  }
+
+  > li + li {
+    border-top: 1px solid ${({ theme }) => tint(theme.colors.primary, 10)};
+  }
+`;
+
+const HistoryTitle = styled.p`
+  ${type.label}
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 ${space[2]};
+
+  span {
+    ${type.meta}
+  }
+`;
+
+// Why a copy was sent back, under its row
+const HistoryNote = styled.p`
+  ${type.meta}
+  max-width: 62ch;
+  padding-left: ${space[3]};
+  border-left: 2px solid ${({ theme }) => tint(theme.colors.primary, 30)};
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+`;
+
+// The filename is the download link, tall enough to tap
+const FileLink = styled(TextAnchor)`
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  ${type.meta}
+  ${type.figures}
+  font-weight: 500;
+  color: ${({ theme }) => theme.colors.primary};
+  overflow-wrap: anywhere;
+`;
+
+function uploader(entry: ContractFileView, perspective: Perspective, clientName: string): string {
+  const fallback = entry.side === 'studio' ? 'the studio' : entry.side === 'former' ? 'a previous client' : null;
+  if (perspective === 'studio') return entry.uploadedByName || fallback || clientName;
+  return fallback || 'you';
+}
+
+function stateOf(entry: ContractFileView, contract: ContractView): string | null {
+  if (entry.returned) return 'Sent back';
+  if (entry.label !== 'original') return null;
+  if (entry.current) return contract.signature?.fileId === entry.fileId ? 'Signed version' : 'Current version';
+  return 'Replaced';
+}
+
+export function FileHistory({
+  contract,
+  perspective,
+  clientName,
+}: {
+  contract: ContractView;
+  perspective: Perspective;
+  clientName: string;
+}) {
+  const files = contract.files;
+  if (files.length === 0) return null;
+  return (
+    <Disclosure>
+      <DisclosureSummary count={files.length === 1 ? '1 file' : `${files.length} files`}>File history</DisclosureSummary>
+      <HistoryList>
+        {files.map((entry) => {
+          const state = stateOf(entry, contract);
+          return (
+            <li key={entry.id}>
+              <HistoryTitle>
+                {fileLabel(entry.label, perspective, contract.requiresSignature, entry.side)}
+                {state && <span>{state}</span>}
+              </HistoryTitle>
+              <FileLink href={fileHref(entry.fileId)}>
+                <VisuallyHidden>Download </VisuallyHidden>
+                {entry.filename}
+              </FileLink>
+              <MetaLine stackOnPhone>
+                <>
+                  Uploaded by {uploader(entry, perspective, clientName)} on <LocalTime value={entry.uploadedAt} />
+                </>
+                {formatBytes(entry.sizeBytes)}
+              </MetaLine>
+              {entry.returned && (
+                <HistoryNote>
+                  Sent back{entry.returned.byName ? ` by ${entry.returned.byName}` : ''} on <LocalTime value={entry.returned.at} />
+                  {entry.returned.reason ? `: ${entry.returned.reason}` : '.'}
+                </HistoryNote>
+              )}
+            </li>
+          );
+        })}
+      </HistoryList>
+    </Disclosure>
+  );
+}

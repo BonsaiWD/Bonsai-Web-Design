@@ -48,7 +48,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable} ${jost.variable} ${italiana.variable}`}>
+    // GlobalStyle smooths anchor jumps; this tells Next to switch it off during route changes
+    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} ${playfair.variable} ${jost.variable} ${italiana.variable}`}>
       <body>
         <StyledComponentsRegistry>
           <Providers>{children}</Providers>

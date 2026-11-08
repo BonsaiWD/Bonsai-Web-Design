@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { Fragment } from 'react';
 import { Section, Container } from '../layout/Container';
 import GradientText from '../common/GradientText';
+import BranchNode from '../common/BranchNode';
+import MetaDot from '../common/MetaDot';
 import { FiArrowUpRight } from 'react-icons/fi';
 import { featured, projects } from '@/data/work';
 import { glassPane, glassTheme, lightField } from '@/styles/glass';
@@ -120,14 +122,6 @@ const MetaRow = styled.div`
   }
 `;
 
-const MetaDot = styled.span`
-  width: 0.25rem;
-  height: 0.25rem;
-  border-radius: 50%;
-  background: ${({ theme }) => theme.colors.primary};
-  opacity: 0.6;
-`;
-
 // Upright, as the site's other headings are: an italic display serif here read as a magazine
 const FeaturedTitle = styled.h3`
   font-family: ${({ theme }) => theme.fonts.heading};
@@ -205,17 +199,6 @@ const Branch = styled.ul`
       ${({ theme }) => tint(theme.colors.primary, 25)} 100%
     );
   }
-`;
-
-const BranchNode = styled.span`
-  position: relative;
-  z-index: 1;
-  width: 0.6875rem;
-  height: 0.6875rem;
-  border-radius: 50%;
-  border: 1px solid ${({ theme }) => theme.colors.primary};
-  background: ${({ theme }) => theme.colors.background};
-  transition: ${({ theme }) => theme.transitions.default};
 `;
 
 const BranchArrow = styled.span`

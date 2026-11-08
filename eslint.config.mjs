@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Git worktrees used by parallel agents: each is a full copy of the project
+    ".claude/**",
   ]),
 ]);
 
