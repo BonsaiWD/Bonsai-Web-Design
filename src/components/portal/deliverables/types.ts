@@ -61,7 +61,8 @@ export interface DeliverableView {
     lastEmailedAt: string | null;
     lastEmailFailed: boolean;
     // The first decided version, which keeps the deliverable on record
-    deleteBlockedBy: { version: number; status: 'approved' | 'changes_requested'; byName: string | null; at: string } | null;
+    // source 'studio': the studio recorded the client's decision, and byName is who recorded it
+    deleteBlockedBy: { version: number; status: 'approved' | 'changes_requested'; source: 'client' | 'studio'; byName: string | null; at: string } | null;
   };
 }
 

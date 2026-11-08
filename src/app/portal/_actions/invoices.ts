@@ -9,7 +9,7 @@ import { invoice, invoiceItem, paymentMethod, type InvoiceStatus } from '@/db/sc
 import { METHOD_LABELS } from '@/components/portal/invoices/labels';
 import { invoiceTotalCents, MAX_LINES, parseDollars, parseQuantity } from '@/components/portal/invoices/money';
 import { projectHref } from '@/components/portal/tabs';
-import { firstName, formatDate, formatMoney, todayIso } from '@/lib/portal-format';
+import { formatDate, formatMoney, todayIso } from '@/lib/portal-format';
 import { assertStillClient, projectActor, studioProjectActor, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
@@ -385,13 +385,13 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
     if (row.status !== 'sent' && row.status !== 'paid') {
       throw new ActionError(
         row.status === 'payment_reported'
-          ? `${firstName(clientName) ?? clientName} has reported paying ${row.number}. Mark it paid to send the receipt.`
+          ? `${clientName} has reported paying ${row.number}. Mark it paid to send the receipt.`
           : `${row.number} is ${row.status === 'draft' ? 'still a draft' : 'void'}, so there is nothing to email.`,
       );
     }
     const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
     if (!slot.ok) {
-      throw new ActionError(`${firstName(clientName) ?? clientName} was emailed about ${row.number} in the last 10 minutes. Give it a little while before sending another.`);
+      throw new ActionError(`${clientName} was emailed about ${row.number} in the last 10 minutes. Give it a little while before sending another.`);
     }
 
     const { totalCents } = await totalOf(db, row.id);

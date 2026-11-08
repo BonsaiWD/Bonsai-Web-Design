@@ -160,12 +160,33 @@ function listNames(names: string[]): string {
     return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
+// 'new': a first invite. 'address_changed': an existing client's sign-in address changed, so
+// the email to the new address says so rather than welcoming them to a portal they already use.
+export type InviteReason = 'new' | 'address_changed';
+
 export async function inviteEmail(
     client: { name: string | null; email: string },
     projectNames: string[],
+    reason: InviteReason = 'new',
 ): Promise<{ subject: string; content: EmailContent }> {
     const name = firstName(client.name);
+    // The sign-in page with the address filled in: they ask for their link from there
     const signIn = `${await portalOrigin()}/portal/sign-in?email=${encodeURIComponent(client.email)}`;
+    if (reason === 'address_changed') {
+        return {
+            subject: `Your sign-in address is now ${client.email}`,
+            content: {
+                heading: 'Your portal sign-in address has changed',
+                paragraphs: [
+                    name ? `Hi ${name},` : 'Hello,',
+                    `We've changed the address you use for your Bonsai Web Design client portal${projectNames.length ? ` (${listNames(projectNames)})` : ''}. From now on, sign in with ${client.email}.`,
+                    `${projectNames.length ? 'Your projects, messages and files are all still there. ' : ''}We email you a link each time you sign in, so there's no password to remember.`,
+                ],
+                action: { label: 'Sign in with this address', url: signIn },
+                footnotes: ["If this isn't your address, you can ignore this email. Nothing happens until someone signs in."],
+            },
+        };
+    }
     return {
         subject: 'Your client portal is ready',
         content: {

@@ -222,6 +222,7 @@ export async function loadDeliverables(
             ? {
                 version: decided.version,
                 status: decided.status as 'approved' | 'changes_requested',
+                source: decided.decision.source,
                 byName: decided.decision.byName,
                 at: decided.decision.at,
               }

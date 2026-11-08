@@ -304,8 +304,13 @@ export function StudioControls({ deliverable, context, announce, statusRef, onDe
               <p>
                 Can&apos;t delete: version {studio.deleteBlockedBy.version} was{' '}
                 {studio.deleteBlockedBy.status === 'approved' ? 'approved' : 'sent back with changes'}
-                {studio.deleteBlockedBy.byName ? ` by ${studio.deleteBlockedBy.byName}` : ''} on{' '}
-                <LocalTime value={studio.deleteBlockedBy.at} />. Decided versions are kept on record.
+                {/* A recorded decision is still the client's: the studio member only entered it */}
+                {studio.deleteBlockedBy.source === 'studio'
+                  ? ` by ${clientName} (recorded by ${studio.deleteBlockedBy.byName?.trim() || 'the studio'})`
+                  : studio.deleteBlockedBy.byName
+                    ? ` by ${studio.deleteBlockedBy.byName}`
+                    : ''}{' '}
+                on <LocalTime value={studio.deleteBlockedBy.at} />. Decided versions are kept on record.
               </p>
             ) : (
               <p>Removes it and every version. Only possible while no version has a decision.</p>

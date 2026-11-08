@@ -32,14 +32,13 @@ export function ClientAside({ projectId, maxUploadMb }: { projectId: string; max
 
 interface StudioAsideProps {
   clientName: string;
-  clientFirst: string;
   clientEmail: string;
   clientCompany: string | null;
   total: number;
   info: StudioThreadInfo;
 }
 
-export function StudioAside({ clientName, clientFirst, clientEmail, clientCompany, total, info }: StudioAsideProps) {
+export function StudioAside({ clientName, clientEmail, clientCompany, total, info }: StudioAsideProps) {
   return (
     <Aside aria-label={`${clientName} and how messages work`}>
       <Panel aria-labelledby="messages-client">
@@ -74,14 +73,14 @@ export function StudioAside({ clientName, clientFirst, clientEmail, clientCompan
           <H3 id="messages-how">How messages work</H3>
           <Tips>
             <li>
-              <strong>Emails:</strong> {clientFirst} gets one when you send a message, at most once every 10 minutes. Anything
+              <strong>Emails:</strong> {clientName} gets one when you send a message, at most once every 10 minutes. Anything
               you add in that time waits here for them.
             </li>
             <li>
-              <strong>Internal notes</strong> stay with the studio. They are never emailed or shown to {clientFirst}.
+              <strong>Internal notes</strong> stay with the studio. They are never emailed or shown to {clientName}.
             </li>
             <li>
-              <strong>Replies:</strong> messages from {clientFirst} are emailed to the studio inbox, with a link back here.
+              <strong>Replies:</strong> messages from {clientName} are emailed to the studio inbox, with a link back here.
             </li>
           </Tips>
         </Stack>

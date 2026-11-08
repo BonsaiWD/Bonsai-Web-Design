@@ -14,7 +14,7 @@ export interface ProjectFieldValues {
 }
 
 // Shared by the new project form and the settings tab
-export default function ProjectFields({ saved, clientFirst }: { saved: ProjectFieldValues; clientFirst?: string }) {
+export default function ProjectFields({ saved, clientName }: { saved: ProjectFieldValues; clientName?: string }) {
   return (
     <>
       <Field label="Project name" name="name" saved={saved.name} hint="The client sees this at the top of every page.">
@@ -36,7 +36,7 @@ export default function ProjectFields({ saved, clientFirst }: { saved: ProjectFi
         name="summary"
         optional
         saved={saved.summary}
-        hint={`One or two sentences on what we're making${clientFirst ? ` for ${clientFirst}` : ''}. Shown on the project's overview.`}
+        hint={`One or two sentences on what we're making${clientName ? ` for ${clientName}` : ''}. Shown on the project's overview.`}
       >
         {(control) => (
           <Textarea

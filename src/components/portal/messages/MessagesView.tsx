@@ -4,7 +4,6 @@ import { useCallback, useEffect, useOptimistic, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { markMessagesRead, sendMessage } from '@/app/portal/_actions/messages';
 import { projectHref } from '@/components/portal/tabs';
-import { firstName } from '@/lib/portal-format';
 import { H2, LocalTime, Meta, Notice, SectionHeader, Split, type ActionState } from '@/components/portal/ui';
 import { ClientAside, StudioAside } from './Aside';
 import { Composer, ComposerPreview } from './Composer';
@@ -20,7 +19,7 @@ const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: r
 export default function MessagesView(props: MessagesViewProps) {
   const { projectId, perspective, viewerId, thread, maxLength } = props;
   const studio = perspective === 'studio';
-  const clientFirst = firstName(props.clientName) ?? props.clientName;
+  const clientName = props.clientName;
   const router = useRouter();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -133,7 +132,7 @@ export default function MessagesView(props: MessagesViewProps) {
             showAllHref={`${projectHref(projectId, 'messages')}?all=1`}
             emptyText={
               studio
-                ? `Start the conversation with ${clientFirst}. They get an email with your message and a link back here.`
+                ? `Start the conversation with ${clientName}. They get an email with your message and a link back here.`
                 : "Write to us about anything on the project. We'll reply here and email you when we do."
             }
           />
@@ -146,15 +145,15 @@ export default function MessagesView(props: MessagesViewProps) {
                     <span>
                       An email to {item.to} about a message on <LocalTime value={item.at} /> could not be sent.{' '}
                       {item.to === props.clientEmail
-                        ? `${clientFirst} can still read it here; your next message will email them again.`
-                        : 'The message is in the thread above.'}
+                        ? `${clientName} can still read it here; your next message will email them again.`
+                        : `${clientName} has since changed address; your next message emails them at ${props.clientEmail}.`}
                     </span>
                   </Notice>
                 ))}
               </FailedEmails>
             )}
             {props.canWrite ? (
-              <Composer projectId={projectId} perspective={perspective} clientFirst={clientFirst} maxLength={maxLength} action={send} />
+              <Composer projectId={projectId} perspective={perspective} clientName={clientName} maxLength={maxLength} action={send} />
             ) : (
               <ComposerPreview clientName={props.clientName} />
             )}
@@ -164,7 +163,6 @@ export default function MessagesView(props: MessagesViewProps) {
         {props.studio ? (
           <StudioAside
             clientName={props.clientName}
-            clientFirst={clientFirst}
             clientEmail={props.clientEmail}
             clientCompany={props.clientCompany}
             total={thread.total}

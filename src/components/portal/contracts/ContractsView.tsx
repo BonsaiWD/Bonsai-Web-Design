@@ -2,7 +2,6 @@
 
 import styled from 'styled-components';
 import { FiPlus } from 'react-icons/fi';
-import { firstName } from '@/lib/portal-format';
 import {
   Button,
   DataList,
@@ -196,7 +195,7 @@ function ClientGuide() {
   );
 }
 
-function StudioGuide({ clientFirst, maxMb }: { clientFirst: string; maxMb: number }) {
+function StudioGuide({ clientName, maxMb }: { clientName: string; maxMb: number }) {
   return (
     <Panel aria-labelledby="contracts-guide">
       <Stack $gap={4}>
@@ -204,10 +203,10 @@ function StudioGuide({ clientFirst, maxMb }: { clientFirst: string; maxMb: numbe
         <Tips>
           <li>Replace a document freely until it is signed. After that it is part of the record.</li>
           <li>
-            When {clientFirst} signs here, we keep the name they type, the time, their email and the file&apos;s SHA-256, and email you
+            When {clientName} signs here, we keep the name they type, the time, their email and the file&apos;s SHA-256, and email you
             both.
           </li>
-          <li>Signed on paper? {clientFirst} can upload the copy, or you can record it with a note.</li>
+          <li>Signed on paper? {clientName} can upload the copy, or you can record it with a note.</li>
           <li>Files up to {maxMb} MB. A PDF opens right in the browser.</li>
         </Tips>
         <Footnote>
@@ -223,7 +222,6 @@ export default function ContractsView({ projectId, perspective, canSign, clientN
   const studio = perspective === 'studio';
   const add = useDialog();
   const { statusRef, message, announce } = useAnnouncer();
-  const clientFirst = firstName(clientName) ?? clientName;
   const maxMb = Math.round(limits.maxUploadBytes / (1024 * 1024));
 
   const entries = GROUP_ORDER.flatMap((status) => {
@@ -242,7 +240,7 @@ export default function ContractsView({ projectId, perspective, canSign, clientN
           <H2>Contracts</H2>
           <Meta>
             {studio
-              ? `Agreements for ${clientFirst} to sign and documents for their records. Each signature is kept with the exact file it covers.`
+              ? `Agreements for ${clientName} to sign and documents for their records. Each signature is kept with the exact file it covers.`
               : 'Agreements to sign and documents for your records. Read each one here, then sign it or upload a signed copy.'}
           </Meta>
         </div>
@@ -269,7 +267,7 @@ export default function ContractsView({ projectId, perspective, canSign, clientN
                   </Button>
                 }
               >
-                Upload an agreement for {clientFirst} to sign, or a document for their records. Signatures are kept with the exact file they
+                Upload an agreement for {clientName} to sign, or a document for their records. Signatures are kept with the exact file they
                 cover.
               </EmptyState>
             ) : (
@@ -302,7 +300,7 @@ export default function ContractsView({ projectId, perspective, canSign, clientN
 
         <Aside aria-label={studio ? 'Contracts summary and notes' : 'Contracts summary and how signing works'}>
           {contracts.length > 0 && <Summary contracts={contracts} perspective={perspective} />}
-          {studio ? <StudioGuide clientFirst={clientFirst} maxMb={maxMb} /> : <ClientGuide />}
+          {studio ? <StudioGuide clientName={clientName} maxMb={maxMb} /> : <ClientGuide />}
         </Aside>
       </Split>
 

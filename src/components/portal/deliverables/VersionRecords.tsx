@@ -270,8 +270,10 @@ export function VersionHistory({ versions, currentId }: { versions: VersionView[
                   <>
                     <Entry label="Decided">
                       <LocalTime value={decision.at} />
-                      {decision.byName ? ` by ${decision.byName}` : ''}
-                      {decision.source === 'studio' ? ', recorded by the studio' : ', in the portal'}
+                      {/* A recorded decision names who entered it, not who decided */}
+                      {decision.source === 'studio'
+                        ? `, recorded by ${decision.byName || 'the studio'}`
+                        : `${decision.byName ? ` by ${decision.byName}` : ''}, in the portal`}
                     </Entry>
                     <Entry label="Signed name">{decision.signedName}</Entry>
                     <Entry label="Email">{decision.signerEmail}</Entry>
