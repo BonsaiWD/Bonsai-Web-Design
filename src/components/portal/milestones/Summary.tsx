@@ -1,0 +1,276 @@
+'use client';
+
+import Link from 'next/link';
+import styled from 'styled-components';
+import { FiArrowRight } from 'react-icons/fi';
+import MetaDot from '@/components/common/MetaDot';
+import { dueInfo, firstName } from '@/lib/portal-format';
+import { projectHref } from '../tabs';
+import { DateText, DueText, Eyebrow, focusRing, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
+import type { MilestoneView } from './types';
+
+const Cells = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+
+  @media (min-width: ${PHONE}) {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.15fr);
+  }
+`;
+
+const Cell = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${space[3]};
+  min-width: 0;
+  padding: ${space[5]} 0;
+
+  &:first-child {
+    padding-top: 0;
+  }
+
+  &:last-child {
+    padding-bottom: 0;
+  }
+
+  & + & {
+    border-top: 1px solid ${({ theme }) => tint(theme.colors.primary, 12)};
+  }
+
+  @media (min-width: ${PHONE}) {
+    padding: 0 ${space[6]};
+
+    &:first-child {
+      padding-left: 0;
+    }
+
+    &:last-child {
+      padding-right: 0;
+    }
+
+    & + & {
+      border-top: none;
+      border-left: 1px solid ${({ theme }) => tint(theme.colors.primary, 12)};
+    }
+  }
+`;
+
+const Figure = styled.p`
+  ${type.h2}
+  ${type.figures}
+  font-weight: 500;
+
+  span {
+    ${type.body}
+    margin-left: ${space[1]};
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+`;
+
+// One segment per milestone, so the bar reads as steps rather than a percentage
+const Segments = styled.div`
+  display: flex;
+  gap: ${space[1]};
+  max-width: 16rem;
+`;
+
+const Segment = styled.span<{ $done: boolean }>`
+  flex: 1;
+  height: 4px;
+  background: ${({ $done, theme }) => ($done ? theme.colors.primary : tint(theme.colors.primary, 16))};
+`;
+
+const CellTitle = styled.p`
+  ${type.label}
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+`;
+
+const JumpLink = styled.a`
+  color: ${({ theme }) => theme.colors.text};
+  text-decoration: underline;
+  text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 45)};
+  text-underline-offset: 0.2em;
+  ${focusRing}
+
+  @media (hover: hover) {
+    &:hover {
+      text-decoration-color: ${({ theme }) => theme.colors.primary};
+    }
+  }
+`;
+
+const DueLine = styled.p`
+  ${type.meta}
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${space[2]};
+`;
+
+const WaitList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: ${space[2]};
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  a {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: ${space[2]};
+    ${type.label}
+    font-size: 1rem;
+    color: ${({ theme }) => theme.colors.text};
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    ${focusRing}
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.3em;
+      color: ${({ theme }) => theme.colors.primary};
+    }
+
+    @media (hover: hover) {
+      &:hover span {
+        text-decoration: underline;
+        text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 45)};
+        text-underline-offset: 0.2em;
+      }
+    }
+  }
+`;
+
+interface WaitingItem {
+  key: string;
+  href: string;
+  label: string;
+  due: string | null;
+}
+
+// What is waiting on the client, worded for whoever is reading
+function waitingItems(milestones: MilestoneView[], projectId: string, forClient: boolean): WaitingItem[] {
+  const items: WaitingItem[] = [];
+  for (const m of milestones) {
+    const anchor = `#milestone-${m.id}`;
+    if (m.requiresSignoff && !m.signoff) {
+      items.push({ key: m.id, href: anchor, label: forClient ? `Initial ${m.title}` : `${m.title}: initials`, due: m.dueDate });
+      continue;
+    }
+    if (m.status !== 'waiting_on_client') continue;
+    const review = m.linked.find((d) => d.status === 'in_review');
+    if (review) {
+      items.push({
+        key: m.id,
+        href: projectHref(projectId, 'deliverables', `deliverable-${review.id}`),
+        label: forClient ? `Review ${review.title}` : `${m.title}: review of ${review.title}`,
+        due: m.dueDate,
+      });
+    } else {
+      items.push({ key: m.id, href: anchor, label: m.title, due: m.dueDate });
+    }
+  }
+  return items;
+}
+
+interface SummaryProps {
+  projectId: string;
+  milestones: MilestoneView[];
+  today: string;
+  forClient: boolean;
+  clientName: string;
+}
+
+export default function Summary({ projectId, milestones, today, forClient, clientName }: SummaryProps) {
+  const total = milestones.length;
+  const doneCount = milestones.filter((m) => m.status === 'done').length;
+  // Earliest open date first, so anything overdue leads
+  const next = milestones
+    .filter((m) => m.status !== 'done' && m.dueDate)
+    .sort((a, b) => ((a.dueDate as string) < (b.dueDate as string) ? -1 : 1))[0];
+  // The first step not yet done is where the project is now
+  const current = milestones.find((m) => m.status !== 'done');
+  const waiting = waitingItems(milestones, projectId, forClient);
+  const shown = waiting.slice(0, 3);
+  const nextDue = next?.dueDate ? dueInfo(next.dueDate, today) : null;
+  const clientFirst = firstName(clientName) ?? clientName;
+
+  return (
+    <Panel aria-labelledby="milestone-summary-heading">
+      <VisuallyHidden as="h2" id="milestone-summary-heading">
+        Summary
+      </VisuallyHidden>
+      <Cells>
+        <Cell>
+          <Eyebrow>Progress</Eyebrow>
+          <Figure>
+            {doneCount} of {total}
+            <span>done</span>
+          </Figure>
+          <Segments aria-hidden="true">
+            {milestones.map((m) => (
+              <Segment key={m.id} $done={m.status === 'done'} />
+            ))}
+          </Segments>
+          <MetaText>{current ? <>Current step: {current.title}</> : 'Every step is complete.'}</MetaText>
+        </Cell>
+
+        <Cell>
+          <Eyebrow>Next deadline</Eyebrow>
+          {next?.dueDate && nextDue ? (
+            <>
+              <CellTitle>
+                <JumpLink href={`#milestone-${next.id}`}>{next.title}</JumpLink>
+              </CellTitle>
+              <DueLine>
+                <DueText value={next.dueDate} today={today} />
+                {/* "Due Mar 4, 2027" already names the day; the relative labels need it added */}
+                {nextDue.tone !== 'later' && (
+                  <>
+                    <MetaDot aria-hidden="true" />
+                    <DateText value={next.dueDate} />
+                  </>
+                )}
+              </DueLine>
+            </>
+          ) : (
+            <MetaText>{doneCount === total ? 'Every milestone is done.' : 'No open milestone has a date yet.'}</MetaText>
+          )}
+        </Cell>
+
+        <Cell>
+          <Eyebrow>{forClient ? 'Waiting on you' : `Waiting on ${clientFirst}`}</Eyebrow>
+          {shown.length > 0 ? (
+            <WaitList>
+              {shown.map((item) => (
+                <li key={item.key}>
+                  {item.href.startsWith('#') ? (
+                    <a href={item.href}>
+                      <FiArrowRight aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </a>
+                  ) : (
+                    <Link href={item.href}>
+                      <FiArrowRight aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </Link>
+                  )}
+                  {item.due && (
+                    <DueLine>
+                      <DueText value={item.due} today={today} />
+                    </DueLine>
+                  )}
+                </li>
+              ))}
+              {waiting.length > shown.length && <MetaText as="li">and {waiting.length - shown.length} more below</MetaText>}
+            </WaitList>
+          ) : (
+            <MetaText>{forClient ? "Nothing right now. We'll email you when something needs you." : `Nothing is waiting on ${clientFirst}.`}</MetaText>
+          )}
+        </Cell>
+      </Cells>
+    </Panel>
+  );
+}
