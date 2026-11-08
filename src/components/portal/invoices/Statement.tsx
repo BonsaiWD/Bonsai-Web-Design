@@ -3,10 +3,9 @@
 import { useId } from 'react';
 import styled from 'styled-components';
 import { formatMoney } from '@/lib/portal-format';
-import { DateText, Eyebrow, H2, PHONE, panelStyles, space, StatusBadge, tint, type } from '@/components/portal/ui';
+import { DateText, Eyebrow, H2, panelStyles, PHONE, sansHeading, space, StatusBadge, tint, type } from '@/components/portal/ui';
 import { invoiceStatus, isOverdue, METHOD_LABELS } from './labels';
 import { formatQuantity } from './money';
-import { sansHeading } from './parts';
 import type { InvoiceDetail, InvoiceParties, Perspective } from './types';
 
 /*

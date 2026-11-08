@@ -80,7 +80,8 @@ export async function loadActivity(context: FeatureContext, options: { limit: nu
             projectName: row.projectName,
             summary: rest === null ? row.summary : actorIsViewer ? `You ${rest}` : asStudio ? capitalise(rest) : row.summary,
             href: targetHref(row.projectId, row.target),
-            actorName: asStudio ? STUDIO_NAME : name || row.actorEmail || null,
+            // No actor (the portal itself, or a removed account): the studio, to a client
+            actorName: asStudio ? STUDIO_NAME : name || row.actorEmail || (studio ? null : STUDIO_NAME),
             actorIsViewer,
             at: row.createdAt.toISOString(),
         };

@@ -129,14 +129,6 @@ export const Badges = styled.div`
   min-height: 1.5rem;
 `;
 
-export const MetaLine = styled.p`
-  ${type.meta}
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: ${space[2]};
-`;
-
 export const Description = styled.p`
   ${type.body}
   max-width: 62ch;
@@ -350,37 +342,6 @@ export const Chevron = styled.span<{ $open: boolean }>`
   }
 `;
 
-export const InlineConfirm = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${space[3]} ${space[4]};
-  padding: ${space[4]} ${space[5]};
-  border: 1px solid ${({ theme }) => tint(theme.colors.error, 45)};
-  background: ${({ theme }) => tint(theme.colors.error, 6)};
-
-  p {
-    ${type.body}
-    color: ${({ theme }) => theme.colors.text};
-  }
-
-  > div {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: ${space[3]};
-  }
-
-  @media (max-width: ${PHONE}) {
-    padding: ${space[4]};
-
-    button {
-      min-height: 2.75rem;
-    }
-  }
-`;
-
 export const EditPanel = styled.div`
   padding: ${space[5]};
   border: 1px solid ${({ theme }) => tint(theme.colors.primary, 22)};
@@ -389,19 +350,4 @@ export const EditPanel = styled.div`
   @media (max-width: ${PHONE}) {
     padding: ${space[4]};
   }
-`;
-
-// Framed sentence the client ticks to confirm, so the statement is read before it is agreed to
-export const StatementBox = styled.div`
-  padding: ${space[4]} ${space[5]};
-  border: 1px solid ${({ theme }) => tint(theme.colors.primary, 30)};
-  background: ${({ theme }) => tint(theme.colors.primary, 5)};
-`;
-
-export const InitialsInput = css`
-  max-width: 9rem;
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 `;

@@ -14,11 +14,14 @@ import {
 import {
   ActionForm,
   Button,
+  ConfirmAction,
   Field,
+  FormDialog,
   FormMessage,
   Input,
   LocalTime,
   PHONE,
+  sansHeading,
   Select,
   space,
   SubmitButton,
@@ -28,11 +31,13 @@ import {
   useDialog,
   useField,
   type ActionState,
+  type Announce,
 } from '@/components/portal/ui';
 import { linkWarning } from './copy';
-import { CardActions, ConfirmAction, FormDialog, sansHeading, type Announce } from './parts';
+import { CardActions } from './parts';
 import { ShareDialog, type ShareContext } from './ShareDialog';
 import type { DeliverableView } from './types';
+import { versionName } from '@/lib/portal-format';
 
 const LastEmailed = styled.span<{ $failed: boolean }>`
   ${type.meta}
@@ -352,7 +357,7 @@ export function StudioControls({ deliverable, context, announce, statusRef, onDe
         <FormDialog
           dialog={record}
           title="Record approval received by email"
-          description={`For when ${clientName} approved version ${target.version} of ${target.titleSnapshot} outside the portal. It is recorded as given to the studio, with your note, and ${clientName} gets a copy by email.`}
+          description={`For when ${clientName} approved ${versionName(target.titleSnapshot, target.version)}, outside the portal. It is recorded as given to the studio, with your note, and ${clientName} gets a copy by email.`}
           action={recordApproval}
           submitLabel="Record approval"
           pendingLabel="Recording…"

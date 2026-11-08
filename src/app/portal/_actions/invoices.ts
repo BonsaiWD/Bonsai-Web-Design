@@ -10,23 +10,23 @@ import { METHOD_LABELS } from '@/components/portal/invoices/labels';
 import { invoiceTotalCents, MAX_LINES, parseDollars, parseQuantity } from '@/components/portal/invoices/money';
 import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate, formatMoney, todayIso } from '@/lib/portal-format';
-import { assertStillClient, projectActor, type ProjectActor, type Tx } from '@/server/portal/access';
-import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
+import { assertStillClient, projectActor, studioProjectActor, type ProjectActor, type Tx } from '@/server/portal/access';
+import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
-  activityKind,
-  claimEmailSlot,
+  invoiceKind,
+  EMAIL_INTERVAL_MS,
+  invoiceEmailKey,
   invoicePath,
   invoiceUrl,
   invoiceVersion,
   notReceivedEmail,
   paymentReportedEmail,
   receiptEmail,
-  releaseEmailSlot,
   reminderEmail,
   sentEmail,
-  studioProjectActor,
 } from '@/server/portal/features/invoices';
 import { emailNote, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * Every export here is an endpoint anyone can call with any arguments, so each one starts by
@@ -38,9 +38,6 @@ const NOT_FOUND = 'That invoice could not be found. Reload the page.';
 const CHECK = 'Check the highlighted fields and try again.';
 
 /* ---------- Form fields ---------- */
-
-// Browsers send textarea line breaks as CRLF; store plain LF so text compares and renders alike
-const lf = <T extends string | null>(value: T): T => (value === null ? value : (value.replace(/\r\n?/g, '\n') as T));
 
 const title = fields.requiredText('a title', 200);
 const notes = fields.optionalText('the notes', 4000).transform(lf);
@@ -218,7 +215,7 @@ export async function createInvoice(_prev: ActionState, formData: FormData): Pro
       await recordActivity({
         projectId,
         actorId: actor.user.id,
-        kind: activityKind('created', input.id),
+        kind: invoiceKind('created', input.id),
         summary: `Drafted invoice ${created.number}: ${input.title}`,
         target: 'invoices',
         visibility: 'studio',
@@ -259,7 +256,7 @@ export async function updateInvoice(_prev: ActionState, formData: FormData): Pro
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('updated', input.invoiceId),
+      kind: invoiceKind('updated', input.invoiceId),
       summary: `Edited draft ${number}`,
       target: 'invoices',
       visibility: 'studio',
@@ -292,7 +289,7 @@ export async function deleteInvoice(_prev: ActionState, formData: FormData): Pro
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('deleted', input.invoiceId),
+      kind: invoiceKind('deleted', input.invoiceId),
       summary: `Deleted draft ${row.number}: ${row.title}`,
       target: 'invoices',
       visibility: 'studio',
@@ -341,19 +338,19 @@ export async function sendInvoice(_prev: ActionState, formData: FormData): Promi
 
     const { row, totalCents } = result;
     // Starts the 10-minute gap before "Email again" can send another
-    await claimEmailSlot(row.id);
+    const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
     const { subject, content } = sentEmail(await facts(actor, row, totalCents));
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('sent', row.id),
+      kind: invoiceKind('sent', row.id),
       summary: `Invoice ${row.number} sent: ${formatMoney(totalCents)}${row.dueOn ? `, due ${formatDate(row.dueOn)}` : ''}`,
       target: 'invoices',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    if (emailStatus !== 'sent') await releaseEmailSlot(row.id);
+    if (emailStatus !== 'sent') await releaseRateSlot(slot);
     return done(
-      `Sent ${row.number} to ${clientName}.${emailStatus === 'sent' ? ` We emailed ${actor.project.clientEmail} a link to it.` : emailNote(emailStatus, clientName)}`,
+      `Sent ${row.number} to ${clientName}.${emailStatus === 'sent' ? ` We emailed ${actor.project.clientEmail} a link to it.` : emailNote(emailStatus, clientName, invoiceKind('sent', row.id))}`,
     );
   });
 }
@@ -388,7 +385,8 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
           : `${row.number} is ${row.status === 'draft' ? 'still a draft' : 'void'}, so there is nothing to email.`,
       );
     }
-    if (!(await claimEmailSlot(row.id))) {
+    const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
+    if (!slot.ok) {
       throw new ActionError(`${firstName(clientName) ?? clientName} was emailed about ${row.number} in the last 10 minutes. Give it a little while before sending another.`);
     }
 
@@ -399,17 +397,17 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('reminded', row.id),
+      kind: invoiceKind('reminded', row.id),
       // Worded as every other receipt row: "Receipt emailed to <name>: <what>"
-      summary: receipt ? `Receipt emailed to ${clientName} again: payment of ${row.number}` : `Reminder about ${row.number} emailed to ${clientName}`,
+      summary: receipt ? `Receipt emailed to ${clientName}: payment of ${row.number} (again)` : `Reminder about ${row.number} emailed to ${clientName}`,
       target: 'invoices',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    if (emailStatus !== 'sent') await releaseEmailSlot(row.id);
+    if (emailStatus !== 'sent') await releaseRateSlot(slot);
     refresh(projectId);
     if (emailStatus === 'sent') return done(receipt ? `Emailed the receipt to ${clientName} again.` : `Emailed ${clientName} a reminder about ${row.number}.`);
-    return done(`Nothing was sent.${emailNote(emailStatus, clientName)}`);
+    return done(`Nothing was sent.${emailNote(emailStatus, clientName, invoiceKind('reminded', row.id))}`);
   });
 }
 
@@ -451,20 +449,20 @@ export async function markInvoicePaid(_prev: ActionState, formData: FormData): P
 
     const { row, totalCents } = result;
     // A receipt always goes out, but it also starts the gap before another email
-    await claimEmailSlot(row.id);
+    const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
     const { subject, content } = receiptEmail({ ...(await facts(actor, row, totalCents)), paidOn: input.paidOn, method: input.method, reference: input.reference });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('paid', row.id),
+      kind: invoiceKind('paid', row.id),
       summary: `${row.number} paid: ${formatMoney(totalCents)} by ${METHOD_LABELS[input.method]}`,
       target: 'invoices',
       email: { to: actor.project.clientEmail, subject, content },
     });
     // A receipt that did not go out must not hold up "Email the receipt again"
-    if (emailStatus !== 'sent') await releaseEmailSlot(row.id);
+    if (emailStatus !== 'sent') await releaseRateSlot(slot);
     return done(
-      `Marked ${row.number} paid.${emailStatus === 'sent' ? ` We emailed ${clientName} a receipt.` : emailNote(emailStatus, clientName)}`,
+      `Marked ${row.number} paid.${emailStatus === 'sent' ? ` We emailed ${clientName} a receipt.` : emailNote(emailStatus, clientName, invoiceKind('paid', row.id))}`,
     );
   });
 }
@@ -493,18 +491,18 @@ export async function markPaymentNotReceived(_prev: ActionState, formData: FormD
     refresh(projectId);
     const { row, totalCents } = result;
     const reported = row.reportedMethod ? ` (${METHOD_LABELS[row.reportedMethod]}${row.reportedReference ? `, ${row.reportedReference}` : ''})` : '';
-    await claimEmailSlot(row.id);
+    const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
     const { subject, content } = notReceivedEmail({ ...(await facts(actor, row, totalCents)), note: input.note });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('notReceived', row.id),
+      kind: invoiceKind('notReceived', row.id),
       summary: `The payment reported for ${row.number}${reported} has not arrived yet, so it is open again`,
       target: 'invoices',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    if (emailStatus !== 'sent') await releaseEmailSlot(row.id);
-    return done(`Reopened ${row.number}.${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName)}`);
+    if (emailStatus !== 'sent') await releaseRateSlot(slot);
+    return done(`Reopened ${row.number}.${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName, invoiceKind('notReceived', row.id))}`);
   });
 }
 
@@ -529,7 +527,7 @@ export async function voidInvoice(_prev: ActionState, formData: FormData): Promi
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('voided', result.row.id),
+      kind: invoiceKind('voided', result.row.id),
       summary: `Invoice ${result.row.number} was cancelled`,
       target: 'invoices',
     });
@@ -584,7 +582,7 @@ export async function reportPayment(_prev: ActionState, formData: FormData): Pro
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: activityKind('reported', result.row.id),
+      kind: invoiceKind('reported', result.row.id),
       // The words of the studio's attention item and email: "<client> reported a payment on BWD-0003"
       summary: `${name} reported a payment on ${result.row.number} by ${METHOD_LABELS[input.method]}`,
       target: 'invoices',

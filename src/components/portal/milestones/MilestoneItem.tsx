@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiArrowDown, FiArrowUp, FiCheck, FiChevronDown, FiChevronRight, FiClipboard, FiEdit2, FiSend, FiTrash2 } from 'react-icons/fi';
-import MetaDot from '@/components/common/MetaDot';
 import { askForSignoff, deleteMilestone, moveMilestone } from '@/app/portal/_actions/milestones';
 import { dueInfo, firstName } from '@/lib/portal-format';
 import type { ActionState } from '@/server/portal/actions';
@@ -13,19 +12,21 @@ import {
   ActionForm,
   Button,
   ButtonLink,
+  ClientOnlyNote,
   DateText,
   DueText,
-  FormMessage,
   H3,
   IconButton,
+  InlineConfirm,
   LocalTime,
+  MetaLine,
   MetaText,
+  space,
   StatusBadge,
+  StatusLine,
   SubmitButton,
   TextLink,
-  space,
-  tint,
-  type,
+  useAnnouncer,
   useDialog,
   useFormStatusState,
   VisuallyHidden,
@@ -43,11 +44,9 @@ import {
   Chevron,
   Description,
   IndexNumber,
-  InlineConfirm,
   Item,
   ItemHeader,
   LinkedList,
-  MetaLine,
   Node,
   Record,
   RecordDetails,
@@ -58,38 +57,9 @@ import {
 } from './styles';
 import type { MilestoneView, SignoffRecord } from './types';
 
-const RowStatus = styled.p<{ $error: boolean }>`
-  ${type.meta}
-  color: ${({ $error, theme }) => ($error ? theme.colors.error : theme.colors.text)};
-
-  &:empty {
-    display: none;
-  }
-
-  &:focus {
-    outline: none;
-  }
-`;
-
-// Asking again on a finished step is a confirmation, not a danger: bronze, not red
-const AskConfirm = styled(InlineConfirm)`
-  border-color: ${({ theme }) => tint(theme.colors.primary, 40)};
-  background: ${({ theme }) => tint(theme.colors.primary, 6)};
-`;
-
 const MoveForm = styled(ActionForm)`
   display: flex;
   gap: ${space[2]};
-`;
-
-// Doubled class: InlineConfirm's "> div" rule would otherwise centre the lines
-const ConfirmText = styled.div`
-  && {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: ${space[1]};
-    min-width: 0;
-  }
 `;
 
 // Hands each result of a small one-button form to the row, which shows it in one place
@@ -226,24 +196,20 @@ export default function MilestoneItem({
   const initialsDue = asksForInitials({ requiresSignoff: m.requiresSignoff, signed: Boolean(m.signoff), status: m.status, reviewPending: Boolean(review) });
   const canSign = isClient && !previewingAsClient;
 
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  // The row's one status line: results land there, and take focus when their button has gone
+  const { statusRef, message, error, announce } = useAnnouncer();
   const [editing, setEditing] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
   // A new key remounts the editor, so it starts from the latest saved values and version
   const [editorKey, setEditorKey] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingAsk, setConfirmingAsk] = useState(false);
-  const [focusStatus, setFocusStatus] = useState(0);
-  const [dialogBusy, setDialogBusy] = useState(false);
   const signDialog = useDialog();
   const recordDialog = useDialog();
   const recordRef = useRef<HTMLDivElement>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
-  const keepButtonRef = useRef<HTMLButtonElement>(null);
   const askButtonRef = useRef<HTMLButtonElement>(null);
-  const keepAskRef = useRef<HTMLButtonElement>(null);
-  const statusRef = useRef<HTMLParagraphElement>(null);
   const lastMove = useRef<'up' | 'down'>('up');
   // After a sign-off lands, focus moves once to the new record so it is read out in place
   const focusRecordPending = useRef(false);
@@ -264,20 +230,7 @@ export default function MilestoneItem({
     setFocusTick((tick) => tick + 1);
   }
 
-  useEffect(() => {
-    if (confirmingDelete) keepButtonRef.current?.focus();
-  }, [confirmingDelete]);
-
-  useEffect(() => {
-    if (confirmingAsk) keepAskRef.current?.focus();
-  }, [confirmingAsk]);
-
-  // After asking on a finished step its button changes, so the result takes focus instead
-  useEffect(() => {
-    if (focusStatus > 0) statusRef.current?.focus();
-  }, [focusStatus]);
-
-  const report = useCallback((state: NonNullable<ActionState>) => setMessage({ text: state.message, error: !state.ok }), []);
+  const report = useCallback((state: NonNullable<ActionState>) => announce(state.message, false, !state.ok), [announce]);
   const setRowDirty = useCallback((value: boolean) => onDirtyChange(m.id, value), [onDirtyChange, m.id]);
 
   function openEditor() {
@@ -329,19 +282,12 @@ export default function MilestoneItem({
                   Was due <DateText value={m.dueDate} />
                 </span>
               ) : (
-                <>
-                  <DueText value={m.dueDate} today={today} />
-                  {dueLabel.tone !== 'later' && (
-                    <>
-                      <MetaDot aria-hidden="true" />
-                      <DateText value={m.dueDate} />
-                    </>
-                  )}
-                </>
+                <DueText value={m.dueDate} today={today} />
               )
             ) : (
               <span>No due date</span>
             )}
+            {m.dueDate && dueLabel && !done && dueLabel.tone !== 'later' && <DateText value={m.dueDate} />}
           </MetaLine>
         )}
 
@@ -356,7 +302,7 @@ export default function MilestoneItem({
             onDirtyChange={setRowDirty}
             onSaved={(text) => {
               setEditing(false);
-              setMessage({ text, error: false });
+              announce(text, false);
               editButtonRef.current?.focus();
             }}
             onCancel={() => {
@@ -446,7 +392,7 @@ export default function MilestoneItem({
               {canSign ? (
                 <Button onClick={signDialog.openDialog}>Initial to sign off</Button>
               ) : (
-                <MetaText>Only {clientName} can initial this.</MetaText>
+                <ClientOnlyNote>Only {clientName} can initial this.</ClientOnlyNote>
               )}
             </div>
           </Callout>
@@ -516,7 +462,7 @@ export default function MilestoneItem({
                 <ResultReporter
                   onResult={(state) => {
                     onAnnounce(state.message);
-                    if (!state.ok) setMessage({ text: state.message, error: true });
+                    if (!state.ok) announce(state.message, false, true);
                     // The row may have moved in the page; keep focus on the button that moved it
                     requestAnimationFrame(() => document.getElementById(`move-${lastMove.current}-${m.id}`)?.focus());
                   }}
@@ -541,100 +487,82 @@ export default function MilestoneItem({
         )}
 
         {showStudio && confirmingAsk && (
-          <ActionForm
+          <InlineConfirm
+            tone="primary"
+            size="sm"
+            question={`Ask ${clientFirst} to initial ${m.title}?`}
+            detail={`This emails ${clientFirst} and moves it back to Waiting on client until it's initialled.`}
             action={askForSignoff}
-            onSuccess={() => {
+            confirmLabel={`Ask ${clientFirst}`}
+            pendingLabel="Sending…"
+            keepLabel="Keep it done"
+            onKeep={closeAsk}
+            // Its button changes once the step is waiting again, so the result takes focus
+            onSuccess={(state) => {
               setConfirmingAsk(false);
-              setFocusStatus((value) => value + 1);
+              announce(state.message);
             }}
-          >
-            <ResultReporter onResult={report} />
-            <AskConfirm>
-              <ConfirmText>
-                <p>
-                  Ask {clientFirst} to initial {m.title}?
-                </p>
-                <MetaText>This emails {clientFirst} and moves it back to Waiting on client until it&apos;s initialled.</MetaText>
-              </ConfirmText>
-              <div>
-                <SubmitButton size="sm" pendingLabel="Sending…">
-                  Ask {clientFirst}
-                </SubmitButton>
-                <Button ref={keepAskRef} $variant="secondary" $size="sm" onClick={closeAsk}>
-                  Keep it done
-                </Button>
-              </div>
-            </AskConfirm>
-            <input type="hidden" name="id" value={m.id} />
-            <input type="hidden" name="projectId" value={projectId} />
-            <input type="hidden" name="confirmReopen" value="on" />
-          </ActionForm>
+            hidden={
+              <>
+                <input type="hidden" name="id" value={m.id} />
+                <input type="hidden" name="projectId" value={projectId} />
+                <input type="hidden" name="confirmReopen" value="on" />
+              </>
+            }
+          />
         )}
 
-        {showStudio && confirmingDelete && (
-          m.signoff ? (
-            <InlineConfirm>
-              <p>
-                Can&apos;t delete:{' '}
-                {m.signoff.source === 'client'
-                  ? `initialled by ${m.signoff.signerName} on `
-                  : `a sign-off was recorded by ${m.signoff.signerName} on `}
-                <DateText value={m.signoff.signedAt.slice(0, 10)} />. Signed records are kept.
-              </p>
-              <div>
-                <Button ref={keepButtonRef} $variant="secondary" $size="sm" onClick={closeDelete}>
-                  OK
-                </Button>
-              </div>
-            </InlineConfirm>
+        {showStudio &&
+          confirmingDelete &&
+          (m.signoff ? (
+            <InlineConfirm
+              size="sm"
+              question={
+                <>
+                  Can&apos;t delete:{' '}
+                  {m.signoff.source === 'client'
+                    ? `initialled by ${m.signoff.signerName} on `
+                    : `a sign-off was recorded by ${m.signoff.signerName} on `}
+                  <DateText value={m.signoff.signedAt.slice(0, 10)} />. Signed records are kept.
+                </>
+              }
+              keepLabel="OK"
+              onKeep={closeDelete}
+            />
           ) : (
-            <ActionForm action={deleteMilestone} onSubmit={() => onDeleteSubmitted(m.id, m.title)}>
-              <InlineConfirm>
-                <ConfirmText>
-                  <p>Delete {m.title}? This can&apos;t be undone.</p>
-                  {m.linked.length > 0 && (
-                    <MetaText>
-                      {m.linked.map((d) => d.title).join(', ')} {m.linked.length === 1 ? 'stays' : 'stay'} in Deliverables, no longer linked to a milestone.
-                    </MetaText>
-                  )}
-                  <FormMessage />
-                </ConfirmText>
-                <div>
-                  <SubmitButton variant="danger" size="sm" pendingLabel="Deleting…">
-                    Delete
-                  </SubmitButton>
-                  <Button ref={keepButtonRef} $variant="secondary" $size="sm" onClick={closeDelete}>
-                    Keep
-                  </Button>
-                </div>
-              </InlineConfirm>
-              <input type="hidden" name="id" value={m.id} />
-              <input type="hidden" name="projectId" value={projectId} />
-            </ActionForm>
-          )
-        )}
+            <InlineConfirm
+              size="sm"
+              question={`Delete ${m.title}? This can't be undone.`}
+              detail={
+                m.linked.length > 0
+                  ? `${m.linked.map((d) => d.title).join(', ')} ${m.linked.length === 1 ? 'stays' : 'stay'} in Deliverables, no longer linked to a milestone.`
+                  : undefined
+              }
+              action={deleteMilestone}
+              confirmLabel="Delete"
+              pendingLabel="Deleting…"
+              onKeep={closeDelete}
+              onSubmit={() => onDeleteSubmitted(m.id, m.title)}
+              hidden={
+                <>
+                  <input type="hidden" name="id" value={m.id} />
+                  <input type="hidden" name="projectId" value={projectId} />
+                </>
+              }
+            />
+          ))}
 
-        <RowStatus ref={statusRef} role="status" aria-live="polite" tabIndex={-1} $error={Boolean(message?.error)}>
-          {message?.text ?? ''}
-        </RowStatus>
+        <StatusLine ref={statusRef} message={message} error={error} />
       </Body>
 
       {/* Mounted whatever the state, so a dialog survives the re-render its own success causes */}
       {canSign && (
         <SignoffDialog
-          open={signDialog.open}
-          onClose={() => {
-            setDialogBusy(false);
-            signDialog.closeDialog();
-          }}
+          dialog={signDialog}
           onSigned={(text) => {
-            setMessage({ text, error: false });
+            announce(text, false);
             focusRecordSoon();
-            signDialog.closeDialog();
           }}
-          onPendingChange={setDialogBusy}
-          busy={dialogBusy}
-          triggerRef={signDialog.triggerRef}
           projectId={projectId}
           milestoneId={m.id}
           title={m.title}
@@ -644,19 +572,11 @@ export default function MilestoneItem({
 
       {showStudio && (
         <RecordSignoffDialog
-          open={recordDialog.open}
-          onClose={() => {
-            setDialogBusy(false);
-            recordDialog.closeDialog();
-          }}
+          dialog={recordDialog}
           onRecorded={(text) => {
-            setMessage({ text, error: false });
+            announce(text, false);
             focusRecordSoon();
-            recordDialog.closeDialog();
           }}
-          onPendingChange={setDialogBusy}
-          busy={dialogBusy}
-          triggerRef={recordDialog.triggerRef}
           projectId={projectId}
           milestoneId={m.id}
           title={m.title}

@@ -111,6 +111,9 @@ export function parseForm<S extends z.ZodType>(schema: S, formData: FormData): z
 
 /* ---------- Field schemas shared by every form ---------- */
 
+// Browsers send textarea line breaks as CRLF; store plain LF so text compares and renders alike
+export const lf = <T extends string | null>(value: T): T => (value === null ? value : (value.replace(/\r\n?/g, '\n') as T));
+
 const trimmed = z.string().transform((value) => value.trim());
 
 export const fields = {

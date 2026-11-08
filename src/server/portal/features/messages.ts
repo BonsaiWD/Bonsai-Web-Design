@@ -1,14 +1,17 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
-import { activity, message, project, projectReadState, rateLimit, user } from '@/db/schema';
+import { activity, message, project, projectReadState, user } from '@/db/schema';
 import type { MessageView, Perspective, Side, StudioThreadInfo, ThreadView } from '@/components/portal/messages/types';
 import type { EmailContent } from '@/lib/email';
 import { firstName } from '@/lib/portal-format';
 import type { PortalProject } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
+import { claimRateSlot, type RateSlot } from '../throttle';
+import { STUDIO_NAME, studioSubject } from '../notify';
+import { FLAGGED_EMAIL_KINDS } from '../kinds';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -47,7 +50,7 @@ function visibleTo(perspective: Perspective): SQL | undefined {
 function displayName(side: Side, name: string, email: string): string {
   if (name.trim()) return name.trim();
   // A studio member's address is theirs, not the client's business
-  return side === 'studio' ? 'Bonsai Web Design' : email;
+  return side === 'studio' ? STUDIO_NAME : email;
 }
 
 /* ---------- The messages page ---------- */
@@ -225,15 +228,15 @@ export async function markThreadRead({ userId, projectId, readerSide, shownMessa
 
 /* ---------- Email throttle ----------
    At most one email per conversation and recipient every 10 minutes. The activity rows are
-   the record (a sent email in the last 10 minutes skips the next one); the claim makes two
+   the record (a sent email in the last 10 minutes skips the next one); the slot makes two
    messages sent at the same moment agree on which of them emails. */
 
 const EMAIL_GAP_MS = 10 * 60 * 1000;
-const throttleKey = (projectId: string, to: string) => `portal:message-email:${projectId}:${to}`;
+const threadEmailKey = (projectId: string, to: string) => `portal:message-email:${projectId}:${to}`;
 
-export async function claimThreadEmail(projectId: string, to: string): Promise<boolean> {
-  const db = getDb();
-  const [recent] = await db
+export async function threadEmailSlot(projectId: string, to: string): Promise<RateSlot> {
+  const key = threadEmailKey(projectId, to);
+  const [recent] = await getDb()
     .select({ id: activity.id })
     .from(activity)
     .where(
@@ -246,24 +249,8 @@ export async function claimThreadEmail(projectId: string, to: string): Promise<b
       ),
     )
     .limit(1);
-  if (recent) return false;
-
-  const now = Date.now();
-  const claimed = await db
-    .insert(rateLimit)
-    .values({ id: randomUUID(), key: throttleKey(projectId, to), count: 1, lastRequest: now })
-    .onConflictDoUpdate({
-      target: rateLimit.key,
-      set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-      setWhere: sql`${rateLimit.lastRequest} <= ${now - EMAIL_GAP_MS}`,
-    })
-    .returning({ id: rateLimit.id });
-  return claimed.length > 0;
-}
-
-// An email that did not go out should not hold back the next one
-export async function releaseThreadEmail(projectId: string, to: string): Promise<void> {
-  await getDb().delete(rateLimit).where(eq(rateLimit.key, throttleKey(projectId, to)));
+  if (recent) return { ok: false, key, waitMinutes: 10 };
+  return claimRateSlot(key, EMAIL_GAP_MS);
 }
 
 /* ---------- Emails ---------- */
@@ -286,7 +273,7 @@ interface ClientMessageEmailInput {
 export function clientMessageEmail(input: ClientMessageEmailInput): { subject: string; content: EmailContent } {
   const { quote, cut } = quoted(input.body);
   return {
-    subject: `${input.clientName} sent a message about ${input.projectName}`,
+    subject: studioSubject(`${input.clientName} sent a message`, input.projectName),
     content: {
       heading: `${input.clientName} sent a message`,
       paragraphs: [`${input.clientName} wrote about ${input.projectName}:`],
@@ -312,11 +299,12 @@ interface StudioMessageEmailInput {
 export function studioMessageEmail(input: StudioMessageEmailInput): { subject: string; content: EmailContent } {
   const { quote, cut } = quoted(input.body);
   const name = firstName(input.clientName);
-  const from = input.authorName === 'Bonsai Web Design' ? 'Bonsai Web Design' : `${input.authorName} at Bonsai Web Design`;
+  const asStudio = input.authorName === STUDIO_NAME;
+  const from = asStudio ? STUDIO_NAME : `${input.authorName} at ${STUDIO_NAME}`;
   return {
     subject: `New message from ${from}`,
     content: {
-      heading: `${input.authorName === 'Bonsai Web Design' ? 'We sent' : `${input.authorName} sent`} you a message`,
+      heading: `${asStudio ? 'We sent' : `${input.authorName} sent`} you a message`,
       paragraphs: [name ? `Hi ${name},` : 'Hello,', `There's a new message about ${input.projectName} in your portal:`],
       quote,
       action: { label: 'Reply in the portal', url: input.url },
@@ -369,35 +357,15 @@ function excerpt(body: string): string {
   return flat.length > 140 ? `${flat.slice(0, 140).trimEnd()}…` : flat;
 }
 
+// Message emails that never arrived, flagged as every feature flags them (failed-emails.ts)
 async function failedEmailItems(context: FeatureContext): Promise<AttentionItem[]> {
-  const rows = await getDb()
-    .select({
-      id: activity.id,
-      summary: activity.summary,
-      emailTo: activity.emailTo,
-      emailStatus: activity.emailStatus,
-      createdAt: activity.createdAt,
-      projectId: project.id,
-      projectName: project.name,
-    })
-    .from(activity)
-    .innerJoin(project, eq(project.id, activity.projectId))
-    .where(
-      and(
-        eq(activity.kind, MESSAGE_KIND),
-        isNotNull(activity.emailTo),
-        inArray(activity.emailStatus, ['sent', 'failed']),
-        gte(activity.createdAt, sql`now() - interval '14 days'`),
-        projectScope(context),
-      ),
-    )
-    .orderBy(asc(activity.createdAt));
-  return unresolvedFailures(rows).map((row) => ({
+  const rows = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.message, subjectOf: () => null });
+  return rows.map((row) => ({
     key: `message-email:${row.id}`,
     projectId: row.projectId,
     projectName: row.projectName,
     tab: 'messages' as const,
-    title: `A message email to ${row.emailTo} could not be sent`,
+    title: failedEmailTitle(row.who, 'a new message'),
     detail: row.summary,
     since: row.createdAt.toISOString(),
     tone: 'alert' as const,

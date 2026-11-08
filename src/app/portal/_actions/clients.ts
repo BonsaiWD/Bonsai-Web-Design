@@ -10,26 +10,19 @@ import { adminActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import { recordActivity } from '@/server/portal/notify';
 import {
-    claimInviteSlot,
-    clientProjectNames,
-    displayName,
-    endAccess,
-    inviteEmail,
-    inviteKey,
-    lockClient,
-    releaseInviteSlot,
-    renameActivitySubject,
-    sendStandaloneEmail,
+  clientProjectNames,
+  displayName,
+  endAccess,
+  INVITE_INTERVAL_MS,
+  inviteEmail,
+  inviteKey,
+  lockClient,
+  renameActivitySubject,
+  sendStandaloneEmail,
 } from '@/server/portal/features/clients';
+import { claimRateSlot, clearRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /* ---------- Form fields ---------- */
-
-// An unticked box sends nothing; fields.checkbox needs the key present under Zod 4, so this
-// marks it optional before turning it into a boolean
-const checkbox = z
-    .union([z.literal('on'), z.literal('true')])
-    .optional()
-    .transform((value) => value !== undefined);
 
 // User ids are UUIDs when the portal or the database makes them, but a row added by hand
 // may carry any text id, so only the shape is checked here and the row is looked up
@@ -75,11 +68,11 @@ async function sendInvite(client: {
     name: string | null;
     email: string;
 }): Promise<{ outcome: InviteOutcome; waitMinutes?: number }> {
-    const slot = await claimInviteSlot(client.id);
+    const slot = await claimRateSlot(inviteKey(client.id), INVITE_INTERVAL_MS);
     if (!slot.ok) return { outcome: 'throttled', waitMinutes: slot.waitMinutes };
     const { subject, content } = await inviteEmail(client, await clientProjectNames(client.id));
     const status = await sendStandaloneEmail(client.email, subject, content);
-    if (status !== 'sent') await releaseInviteSlot(client.id);
+    if (status !== 'sent') await releaseRateSlot(slot);
     return { outcome: status };
 }
 
@@ -103,7 +96,7 @@ const addSchema = z.object({
     name,
     company,
     email: fields.email,
-    sendInvite: checkbox,
+    sendInvite: fields.checkbox,
 });
 
 export async function addClient(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -192,7 +185,7 @@ export async function updateClient(_prev: ActionState, formData: FormData): Prom
 
 /* ---------- Change email address ---------- */
 
-const emailSchema = z.object({ clientId, email: fields.email, sendInvite: checkbox });
+const emailSchema = z.object({ clientId, email: fields.email, sendInvite: fields.checkbox });
 
 export async function changeClientEmail(_prev: ActionState, formData: FormData): Promise<ActionState> {
     return runAction(formData, async () => {
@@ -245,7 +238,7 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
         let invite = '';
         if (input.sendInvite) {
             // A new address gets its invite even if the old one had one minutes ago
-            await releaseInviteSlot(input.clientId);
+            await clearRateSlot(inviteKey(input.clientId));
             const sent = await sendInvite({ id: input.clientId, name: result.name, email: input.email });
             invite = inviteSentence(sent.outcome, input.email, sent.waitMinutes);
         } else {
@@ -327,7 +320,7 @@ export async function removeClient(_prev: ActionState, formData: FormData): Prom
                     );
                 }
                 await tx.delete(user).where(and(eq(user.id, current.id), eq(user.role, 'client')));
-                await tx.delete(rateLimit).where(eq(rateLimit.key, inviteKey(current.id)));
+                await clearRateSlot(inviteKey(current.id), tx);
                 return { name: who, email: current.email };
             });
         } catch (error) {

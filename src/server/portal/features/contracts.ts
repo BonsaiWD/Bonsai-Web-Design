@@ -1,9 +1,8 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gte, inArray, isNull, like, ne, notExists, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
-import { activity, contract, contractFile, contractSignature, file, project, rateLimit, user } from '@/db/schema';
+import { activity, contract, contractFile, contractSignature, file, project, user } from '@/db/schema';
 import type {
   ContractFileView,
   ContractSignatureView,
@@ -14,13 +13,12 @@ import type {
 } from '@/components/portal/contracts/types';
 import type { EmailContent } from '@/lib/email';
 import { firstName, formatUtcMoment } from '@/lib/portal-format';
-import { isUuid, type PortalProject, type Tx } from '../access';
+import { type Db, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
-import { STUDIO_EMAIL } from '../notify';
+import { STUDIO_EMAIL, studioSubject, summaryWithText, textFromSummary } from '../notify';
 import { INLINE_TYPES } from '../storage';
 import { failedEmails, failedEmailTitle } from './failed-emails';
-
-type Db = ReturnType<typeof getDb>;
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker, parseKind } from '../kinds';
 
 /* ---------- Activity kinds ----------
    Rows carry the contract's id in their kind ("contract.added:<id>"), so the page can say when
@@ -49,14 +47,9 @@ const KINDS = {
 // worth flagging to the studio. (Earlier sent-back rows carried the email themselves.)
 const ASKING = [KINDS.added, KINDS.replaced, KINDS.reminded, KINDS.returned, KINDS.returnedNote];
 
-export function contractKind(event: keyof typeof KINDS, contractId: string): string {
-  return `${KINDS[event]}:${contractId}`;
-}
-
-function contractIdOf(kind: string): string | null {
-  const id = kind.split(':')[1];
-  return isUuid(id) ? id : null;
-}
+// contractKind('signed', contractId); a sent-back copy adds its contract file:
+// contractKind('returned', contractId, contractFileId)
+export const contractKind = kindMaker(KINDS);
 
 export const contractAnchor = (contractId: string) => `contract-${contractId}`;
 
@@ -66,19 +59,8 @@ export const contractAnchor = (contractId: string) => `contract-${contractId}`;
    studio-only row, so the timeline every viewer reads (including a later client, should the
    project move) says only that it was sent back. */
 
-const REASON_MARKER = '. Reason: ';
-
 export function returnedNoteSummary(clientName: string, title: string, reason: string): string {
-  return `Emailed ${clientName} why we sent back the signed copy of ${title}${REASON_MARKER}${reason}`;
-}
-
-export function returnedKind(event: 'returned' | 'returnedNote', contractId: string, contractFileId: string): string {
-  return `${KINDS[event]}:${contractId}:${contractFileId}`;
-}
-
-function reasonFromSummary(summary: string): string | null {
-  const at = summary.indexOf(REASON_MARKER);
-  return at >= 0 ? summary.slice(at + REASON_MARKER.length) || null : null;
+  return summaryWithText(`Emailed ${clientName} why we sent back the signed copy of ${title}`, 'Reason', reason);
 }
 
 export function contractStatus(input: {
@@ -197,12 +179,12 @@ export async function loadContracts(
     : [];
   const returns = new Map<string, ReturnedInfo>();
   for (const row of returnRows) {
-    const key = row.kind.split(':')[2];
+    const key = parseKind(row.kind).more[0];
     const earlier = returns.get(key);
     returns.set(key, {
       at: earlier?.at ?? row.createdAt.toISOString(),
       // The note row has it; the status row (and rows written before the split) may not
-      reason: reasonFromSummary(row.summary) ?? earlier?.reason ?? null,
+      reason: textFromSummary(row.summary, 'Reason') ?? earlier?.reason ?? null,
       byName: studio ? row.byName || earlier?.byName || null : null,
     });
   }
@@ -274,7 +256,7 @@ export async function loadContracts(
 
     let studioExtras: ContractView['studio'];
     if (studio) {
-      const mine = emails.filter((entry) => contractIdOf(entry.kind) === item.id);
+      const mine = emails.filter((entry) => kindItemId(entry.kind) === item.id);
       const lastSent = mine.find((entry) => entry.emailStatus === 'sent');
       studioExtras = {
         createdByName: item.createdByName || null,
@@ -376,37 +358,10 @@ export async function currentOriginal(tx: Tx | Db, contractId: string) {
 }
 
 /* ---------- Email throttle ----------
-   At most one "please sign" email per contract every 10 minutes. The claim is a single
-   conditional upsert, so two clicks at once cannot both send. */
+   At most one "please sign" email per contract every 10 minutes (claimRateSlot). */
 
-const EMAIL_GAP_MS = 10 * 60 * 1000;
-const throttleKey = (contractId: string) => `portal:contract-email:${contractId}`;
-
-export async function claimEmailSlot(contractId: string): Promise<{ ok: true } | { ok: false; waitMinutes: number }> {
-  const db = getDb();
-  const key = throttleKey(contractId);
-  const now = Date.now();
-  const claimed = await db
-    .insert(rateLimit)
-    .values({ id: randomUUID(), key, count: 1, lastRequest: now })
-    .onConflictDoUpdate({
-      target: rateLimit.key,
-      set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-      setWhere: sql`${rateLimit.lastRequest} <= ${now - EMAIL_GAP_MS}`,
-    })
-    .returning({ id: rateLimit.id });
-  if (claimed.length) return { ok: true };
-  const [row] = await db.select({ lastRequest: rateLimit.lastRequest }).from(rateLimit).where(eq(rateLimit.key, key));
-  const last = row?.lastRequest ?? now;
-  return { ok: false, waitMinutes: Math.max(1, Math.ceil((last + EMAIL_GAP_MS - now) / 60_000)) };
-}
-
-// An email that did not go out should not block the next try
-export async function releaseEmailSlot(contractId: string): Promise<void> {
-  await getDb()
-    .delete(rateLimit)
-    .where(eq(rateLimit.key, throttleKey(contractId)));
-}
+export const CONTRACT_EMAIL_GAP_MS = 10 * 60 * 1000;
+export const contractEmailKey = (contractId: string) => `portal:contract-email:${contractId}`;
 
 // Whether an email asking this client to sign the contract ever reached them, so the next one
 // is worded as a reminder only when it is one
@@ -427,11 +382,6 @@ export async function askedByEmail(projectId: string, contractId: string, to: st
 }
 
 /* ---------- Emails ---------- */
-
-// "2026-11-08 19:30 UTC": receipts state one unambiguous time
-export function utcStamp(value: Date): string {
-  return `${value.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-}
 
 const greeting = (clientName: string | null) => {
   const name = firstName(clientName);
@@ -503,6 +453,7 @@ export function askEmail(input: AskEmailInput): { subject: string; content: Emai
 
 interface SignedEmailInput {
   clientName: string;
+  projectName: string;
   title: string;
   filename: string;
   sha256: string;
@@ -519,15 +470,15 @@ export function signedEmails(input: SignedEmailInput) {
     `Document: ${input.filename}`,
     `SHA-256: ${input.sha256}`,
     `Signed as: ${input.signedName} (${input.signerEmail})`,
-    `Time: ${utcStamp(input.at)}`,
+    `Time: ${formatUtcMoment(input.at)}`,
     `Statement: ${input.statement}`,
   ];
   return {
     studio: {
-      subject: `${input.clientName} signed ${input.title}`,
+      subject: studioSubject(`${input.clientName} signed ${input.title}`, input.projectName),
       content: {
         heading: `${input.clientName} signed ${input.title}`,
-        paragraphs: [`${input.clientName} signed ${input.title} in the portal.`, ...facts],
+        paragraphs: [`${input.clientName} signed ${input.title} for ${input.projectName} in the portal.`, ...facts],
         quote: input.note ?? undefined,
         action: { label: 'Open it in the portal', url: input.url },
       } satisfies EmailContent,
@@ -565,7 +516,7 @@ export function recordedSignatureEmail(input: {
       heading: `We recorded your signature on ${input.title}`,
       paragraphs: [
         greeting(input.clientName),
-        `${input.recordedBy} recorded that you signed ${input.title} outside the portal, at ${utcStamp(input.at)}.`,
+        `${input.recordedBy} recorded that you signed ${input.title} outside the portal, at ${formatUtcMoment(input.at)}.`,
         `Document: ${input.filename} (SHA-256 ${input.sha256})`,
         ...(input.attached ? [`Your signed copy, ${input.attached}, is in the portal with it.`] : []),
         'Our note is below.',
@@ -589,6 +540,7 @@ function signedCopyCheck(original: { filename: string; sha256: string; uploadedA
 
 export function signedCopyEmail(input: {
   clientName: string;
+  projectName: string;
   title: string;
   filename: string;
   sha256: string;
@@ -598,10 +550,11 @@ export function signedCopyEmail(input: {
   url: string;
 }): { subject: string; content: EmailContent } {
   return {
-    subject: `${input.clientName} uploaded a signed copy of ${input.title}`,
+    subject: studioSubject(`${input.clientName} uploaded a signed copy of ${input.title}`, input.projectName),
     content: {
       heading: `${input.clientName} uploaded a signed copy of ${input.title}`,
       paragraphs: [
+        `Project: ${input.projectName}`,
         `File: ${input.filename}`,
         `SHA-256: ${input.sha256}`,
         signedCopyCheck(input.original),
@@ -748,7 +701,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
           projectScope(context),
         ),
       ),
-    failedEmails(context, { kinds: ['contract.'], subjectOf: contractIdOf }),
+    failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.contract, subjectOf: kindItemId }),
     awaitingContracts(context),
   ]);
 

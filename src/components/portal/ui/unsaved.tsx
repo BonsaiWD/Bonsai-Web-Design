@@ -10,15 +10,18 @@ import {
   useId,
   useMemo,
   useRef,
+  useState,
   type ComponentProps,
   type ReactNode,
+  type RefObject,
 } from 'react';
 
 /*
  * Guards unsaved edits. A view calls useUnsavedChanges(dirty): closing or reloading the tab
  * asks first (beforeunload), and so do the portal's own links (tabs, shell navigation,
  * breadcrumbs, TextLink and ButtonLink), which navigate inside the app and would otherwise
- * discard the edits silently.
+ * discard the edits silently. Every ActionForm (so every FormDialog) registers itself through
+ * useFormEdits; views that compare against saved values opt out and register their own.
  */
 
 interface UnsavedContextValue {
@@ -68,6 +71,32 @@ export function useUnsavedChanges(dirty: boolean) {
     setDirty(id, dirty);
     return () => setDirty(id, false);
   }, [id, dirty, setDirty]);
+}
+
+/*
+ * Whether anything has been typed, chosen or attached in a form since it mounted or was last
+ * cleared (ActionForm clears it on success). Ticking a checkbox or radio on its own is not
+ * counted: it is one click to redo, and a toggle such as "Internal note" is not unsaved work.
+ * After a failed submit the form still holds what was typed, so it stays edited.
+ */
+export function useFormEdits(formRef: RefObject<HTMLFormElement | null>) {
+  const [edited, setEdited] = useState(false);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const onEdit = (event: Event) => {
+      const target = event.target as HTMLInputElement | null;
+      if (!target || target.type === 'hidden' || target.type === 'checkbox' || target.type === 'radio') return;
+      setEdited(true);
+    };
+    form.addEventListener('input', onEdit);
+    form.addEventListener('change', onEdit);
+    return () => {
+      form.removeEventListener('input', onEdit);
+      form.removeEventListener('change', onEdit);
+    };
+  }, [formRef]);
+  return [edited, setEdited] as const;
 }
 
 // For Next <Link onNavigate>: cancels the navigation when the person chooses to stay

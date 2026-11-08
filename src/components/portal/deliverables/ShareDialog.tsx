@@ -8,6 +8,7 @@ import {
   Checkbox,
   Field,
   FieldRow,
+  FormDialog,
   Input,
   Select,
   space,
@@ -20,8 +21,8 @@ import {
 } from '@/components/portal/ui';
 import { UploadField } from '../files/UploadField';
 import { linkWarning } from './copy';
-import { FormDialog } from './parts';
 import type { DeliverableView, MilestoneOption } from './types';
+import { versionName } from '@/lib/portal-format';
 
 const LINK_HINT =
   'Use a link that will not change: a Vercel deployment URL (not a branch alias), a Figma version link, or upload a PDF.';
@@ -179,8 +180,6 @@ function ShareFields({ context, deliverable }: { context: ShareContext; delivera
         >
           {(control) => (
             <Select
-              // React does not re-apply a changed defaultValue to a select, so a failed submit remounts it
-              key={control.defaultValue}
               id={control.id}
               name={control.name}
               defaultValue={control.defaultValue}
@@ -252,7 +251,7 @@ export function ShareDialog({ dialog, context, deliverable, onShared, returnFocu
   return (
     <FormDialog
       dialog={dialog}
-      title={deliverable ? `Share version ${next} of ${deliverable.title}` : 'Share a deliverable'}
+      title={deliverable ? `Share ${versionName(deliverable.title, next)}` : 'Share a deliverable'}
       description={
         deliverable
           ? `Version ${next} becomes the one ${context.clientName} sees. Earlier versions stay in the record.`

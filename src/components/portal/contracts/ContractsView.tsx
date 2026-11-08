@@ -3,7 +3,6 @@
 import styled from 'styled-components';
 import { FiPlus } from 'react-icons/fi';
 import { firstName } from '@/lib/portal-format';
-import { sansHeading, StatusLine, useAnnouncer } from '@/components/portal/deliverables/parts';
 import {
   Button,
   DataList,
@@ -13,12 +12,15 @@ import {
   H3,
   Meta,
   Panel,
+  sansHeading,
   SectionHeader,
   space,
   Split,
   Stack,
+  StatusLine,
   tint,
   type,
+  useAnnouncer,
   useDialog,
 } from '@/components/portal/ui';
 import { AddContractDialog } from './AddContractDialog';

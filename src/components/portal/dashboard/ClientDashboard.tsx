@@ -2,7 +2,7 @@
 
 import styled from 'styled-components';
 import { dueInfo, formatShortDate } from '@/lib/portal-format';
-import { EmptyState, Eyebrow, H1, H2, LAPTOP, Lead, MetaText, space, Stack } from '../ui';
+import { EmptyState, Eyebrow, H1, H2, LAPTOP, MetaLine, MetaText, space, Stack } from '../ui';
 import { AttentionPanel, DeadlinePanel } from './parts';
 import { ProjectCard } from './ProjectCard';
 import type { AttentionItem, DeadlineItem, ProjectCardView } from './types';
@@ -17,44 +17,6 @@ const Intro = styled.header`
 // The words carry the meaning; the colour only marks it as late
 const Overdue = styled.span`
   color: ${({ theme }) => theme.colors.error};
-`;
-
-/*
- * Parts separated by the bronze dot, as in MetaLine: each part carries its dot in front, and
- * the row is pulled left by one slot inside a clipping box, so a wrapped line never starts or
- * ends on a dot.
- */
-const DOT_SLOT = '1.75rem';
-
-const SummaryClip = styled.div`
-  overflow: hidden;
-`;
-
-const SummaryLine = styled(Lead)`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: ${space[1]};
-  max-width: none;
-  margin-left: -${DOT_SLOT};
-
-  > span {
-    position: relative;
-    padding-left: ${DOT_SLOT};
-  }
-
-  > span::before {
-    content: '';
-    position: absolute;
-    left: calc(${DOT_SLOT} / 2 - 2px);
-    top: 50%;
-    width: 4px;
-    height: 4px;
-    margin-top: -2px;
-    border-radius: 50%;
-    background: ${({ theme }) => theme.colors.primary};
-    opacity: 0.6;
-  }
 `;
 
 /*
@@ -134,19 +96,15 @@ export default function ClientDashboard({ firstName, eyebrow, today, attention, 
       <Intro>
         {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <H1>{greeting}</H1>
-        <SummaryClip>
-          <SummaryLine>
+        <MetaLine size="lead">
+          {open.length === 0 ? 'Nothing needs you right now' : open.length === 1 ? '1 thing needs you' : `${open.length} things need you`}
+          {overdue.length > 0 && <Overdue>{overdueText}</Overdue>}
+          {upcoming && (
             <span>
-              {open.length === 0 ? 'Nothing needs you right now' : open.length === 1 ? '1 thing needs you' : `${open.length} things need you`}
+              next deadline <time dateTime={upcoming.date}>{formatShortDate(upcoming.date)}</time>
             </span>
-            {overdue.length > 0 && <Overdue>{overdueText}</Overdue>}
-            {upcoming && (
-              <span>
-                next deadline <time dateTime={upcoming.date}>{formatShortDate(upcoming.date)}</time>
-              </span>
-            )}
-          </SummaryLine>
-        </SummaryClip>
+          )}
+        </MetaLine>
       </Intro>
 
       <Grid>

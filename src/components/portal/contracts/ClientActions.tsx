@@ -2,64 +2,40 @@
 
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import styled from 'styled-components';
-import MetaDot from '@/components/common/MetaDot';
-import { FiEdit3, FiLock, FiUpload } from 'react-icons/fi';
+import { FiEdit3, FiUpload } from 'react-icons/fi';
 import { signContract, uploadSignedCopy } from '@/app/portal/_actions/contracts';
 import { formatBytes } from '@/components/portal/deliverables/copy';
-import { CardActions, FormDialog, InsetPanel, type Announce } from '@/components/portal/deliverables/parts';
+import { CardActions, InsetPanel } from '@/components/portal/deliverables/parts';
 import {
   ActionForm,
   Button,
-  Checkbox,
+  ClientOnlyNote,
   Field,
   FormActions,
+  FormDialog,
+  FormId,
   FormMessage,
   FormStack,
-  Input,
   LocalTime,
+  MetaLine,
   Notice,
+  SignStatement,
   space,
   SubmitButton,
   Text,
-  Textarea,
   TextAnchor,
-  tint,
+  Textarea,
   type,
   useDialog,
+  useHeldWhileOpen,
   VisuallyHidden,
   type ActionState,
+  type Announce,
 } from '@/components/portal/ui';
-import { fileHref, FreshId } from '../files/parts';
+import { fileHref } from '../files/parts';
 import { UploadField } from '../files/UploadField';
 import { shortSha, signStatement, wasReplaced } from './copy';
 import type { ContractView, UploadLimits } from './types';
-
-// What exactly is being signed, restated inside the dialog with a way to read it first
-const Signing = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${space[1]};
-  padding: ${space[4]};
-  border: 1px solid ${({ theme }) => tint(theme.colors.primary, 18)};
-  background: ${({ theme }) => tint(theme.colors.background, 55)};
-
-  > span {
-    ${type.meta}
-    ${type.figures}
-    overflow-wrap: anywhere;
-  }
-
-  strong {
-    ${type.label}
-    overflow-wrap: anywhere;
-  }
-
-  a {
-    ${type.meta}
-    align-self: flex-start;
-    margin-top: ${space[1]};
-  }
-`;
 
 // The filename the copy should be of
 const Version = styled.strong`
@@ -70,29 +46,6 @@ const Version = styled.strong`
 
 const PanelNotice = styled.div`
   margin-bottom: ${space[5]};
-`;
-
-const Dot = styled(MetaDot)`
-  margin: 0 ${space[1]};
-`;
-
-const StatementBox = styled.div`
-  padding: ${space[4]} ${space[5]};
-  border: 1px solid ${({ theme }) => tint(theme.colors.primary, 30)};
-  background: ${({ theme }) => tint(theme.colors.primary, 5)};
-  overflow-wrap: anywhere;
-`;
-
-const OnlyClient = styled.p`
-  ${type.meta}
-  display: flex;
-  align-items: center;
-  gap: ${space[2]};
-
-  svg {
-    flex-shrink: 0;
-    color: ${({ theme }) => theme.colors.primary};
-  }
 `;
 
 interface ClientActionsProps {
@@ -118,9 +71,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
   const panelRef = useRef<HTMLDivElement>(null);
   const awaiting = contract.status === 'awaiting';
   // The dialog acts on the document as it was opened, and stays mounted to report its result
-  const [held, setHeld] = useState(contract.original);
-  if (contract.original && contract.original !== held && !sign.open) setHeld(contract.original);
-  const original = held;
+  const original = useHeldWhileOpen(contract.original, sign.open);
   // The open panel follows the document now on the card, with a fresh form and a word on why
   const current = contract.original;
   if (uploadOpen && uploadFor && current && current.fileId !== uploadFor) {
@@ -136,10 +87,9 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
     if (!awaiting) return null;
     return (
       <CardActions>
-        <OnlyClient>
-          <FiLock aria-hidden="true" />
+        <ClientOnlyNote>
           Only {clientName} can sign this or upload a signed copy.
-        </OnlyClient>
+        </ClientOnlyNote>
       </CardActions>
     );
   }
@@ -250,7 +200,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="contractId" value={contract.id} />
             <input type="hidden" name="shownFileId" value={uploadFor} />
-            <FreshId name="contractFileId" />
+            <FormId name="contractFileId" />
           </ActionForm>
         )}
       </InsetPanel>
@@ -259,7 +209,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
         <FormDialog
           dialog={sign}
           title={`Sign ${contract.title}`}
-          description="Read the document first. Signing here records your name, the time and the document's fingerprint, and we email you a receipt."
+          description="Read the document first. Your signature is kept with the document's fingerprint, so the record shows exactly what you signed."
           action={signContract}
           submitLabel="Sign and agree"
           pendingLabel="Signing…"
@@ -275,52 +225,29 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             </>
           }
         >
-          <Signing>
-            <span>You are signing</span>
-            <strong>{original.filename}</strong>
-            <span>
-              {formatBytes(original.sizeBytes)} <Dot aria-hidden="true" /> Fingerprint {shortSha(original.sha256)}…
-            </span>
-            {original.previewable ? (
-              <TextAnchor href={fileHref(original.fileId, true)} target="_blank" rel="noopener noreferrer">
-                Read it in a new tab
-              </TextAnchor>
-            ) : (
-              <TextAnchor href={fileHref(original.fileId)}>Download it to read</TextAnchor>
-            )}
-          </Signing>
-          <StatementBox>
-            <Checkbox name="confirm" required>
-              {statement}
-            </Checkbox>
-          </StatementBox>
-          <Field label="Type your full name to sign" name="signedName" hint="We record your name and the time as your signature.">
-            {(control) => (
-              <Input
-                id={control.id}
-                name={control.name}
-                defaultValue={control.defaultValue}
-                aria-describedby={control.describedBy}
-                aria-invalid={control.invalid || undefined}
-                autoComplete="name"
-                maxLength={120}
-                required
-              />
-            )}
-          </Field>
-          <Field label="Note" name="note" optional>
-            {(control) => (
-              <Textarea
-                id={control.id}
-                name={control.name}
-                defaultValue={control.defaultValue}
-                aria-describedby={control.describedBy}
-                aria-invalid={control.invalid || undefined}
-                rows={2}
-                maxLength={2000}
-              />
-            )}
-          </Field>
+          <SignStatement
+            summary={{
+              lead: 'You are signing',
+              title: original.filename,
+              details: (
+                <>
+                  <MetaLine>
+                    {formatBytes(original.sizeBytes)}
+                    {`Fingerprint ${shortSha(original.sha256)}…`}
+                  </MetaLine>
+                  {original.previewable ? (
+                    <TextAnchor href={fileHref(original.fileId, true)} target="_blank" rel="noopener noreferrer">
+                      Read it in a new tab
+                    </TextAnchor>
+                  ) : (
+                    <TextAnchor href={fileHref(original.fileId)}>Download it to read</TextAnchor>
+                  )}
+                </>
+              ),
+            }}
+            statement={statement}
+            signWith="name"
+          />
         </FormDialog>
       )}
     </>

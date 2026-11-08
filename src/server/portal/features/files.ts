@@ -6,11 +6,13 @@ import { getDb } from '@/db';
 import { activity, file, project, rateLimit, user } from '@/db/schema';
 import type { ProjectFileView } from '@/components/portal/files/types';
 import { plural } from '@/lib/portal-format';
-import { isUuid } from '../access';
 import { ActionError } from '../actions';
 import { projectScope, type AttentionItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
 import { INLINE_TYPES, MAX_UPLOAD_BYTES } from '../storage';
 import { failedEmails, failedEmailTitle } from './failed-emails';
+import { countInWindow, uncountInWindow } from '../throttle';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker } from '../kinds';
+import { summaryWithText, textFromSummary } from '../notify';
 
 /* ---------- Activity ----------
    The file table has no column for the note an uploader writes, so it travels in the
@@ -19,27 +21,11 @@ import { failedEmails, failedEmailTitle } from './failed-emails';
 
 export const FILE_KINDS = { shared: 'file.shared', removed: 'file.removed' } as const;
 
-export function fileKind(event: keyof typeof FILE_KINDS, fileId: string): string {
-  return `${FILE_KINDS[event]}:${fileId}`;
-}
-
-function fileIdOf(kind: string): string | null {
-  const id = kind.split(':')[1];
-  return isUuid(id) ? id : null;
-}
-
-const NOTE_MARKER = '. Note: ';
+export const fileKind = kindMaker(FILE_KINDS);
 
 // `who` is null for the studio, whose summaries read "Shared <filename>" like its other entries
 export function sharedSummary(who: string | null, filename: string, note: string | null): string {
-  const base = who ? `${who} shared ${filename}` : `Shared ${filename}`;
-  return note ? `${base}${NOTE_MARKER}${note}` : base;
-}
-
-export function noteFromSummary(summary: string, filename: string): string | null {
-  const marker = `hared ${filename}${NOTE_MARKER}`;
-  const at = summary.indexOf(marker);
-  return at >= 0 ? summary.slice(at + marker.length) || null : null;
+  return summaryWithText(who ? `${who} shared ${filename}` : `Shared ${filename}`, 'Note', note);
 }
 
 export const fileAnchor = (fileId: string) => `file-${fileId}`;
@@ -94,12 +80,12 @@ export async function loadProjectFiles(
 
   const summaries = new Map<string, string>();
   for (const row of shared) {
-    const id = fileIdOf(row.kind);
+    const id = kindItemId(row.kind);
     if (id) summaries.set(id, row.summary);
   }
   const removedBy = new Map<string, { at: string; byName: string | null }>();
   for (const row of removals) {
-    const id = fileIdOf(row.kind);
+    const id = kindItemId(row.kind);
     if (id && !removedBy.has(id)) removedBy.set(id, { at: row.createdAt.toISOString(), byName: row.byName || null });
   }
 
@@ -115,7 +101,7 @@ export async function loadProjectFiles(
       // Which of the two of us uploaded it matters to the studio only
       uploadedByName: studio || row.uploaderRole !== 'admin' ? row.uploaderName : 'the studio',
       mine: row.uploadedBy === viewerId,
-      note: summary ? noteFromSummary(summary, row.filename) : null,
+      note: summary ? textFromSummary(summary, 'Note', `hared ${row.filename}`) : null,
       ...(studio
         ? {
             removed: row.removedAt ? (removedBy.get(row.id) ?? { at: row.removedAt.toISOString(), byName: null }) : null,
@@ -179,7 +165,6 @@ function quotaRefusal(waitMs: number): string {
 // Both measures move together: a refusal rolls the transaction back, so it counts nothing.
 export async function claimUploadQuota(userId: string, bytes: number): Promise<QuotaClaim> {
   const now = Date.now();
-  const expired = now - UPLOAD_QUOTA.windowMs;
   // storeUpload refuses anything over the per-file limit (and the claim is then refunded), so
   // counting at most that keeps the number a small integer
   const size = Math.min(Math.max(0, Math.ceil(bytes)), MAX_UPLOAD_BYTES);
@@ -190,15 +175,8 @@ export async function claimUploadQuota(userId: string, bytes: number): Promise<Q
       ['bytes', size, UPLOAD_QUOTA.bytes],
     ] as const;
     for (const [measure, amount, max] of measures) {
-      const result = await tx.execute<{ count: number; last_request: string }>(sql`
-        INSERT INTO rate_limit (id, key, count, last_request)
-        VALUES (gen_random_uuid()::text, ${quotaKey(measure, userId)}, ${amount}::int, ${now})
-        ON CONFLICT (key) DO UPDATE SET
-          count = CASE WHEN rate_limit.last_request < ${expired} THEN ${amount}::int ELSE rate_limit.count + ${amount}::int END,
-          last_request = CASE WHEN rate_limit.last_request < ${expired} THEN ${now} ELSE rate_limit.last_request END
-        RETURNING count, last_request`);
-      const row = result.rows[0];
-      if (row && Number(row.count) > max) resetAt = Math.max(resetAt, Number(row.last_request) + UPLOAD_QUOTA.windowMs);
+      const { count, windowStart } = await countInWindow(quotaKey(measure, userId), amount, UPLOAD_QUOTA.windowMs, { db: tx, now });
+      if (count > max) resetAt = Math.max(resetAt, windowStart + UPLOAD_QUOTA.windowMs);
     }
     if (resetAt) throw new ActionError(quotaRefusal(resetAt - now));
   });
@@ -207,44 +185,18 @@ export async function claimUploadQuota(userId: string, bytes: number): Promise<Q
 
 // An upload that was refused or failed after its claim gives it back (within the same window)
 export async function refundUploadQuota(claim: QuotaClaim): Promise<void> {
-  await getDb()
-    .execute(
-      sql`UPDATE rate_limit
-          SET count = greatest(count - CASE WHEN key = ${quotaKey('files', claim.userId)} THEN 1 ELSE ${claim.bytes}::int END, 0)
-          WHERE key IN (${quotaKey('files', claim.userId)}, ${quotaKey('bytes', claim.userId)}) AND last_request <= ${claim.at}`,
-    )
-    .catch((error) => console.error('[portal files] upload quota refund', error));
+  await Promise.all([
+    uncountInWindow(quotaKey('files', claim.userId), 1, claim.at),
+    uncountInWindow(quotaKey('bytes', claim.userId), claim.bytes, claim.at),
+  ]).catch((error) => console.error('[portal files] upload quota refund', error));
 }
 
 /* ---------- Upload emails ----------
-   A client's uploads email the studio at most once per project every 10 minutes; later ones
-   land in the activity feed and the dashboard's "new files" item. The claim is one conditional
-   upsert, so two uploads at the same moment cannot both send. */
+   A client's uploads email the studio at most once per project every 10 minutes
+   (claimRateSlot); later ones land in the activity feed and the dashboard's "new files" item. */
 
-const UPLOAD_EMAIL_GAP_MS = 10 * 60 * 1000;
-const uploadEmailKey = (projectId: string) => `portal:upload-email:${projectId}`;
-
-export async function claimUploadEmail(projectId: string): Promise<boolean> {
-  const now = Date.now();
-  const claimed = await getDb()
-    .insert(rateLimit)
-    .values({ id: randomUUID(), key: uploadEmailKey(projectId), count: 1, lastRequest: now })
-    .onConflictDoUpdate({
-      target: rateLimit.key,
-      set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-      setWhere: sql`${rateLimit.lastRequest} <= ${now - UPLOAD_EMAIL_GAP_MS}`,
-    })
-    .returning({ id: rateLimit.id });
-  return claimed.length > 0;
-}
-
-// An email that did not go out should not hold back the next one
-export async function releaseUploadEmail(projectId: string): Promise<void> {
-  await getDb()
-    .delete(rateLimit)
-    .where(eq(rateLimit.key, uploadEmailKey(projectId)))
-    .catch(() => undefined);
-}
+export const UPLOAD_EMAIL_GAP_MS = 10 * 60 * 1000;
+export const uploadEmailKey = (projectId: string) => `portal:upload-email:${projectId}`;
 
 /* ---------- Attention ---------- */
 
@@ -299,7 +251,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
 // Failed emails about shared files, flagged as every feature flags them (failed-emails.ts).
 // One about a file that has since been removed no longer matters.
 async function failedEmailItems(context: FeatureContext): Promise<AttentionItem[]> {
-  const emails = await failedEmails(context, { kinds: ['file.'], subjectOf: fileIdOf });
+  const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.file, subjectOf: kindItemId });
   const ids = [...new Set(emails.map((row) => row.subject).filter((id): id is string => Boolean(id)))];
   if (ids.length === 0) return [];
   const files = await getDb()

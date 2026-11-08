@@ -1,5 +1,6 @@
 'use client';
 
+import { Children, type ReactNode } from 'react';
 import styled, { css } from 'styled-components';
 import { LAPTOP, PHONE, radius, space, tint, type } from './tokens';
 
@@ -222,3 +223,89 @@ export const DataList = styled.dl`
     overflow-wrap: anywhere;
   }
 `;
+
+/* ---------- Meta line ----------
+   Meta items separated by the bronze dot, as everywhere on the site. Each item carries its
+   dot in front of it, and the row is pulled left by one dot slot inside a clipping box, so
+   the item that starts a line hides its dot: a wrapped line never begins or ends on one. */
+
+const META_SLOT = { meta: '1rem', lead: '1.75rem' } as const;
+
+const MetaClip = styled.div`
+  overflow: hidden;
+  min-width: 0;
+`;
+
+const MetaRow = styled.div<{ $size: 'meta' | 'lead'; $stackOnPhone: boolean }>`
+  ${({ $size }) => ($size === 'lead' ? type.lead : type.meta)}
+  ${type.figures}
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: ${space[1]};
+  max-width: none;
+  margin-left: -${({ $size }) => META_SLOT[$size]};
+
+  /* Each item is a flex item with ordinary inline content, so "Shared <time>" keeps its space */
+  > span {
+    position: relative;
+    padding-left: ${({ $size }) => META_SLOT[$size]};
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  > span::before {
+    content: '';
+    position: absolute;
+    left: calc(${({ $size }) => META_SLOT[$size]} / 2 - 2px);
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    margin-top: -2px;
+    border-radius: 50%;
+    background: ${({ theme }) => theme.colors.primary};
+    opacity: 0.6;
+  }
+
+  /* Long items go one per line on phones, with no dots */
+  ${({ $stackOnPhone }) =>
+    $stackOnPhone &&
+    css`
+      @media (max-width: ${PHONE}) {
+        flex-direction: column;
+        align-items: flex-start;
+        margin-left: 0;
+
+        > span {
+          padding-left: 0;
+        }
+
+        > span::before {
+          display: none;
+        }
+      }
+    `}
+`;
+
+interface MetaLineProps {
+  children: ReactNode;
+  // 'lead' for a summary under a page title
+  size?: 'meta' | 'lead';
+  stackOnPhone?: boolean;
+  className?: string;
+}
+
+export function MetaLine({ children, size = 'meta', stackOnPhone = false, className }: MetaLineProps) {
+  const items = Children.toArray(children).filter(Boolean);
+  // Nothing to say: no empty row taking a gap in the layout
+  if (items.length === 0) return null;
+  return (
+    <MetaClip className={className}>
+      <MetaRow $size={size} $stackOnPhone={stackOnPhone}>
+        {items.map((item, index) => (
+          <span key={index}>{item}</span>
+        ))}
+      </MetaRow>
+    </MetaClip>
+  );
+}

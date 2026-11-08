@@ -7,7 +7,7 @@ import { getDb } from '@/db';
 import { milestone, milestoneSignoff, project, user } from '@/db/schema';
 import type { ProjectRecordCounts, ProjectSettingsData } from '@/components/portal/admin/types';
 import type { NextMilestoneView, ProjectCardView } from '@/components/portal/dashboard/types';
-import { adminActor, projectActor, type Tx } from '../access';
+import { type Db, type Tx } from '../access';
 import { projectScope, sortAttention, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { contractsFeature } from './contracts';
 import { deliverablesFeature } from './deliverables';
@@ -15,19 +15,12 @@ import { failedEmails, failedEmailTitle } from './failed-emails';
 import { filesFeature } from './files';
 import { invoicesFeature } from './invoices';
 import { linkedReviewTitle, milestonesFeature } from './milestones';
-
-type Db = ReturnType<typeof getDb>;
+import { FLAGGED_EMAIL_KINDS } from '../kinds';
 
 /* ---------- Shared by the pages and the actions ---------- */
 
 // Changes on every save (to the microsecond), so an edit made from a stale form is refused
 export const projectVersion = sql<string>`to_char(${project.updatedAt} at time zone 'UTC', 'YYYYMMDDHH24MISSUS')`;
-
-// Studio actions on a project: the signed-in user must be an admin, and the project must exist
-export async function studioProjectActor(projectId: unknown) {
-    await adminActor();
-    return projectActor(projectId);
-}
 
 // Activity kinds this feature writes. The dot keeps them apart from other features' kinds
 // that happen to start with "project".
@@ -295,7 +288,7 @@ export const projectsFeature: PortalFeature = {
     // that reaches the same person on that project makes up for it.
     async attention(context) {
         if (context.perspective !== 'studio') return [];
-        const emails = await failedEmails(context, { kinds: ['project.'], clearedBy: [''], subjectOf: () => 'project' });
+        const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.project, clearedBy: [''], subjectOf: () => 'project' });
         return emails.map((row) => ({
             key: `project-email:${row.id}`,
             projectId: row.projectId,

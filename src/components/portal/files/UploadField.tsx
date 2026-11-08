@@ -47,10 +47,14 @@ export function UploadField({
   tooLargeAdvice = 'for anything larger, share a link in Messages instead.',
 }: UploadFieldProps) {
   const { state } = useFormStatusState();
-  const [chosen, setChosen] = useState<{ name: string; at: number | null } | null>(null);
+  // The file sent with the last failed submit, which the form's reset has cleared. It comes
+  // from the form's result, so it survives the fields being remounted after that result.
+  const sent = state && !state.ok ? state.files?.[name] : undefined;
+  // The result after which a file was chosen again (or the choice cleared)
+  const [pickedAfter, setPickedAfter] = useState<number | null>(null);
   const [tooLarge, setTooLarge] = useState<{ name: string; size: number } | null>(null);
   const warningId = useId();
-  const cleared = Boolean(chosen && state && !state.ok && state.at !== chosen.at);
+  const cleared = sent && pickedAfter !== state?.at ? sent : null;
   const limit = `${Math.round(maxUploadBytes / (1024 * 1024))} MB`;
 
   return (
@@ -59,7 +63,7 @@ export function UploadField({
         label={label}
         name={name}
         optional={optional}
-        hint={cleared && chosen ? `Choose ${chosen.name} again: files are cleared when the form needs a correction.` : hint}
+        hint={cleared ? `Choose ${cleared} again: files are cleared when the form needs a correction.` : hint}
       >
         {(control) => (
           <FileInput
@@ -70,15 +74,13 @@ export function UploadField({
             aria-invalid={control.invalid || Boolean(tooLarge) || undefined}
             onChange={(event) => {
               const picked = event.target.files?.[0];
+              setPickedAfter(state?.at ?? null);
               if (picked && picked.size > maxUploadBytes) {
                 event.target.value = '';
                 setTooLarge({ name: picked.name, size: picked.size });
-                setChosen(null);
                 return;
               }
               setTooLarge(null);
-              // Remember which result this choice came after, so the hint shows only once it is cleared
-              setChosen(picked ? { name: picked.name, at: state?.at ?? null } : null);
             }}
           />
         )}

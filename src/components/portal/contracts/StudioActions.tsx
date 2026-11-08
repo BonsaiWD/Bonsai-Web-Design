@@ -12,25 +12,30 @@ import {
   returnSignedCopy,
   uploadCountersigned,
 } from '@/app/portal/_actions/contracts';
-import { CardActions, ConfirmAction, FormDialog, sansHeading, type Announce } from '@/components/portal/deliverables/parts';
+import { CardActions } from '@/components/portal/deliverables/parts';
 import {
   ActionForm,
   Button,
   Checkbox,
+  ConfirmAction,
   Field,
+  FormDialog,
+  FormId,
   FormMessage,
   Input,
   LocalTime,
   PHONE,
+  sansHeading,
   space,
   SubmitButton,
   Textarea,
   tint,
   type,
   useDialog,
+  useHeldWhileOpen,
   type ActionState,
+  type Announce,
 } from '@/components/portal/ui';
-import { FreshId } from '../files/parts';
 import { UploadField } from '../files/UploadField';
 import type { ContractView, UploadLimits } from './types';
 
@@ -150,8 +155,7 @@ export function StudioActions({
   const returnable = status === 'signed' && !signature && contract.signedCopy?.side === 'client' ? contract.signedCopy : null;
   // The dialog outlives its copy: success re-renders the card without it, and the dialog must
   // still be there to report the result and hand focus back
-  const [heldCopy, setHeldCopy] = useState(returnable);
-  if (returnable?.id !== heldCopy?.id && !sendBack.open) setHeldCopy(returnable);
+  const heldCopy = useHeldWhileOpen(returnable, sendBack.open);
 
   // Every action lands its message in the card's status line, and focus goes with it
   const landed = (state: NonNullable<ActionState>) => announce(state.message);
@@ -349,7 +353,7 @@ export function StudioActions({
             <>
               {contractFields}
               <input type="hidden" name="expectedFileId" value={original.id} />
-              <FreshId name="contractFileId" />
+              <FormId name="contractFileId" />
             </>
           }
         >
@@ -392,7 +396,7 @@ export function StudioActions({
             <>
               {contractFields}
               <input type="hidden" name="shownFileId" value={original.fileId} />
-              <FreshId name="contractFileId" />
+              <FormId name="contractFileId" />
             </>
           }
         >
@@ -470,7 +474,7 @@ export function StudioActions({
         hidden={
           <>
             {contractFields}
-            <FreshId name="contractFileId" />
+            <FormId name="contractFileId" />
           </>
         }
       >

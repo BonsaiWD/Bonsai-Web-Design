@@ -10,28 +10,19 @@ import { hasSignedRecords, listParts, signedRecords } from '@/components/portal/
 import { STAGE_LABELS } from '@/components/portal/labels';
 import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate } from '@/lib/portal-format';
-import { adminActor } from '@/server/portal/access';
-import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
+import { adminActor, studioProjectActor } from '@/server/portal/access';
+import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import { portalOrigin, recordActivity } from '@/server/portal/notify';
 import { displayName, lockClient } from '@/server/portal/features/clients';
 import {
-    countProjectRecords,
-    lockProjectForRecords,
-    PROJECT_KINDS,
-    projectVersion,
-    removeStoredFiles,
-    studioProjectActor,
+  countProjectRecords,
+  lockProjectForRecords,
+  PROJECT_KINDS,
+  projectVersion,
+  removeStoredFiles,
 } from '@/server/portal/features/projects';
 
 /* ---------- Form fields ---------- */
-
-const checkbox = z
-    .union([z.literal('on'), z.literal('true')])
-    .optional()
-    .transform((value) => value !== undefined);
-
-// Browsers send textarea line breaks as CRLF; store plain LF so text compares and renders alike
-const lf = <T extends string | null>(value: T): T => (value === null ? value : (value.replace(/\r\n?/g, '\n') as T));
 
 const name = fields.requiredText('the project name', 120);
 const summary = fields.optionalText('the summary', 2000).transform(lf);
@@ -57,7 +48,7 @@ const createSchema = z.object({
     summary,
     stage,
     targetLaunch,
-    emailClient: checkbox,
+    emailClient: fields.checkbox,
 });
 
 export async function createProject(_prev: ActionState, formData: FormData): Promise<ActionState> {

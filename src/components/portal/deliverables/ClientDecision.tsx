@@ -1,61 +1,28 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
-import styled from 'styled-components';
-import { FiCheck, FiEdit3, FiLock } from 'react-icons/fi';
+import { FiCheck, FiEdit3 } from 'react-icons/fi';
 import { approveVersion, requestChanges } from '@/app/portal/_actions/deliverables';
 import {
   ActionForm,
   Button,
-  Checkbox,
+  ClientOnlyNote,
   Field,
   FormActions,
+  FormDialog,
   FormMessage,
   FormStack,
-  Input,
-  space,
+  SignStatement,
   SubmitButton,
   Textarea,
-  tint,
-  type,
   useDialog,
   type ActionState,
+  type Announce,
 } from '@/components/portal/ui';
 import { approvalStatement, formatBytes, linkHost } from './copy';
-import { CardActions, FormDialog, InsetPanel, UnsavedFormGuard, type Announce } from './parts';
+import { CardActions, InsetPanel } from './parts';
 import type { VersionView } from './types';
-
-// What exactly is being approved, restated inside the dialog
-const Approving = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${space[1]};
-  padding: ${space[4]};
-  border: 1px solid ${({ theme }) => tint(theme.colors.primary, 18)};
-  background: ${({ theme }) => tint(theme.colors.background, 55)};
-
-  span {
-    ${type.meta}
-  }
-
-  strong {
-    ${type.label}
-    ${type.figures}
-    overflow-wrap: anywhere;
-  }
-`;
-
-const OnlyClient = styled.p`
-  ${type.meta}
-  display: flex;
-  align-items: center;
-  gap: ${space[2]};
-
-  svg {
-    flex-shrink: 0;
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
+import { versionName } from '@/lib/portal-format';
 
 function ShownFields({ projectId, version }: { projectId: string; version: VersionView }) {
   return (
@@ -108,6 +75,7 @@ export function ClientDecision({
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const changesButtonRef = useRef<HTMLButtonElement>(null);
   const statement = approvalStatement(version.version, version.titleSnapshot);
+  const reviewed = reviewedSummary(version);
 
   useEffect(() => {
     if (changesOpen) notesRef.current?.focus();
@@ -117,10 +85,9 @@ export function ClientDecision({
     if (!reviewing) return null;
     return (
       <CardActions>
-        <OnlyClient>
-          <FiLock aria-hidden="true" />
+        <ClientOnlyNote>
           Only {clientName} can approve this or ask for changes.
-        </OnlyClient>
+        </ClientOnlyNote>
       </CardActions>
     );
   }
@@ -150,16 +117,16 @@ export function ClientDecision({
       </CardActions>
 
       <InsetPanel id={panelId} hidden={!changesOpen || !reviewing}>
+        {/* Cancel only collapses the notes (they are still there on reopening), so they stop
+            guarding the page while hidden */}
         <ActionForm
           action={requestChanges}
+          guardUnsaved={changesOpen && reviewing}
           onSuccess={(state) => {
             setChangesOpen(false);
             decided(state);
           }}
         >
-          {/* Cancel only collapses the notes (they are still there on reopening), so they
-              stop guarding the page while hidden */}
-          <UnsavedFormGuard active={changesOpen && reviewing} />
           <FormStack>
             <Field
               label="What would you like changed?"
@@ -200,7 +167,7 @@ export function ClientDecision({
 
       <FormDialog
         dialog={approve}
-        title={`Approve version ${version.version} of ${version.titleSnapshot}`}
+        title={`Approve ${versionName(version.titleSnapshot, version.version)}`}
         description={`Approving tells us this version is final, and we move on to ${milestoneTitle ? `the next step after ${milestoneTitle}` : 'the next step'}. If something needs changing, ask for changes instead and we'll share version ${nextVersion}.`}
         action={approveVersion}
         submitLabel={`Approve version ${version.version}`}
@@ -209,43 +176,15 @@ export function ClientDecision({
         returnFocusTo={statusRef}
         hidden={<ShownFields projectId={projectId} version={version} />}
       >
-        <Approving>
-          <span>You are approving</span>
-          <strong>
-            Version {version.version} of {version.titleSnapshot}
-          </strong>
-          {reviewedSummary(version) && <span>{reviewedSummary(version)}</span>}
-        </Approving>
-        <Checkbox name="confirm" required>
-          {statement}
-        </Checkbox>
-        <Field label="Type your full name to sign" name="signedName" hint="We record your name and the date as your sign-off.">
-          {(control) => (
-            <Input
-              id={control.id}
-              name={control.name}
-              defaultValue={control.defaultValue}
-              aria-describedby={control.describedBy}
-              aria-invalid={control.invalid || undefined}
-              autoComplete="name"
-              maxLength={120}
-              required
-            />
-          )}
-        </Field>
-        <Field label="Note" name="note" optional>
-          {(control) => (
-            <Textarea
-              id={control.id}
-              name={control.name}
-              defaultValue={control.defaultValue}
-              aria-describedby={control.describedBy}
-              aria-invalid={control.invalid || undefined}
-              rows={3}
-              maxLength={2000}
-            />
-          )}
-        </Field>
+        <SignStatement
+          summary={{
+            lead: 'You are approving',
+            title: versionName(version.titleSnapshot, version.version),
+            details: reviewed ? <span>{reviewed}</span> : null,
+          }}
+          statement={statement}
+          signWith="name"
+        />
       </FormDialog>
     </>
   );

@@ -1,30 +1,27 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { and, asc, eq, max, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
-import { deliverable, milestone, milestoneSignoff, milestoneStatus, project, rateLimit, user, type MilestoneStatus } from '@/db/schema';
+import { deliverable, milestone, milestoneSignoff, milestoneStatus, project, user, type MilestoneStatus } from '@/db/schema';
 import { projectHref } from '@/components/portal/tabs';
-import { firstName, formatDate } from '@/lib/portal-format';
-import { assertStillClient, projectActor, type Tx } from '@/server/portal/access';
-import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
+import { firstName, formatDate, formatUtcMoment } from '@/lib/portal-format';
+import { assertStillClient, projectActor, studioProjectActor, type Tx } from '@/server/portal/access';
+import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import {
-    formatUtc,
-    milestoneKind,
-    milestoneVersion,
-    pendingReview,
-    releaseSignoffAsk,
-    SIGNOFF_ASK_INTERVAL_MS,
-    SIGNOFF_METHODS,
-    signoffAskKey,
-    signoffStatement,
-    studioProjectActor,
-    studioSignoffStatement,
+  milestoneKind,
+  milestoneVersion,
+  pendingReview,
+  SIGNOFF_ASK_INTERVAL_MS,
+  SIGNOFF_METHODS,
+  signoffAskKey,
+  signoffStatement,
+  studioSignoffStatement,
 } from '@/server/portal/features/milestones';
+import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /* ---------- Form fields ---------- */
 
@@ -32,9 +29,6 @@ const title = z
     .string()
     .transform((value) => value.trim())
     .pipe(z.string().min(1, { error: 'Give the milestone a title.' }).max(200, { error: 'Keep the title under 200 characters.' }));
-
-// Browsers send textarea line breaks as CRLF; store plain LF so text compares and renders alike
-const lf = <T extends string | null>(value: T): T => (value === null ? value : (value.replace(/\r\n?/g, '\n') as T));
 
 const description = fields.optionalText('the description', 4000).transform(lf);
 
@@ -44,13 +38,6 @@ const status = z.enum(milestoneStatus.enumValues, { error: 'Choose a status.' })
 const dueDate = fields.optionalDate.refine((value) => !value || (value >= '2000-01-01' && value <= '2100-12-31'), {
     error: 'Choose a date between 2000 and 2100.',
 });
-
-// An unticked box sends nothing. fields.checkbox fails on the missing key under Zod 4 (its
-// transform makes the key required), so this marks the key optional before transforming.
-const checkbox = z
-    .union([z.literal('on'), z.literal('true')])
-    .optional()
-    .transform((value) => value !== undefined);
 
 const NOT_FOUND = 'That milestone could not be found. Reload the page.';
 
@@ -115,7 +102,7 @@ const addSchema = z.object({
     description,
     status,
     dueDate,
-    requiresSignoff: checkbox,
+    requiresSignoff: fields.checkbox,
 });
 
 export async function addMilestone(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -178,7 +165,7 @@ const updateSchema = z.object({
     description,
     status,
     dueDate,
-    requiresSignoff: checkbox,
+    requiresSignoff: fields.checkbox,
 });
 
 export async function updateMilestone(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -343,7 +330,7 @@ export async function deleteMilestone(_prev: ActionState, formData: FormData): P
 
 // confirmReopen comes from the two-step confirm a finished milestone shows, so a button
 // rendered before the step was marked done cannot reopen it in one click
-const askSchema = z.object({ id: fields.uuid, projectId: fields.uuid, confirmReopen: checkbox });
+const askSchema = z.object({ id: fields.uuid, projectId: fields.uuid, confirmReopen: fields.checkbox });
 
 export async function askForSignoff(_prev: ActionState, formData: FormData): Promise<ActionState> {
     return runAction(formData, async () => {
@@ -382,23 +369,10 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
             }
 
             // At most one request email per milestone every ten minutes, so a double click or
-            // an eager reminder cannot flood the client's inbox. The previous time is kept, so
-            // the claim can be given back if this email does not go out.
-            const [previous] = await tx
-                .select({ lastRequest: rateLimit.lastRequest })
-                .from(rateLimit)
-                .where(eq(rateLimit.key, signoffAskKey(current.id)));
-            const now = Date.now();
-            const claimed = await tx
-                .insert(rateLimit)
-                .values({ id: randomUUID(), key: signoffAskKey(current.id), count: 1, lastRequest: now })
-                .onConflictDoUpdate({
-                    target: rateLimit.key,
-                    set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
-                    setWhere: sql`${rateLimit.lastRequest} < ${now - SIGNOFF_ASK_INTERVAL_MS}`,
-                })
-                .returning({ id: rateLimit.id });
-            if (claimed.length === 0) {
+            // an eager reminder cannot flood the client's inbox. The slot is given back if this
+            // email does not go out.
+            const slot = await claimRateSlot(signoffAskKey(current.id), SIGNOFF_ASK_INTERVAL_MS, tx);
+            if (!slot.ok) {
                 throw new ActionError(`${clientFirst} was emailed about this in the last 10 minutes. Give it a little while before sending a reminder.`);
             }
 
@@ -406,7 +380,7 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                 .update(milestone)
                 .set({ requiresSignoff: true, status: 'waiting_on_client' })
                 .where(eq(milestone.id, current.id));
-            return { ...current, claimedAt: now, previousAskAt: previous?.lastRequest ?? null };
+            return { ...current, slot };
         });
 
         const greeting = firstName(actor.project.clientName);
@@ -431,10 +405,10 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                 },
             },
         });
-        if (emailStatus !== 'sent') await releaseSignoffAsk(row.id, row.claimedAt, row.previousAskAt);
+        if (emailStatus !== 'sent') await releaseRateSlot(row.slot);
         refresh(projectId);
         const verb = row.requiresSignoff && row.status === 'waiting_on_client' ? 'Reminded' : 'Asked';
-        return done(`${verb} ${clientName} to initial ${row.title}.${emailNote(emailStatus, clientName)}`);
+        return done(`${verb} ${clientName} to initial ${row.title}.${emailNote(emailStatus, clientName, milestoneKind('signoff_requested', row.id))}`);
     });
 }
 
@@ -506,7 +480,7 @@ export async function recordSignoff(_prev: ActionState, formData: FormData): Pro
                     paragraphs: [
                         `You confirmed ${record.title} ${SIGNOFF_METHODS[input.method]}, so we've recorded your sign-off in the portal.`,
                         `Record: "${record.statement}"`,
-                        `Recorded: ${formatUtc(record.signedAt)}`,
+                        `Recorded: ${formatUtcMoment(record.signedAt)}`,
                     ],
                     quote: input.note,
                     action: { label: 'View in the portal', url: await milestoneUrl(projectId, input.id) },
@@ -515,7 +489,7 @@ export async function recordSignoff(_prev: ActionState, formData: FormData): Pro
             },
         });
         refresh(projectId);
-        return done(`Recorded ${clientName}'s sign-off for ${record.title}.${emailNote(emailStatus, clientName)}`);
+        return done(`Recorded ${clientName}'s sign-off for ${record.title}.${emailNote(emailStatus, clientName, milestoneKind('signoff_recorded', input.id))}`);
     });
 }
 
@@ -538,7 +512,7 @@ const signoffSchema = z.object({
         )
         .transform((value) => value.toLocaleUpperCase('en-US')),
     note: fields.optionalText('your note', 2000).transform(lf),
-    confirm: checkbox.refine((value) => value, { error: 'Tick the box to confirm the statement.' }),
+    confirm: fields.checkbox.refine((value) => value, { error: 'Tick the box to confirm the statement.' }),
 });
 
 export async function signOffMilestone(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -614,7 +588,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             `Milestone: ${result.title}`,
             `Statement: "${result.statement}"`,
             `Initials: ${input.initials}`,
-            `Signed: ${formatUtc(result.signedAt)}`,
+            `Time: ${formatUtcMoment(result.signedAt)}`,
         ];
 
         await recordActivity({
@@ -625,7 +599,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             target: 'milestones',
             email: {
                 to: STUDIO_EMAIL,
-                subject: `${name} initialled ${result.title}`,
+                subject: studioSubject(`${name} initialled ${result.title}`, actor.project.name),
                 content: {
                     heading: `${result.title} is signed off`,
                     paragraphs: [`${name} (${actor.user.email}) initialled ${result.title} on ${actor.project.name}.`, ...facts],

@@ -4,21 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiTrash2 } from 'react-icons/fi';
 import { removeProjectFile } from '@/app/portal/_actions/files';
-import MetaDot from '@/components/common/MetaDot';
 import { formatBytes } from '@/components/portal/deliverables/copy';
-import {
-  ActionForm,
-  Button,
-  FormMessage,
-  IconButton,
-  LocalTime,
-  PHONE,
-  space,
-  SubmitButton,
-  tint,
-  type,
-  type ActionState,
-} from '@/components/portal/ui';
+import { IconButton, InlineConfirm, LocalTime, MetaLine, PHONE, space, tint, type, type ActionState } from '@/components/portal/ui';
 import { FileButtons, FileGlyph } from './parts';
 import type { ProjectFileView } from './types';
 
@@ -68,18 +55,10 @@ const Body = styled.div`
 `;
 
 // Size and uploader on one line, the time on the next: the text column beside the actions is
-// narrow, and this way no dot is ever left dangling at the end of a wrapped line
-const FileMeta = styled.p`
+// narrow, and a time on its own line reads more easily
+const FileTime = styled.p`
   ${type.meta}
   ${type.figures}
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 ${space[3]};
-
-  > [data-break] {
-    flex-basis: 100%;
-  }
 `;
 
 // What the uploader wrote with it, as a quiet quotation under the name
@@ -125,27 +104,10 @@ const RemoveButton = styled(IconButton)`
   }
 `;
 
-const Confirm = styled(ActionForm)`
-  display: flex;
-  flex-direction: column;
-  gap: ${space[3]};
+// The removal question takes the whole row
+const ConfirmRow = styled.div`
   flex: 1 1 100%;
-  padding: ${space[4]};
-  border: 1px solid ${({ theme }) => tint(theme.colors.error, 35)};
-  background: ${({ theme }) => tint(theme.colors.error, 6)};
-
-  > p:first-child {
-    ${type.body}
-    color: ${({ theme }) => theme.colors.text};
-    overflow-wrap: anywhere;
-  }
-
-  > div {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: ${space[3]} ${space[4]};
-  }
+  min-width: 0;
 `;
 
 interface FileItemProps {
@@ -160,14 +122,12 @@ interface FileItemProps {
 
 export function FileItem({ projectId, item, byline, canRemove, removeQuestion, onRemoved }: FileItemProps) {
   const [asking, setAsking] = useState(false);
-  const keepRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef(false);
 
-  // Keep takes focus, so Enter never removes by accident; cancelling returns to Remove
+  // The confirm focuses Keep, so Enter never removes by accident; cancelling returns to Remove
   useEffect(() => {
-    if (asking) keepRef.current?.focus();
-    else if (returnFocus.current) {
+    if (!asking && returnFocus.current) {
       returnFocus.current = false;
       triggerRef.current?.focus();
     }
@@ -186,18 +146,15 @@ export function FileItem({ projectId, item, byline, canRemove, removeQuestion, o
         <FileGlyph filename={item.filename} />
         <Body>
           <p>{item.filename}</p>
-          <FileMeta>
-            <span>{formatBytes(item.sizeBytes)}</span>
-            {byline && (
-              <>
-                <MetaDot aria-hidden="true" />
-                <span>{byline}</span>
-              </>
-            )}
-            <span data-break>
+          <div>
+            <MetaLine>
+              {formatBytes(item.sizeBytes)}
+              {byline}
+            </MetaLine>
+            <FileTime>
               <LocalTime value={item.uploadedAt} />
-            </span>
-          </FileMeta>
+            </FileTime>
+          </div>
           {item.note && <Note>{item.note}</Note>}
         </Body>
       </Main>
@@ -214,27 +171,24 @@ export function FileItem({ projectId, item, byline, canRemove, removeQuestion, o
       )}
 
       {asking && (
-        <Confirm action={removeAndReport}>
-          <p>{removeQuestion}</p>
-          <div>
-            <SubmitButton variant="danger" pendingLabel="Removing…">
-              Remove
-            </SubmitButton>
-            <Button
-              ref={keepRef}
-              $variant="quiet"
-              onClick={() => {
-                returnFocus.current = true;
-                setAsking(false);
-              }}
-            >
-              Keep
-            </Button>
-            <FormMessage />
-          </div>
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="fileId" value={item.id} />
-        </Confirm>
+        <ConfirmRow>
+          <InlineConfirm
+            question={removeQuestion}
+            action={removeAndReport}
+            confirmLabel="Remove"
+            pendingLabel="Removing…"
+            onKeep={() => {
+              returnFocus.current = true;
+              setAsking(false);
+            }}
+            hidden={
+              <>
+                <input type="hidden" name="projectId" value={projectId} />
+                <input type="hidden" name="fileId" value={item.id} />
+              </>
+            }
+          />
+        </ConfirmRow>
       )}
     </Item>
   );

@@ -6,10 +6,11 @@ import { deliverable, deliverableVersion, milestone, milestoneSignoff, project, 
 import { asksForInitials } from '@/components/portal/milestones/signoff';
 import type { LinkedDeliverable, MilestoneView, SignoffRecord } from '@/components/portal/milestones/types';
 import { daysBetween, firstName } from '@/lib/portal-format';
-import { adminActor, isUuid, projectActor, type Tx } from '../access';
+import { type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
 import { STUDIO_NAME } from '../notify';
 import { failedEmails, failedEmailTitle } from './failed-emails';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker, parseKind } from '../kinds';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -24,17 +25,18 @@ export { asksForInitials };
    link to its milestone and clear once a later email of the same kind reaches the same
    person. Rows written before used "milestone_<event>" with no id; both match 'milestone%'. */
 
-export type MilestoneEvent = 'added' | 'status' | 'due' | 'deleted' | 'signoff_requested' | 'signoff_recorded' | 'signoff' | 'signoff_receipt';
+const KINDS = {
+    added: 'milestone.added',
+    status: 'milestone.status',
+    due: 'milestone.due',
+    deleted: 'milestone.deleted',
+    signoff_requested: 'milestone.signoff_requested',
+    signoff_recorded: 'milestone.signoff_recorded',
+    signoff: 'milestone.signoff',
+    signoff_receipt: 'milestone.signoff_receipt',
+} as const;
 
-export function milestoneKind(event: MilestoneEvent, milestoneId: string): string {
-    return `milestone.${event}:${milestoneId}`;
-}
-
-function parseKind(kind: string): { event: string; milestoneId: string | null } {
-    const current = /^milestone\.([a-z_]+):(.*)$/.exec(kind);
-    if (current) return { event: current[1], milestoneId: isUuid(current[2]) ? current[2] : null };
-    return { event: kind.replace(/^milestone_?/, ''), milestoneId: null };
-}
+export const milestoneKind = kindMaker(KINDS);
 
 export const SIGNOFF_METHODS = {
     email: 'by email',
@@ -50,21 +52,13 @@ export function studioSignoffStatement(options: { recordedBy: string; clientName
     return `${options.recordedBy} recorded that ${options.clientName} confirmed ${options.title} is complete and approved moving on, ${SIGNOFF_METHODS[options.method]}.`;
 }
 
-// One rate-limit row per milestone: when the client was last emailed a sign-off request
+// One rate-limit slot per milestone (claimRateSlot): when the client was last emailed a
+// sign-off request
 export function signoffAskKey(milestoneId: string): string {
     return `portal:milestone-signoff-ask:${milestoneId}`;
 }
 
 export const SIGNOFF_ASK_INTERVAL_MS = 10 * 60 * 1000;
-
-// Gives back an ask whose email did not go out, so Remind works straight away and "Emailed
-// <time>" keeps pointing at the last email that really went. Only the claim this request
-// made is touched.
-export async function releaseSignoffAsk(milestoneId: string, claimedAt: number, previousAt: number | null): Promise<void> {
-    const mine = and(eq(rateLimit.key, signoffAskKey(milestoneId)), eq(rateLimit.lastRequest, claimedAt));
-    if (previousAt === null) await getDb().delete(rateLimit).where(mine);
-    else await getDb().update(rateLimit).set({ lastRequest: previousAt, count: sql`greatest(${rateLimit.count} - 1, 1)` }).where(mine);
-}
 
 // The first linked deliverable whose newest version is still in review, if any: that review
 // comes before the client's initials
@@ -80,27 +74,6 @@ export async function pendingReview(tx: Tx, milestoneId: string): Promise<string
         .orderBy(asc(deliverable.createdAt))
         .limit(1);
     return row?.title ?? null;
-}
-
-// "Nov 8, 2026, 3:04 PM UTC": emails cannot know the reader's time zone, so they say UTC
-const utcMoment = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-});
-
-export function formatUtc(value: Date): string {
-    return utcMoment.format(value);
-}
-
-// Studio actions on a project: the signed-in user must be an admin, and the project must exist
-export async function studioProjectActor(projectId: unknown) {
-    await adminActor();
-    return projectActor(projectId);
 }
 
 /* ---------- The milestones page ---------- */
@@ -334,11 +307,11 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
 // them (failed-emails.ts). A request no longer matters once the milestone is signed off or
 // deleted; rows from before kinds carried the milestone's id match on their kind alone.
 async function failedEmailItems(context: FeatureContext, milestones: ScopedMilestone[]): Promise<AttentionItem[]> {
-    const emails = await failedEmails(context, { kinds: ['milestone'], subjectOf: (kind) => parseKind(kind).milestoneId });
+    const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.milestone, subjectOf: kindItemId });
     const byId = new Map(milestones.map((row) => [row.id, row]));
     const items: AttentionItem[] = [];
     for (const row of emails) {
-        const { event, milestoneId } = parseKind(row.kind);
+        const { event, id: milestoneId } = parseKind(row.kind);
         const target = milestoneId ? byId.get(milestoneId) : undefined;
         if (milestoneId && !target) continue;
         if (event === 'signoff_requested' && target?.signoffId) continue;

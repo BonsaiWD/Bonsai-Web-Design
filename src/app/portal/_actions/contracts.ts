@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
-import { contract, contractFile, contractSignature, file, rateLimit, user } from '@/db/schema';
+import { contract, contractFile, contractSignature, file, user } from '@/db/schema';
 import { signStatement, studioSignStatement } from '@/components/portal/contracts/copy';
 import { projectHref } from '@/components/portal/tabs';
 import { plural } from '@/lib/portal-format';
@@ -13,15 +13,14 @@ import { ActionError, done, fields, parseForm, runAction, type ActionState } fro
 import {
   askedByEmail,
   askEmail,
-  claimEmailSlot,
+  CONTRACT_EMAIL_GAP_MS,
   contractAnchor,
+  contractEmailKey,
   contractKind,
   countersignedEmail,
   lockContract,
   recordedSignatureEmail,
-  releaseEmailSlot,
   returnedCopyEmail,
-  returnedKind,
   returnedNoteSummary,
   signedCopyEmail,
   signedEmails,
@@ -31,6 +30,7 @@ import { claimUploadQuota, refundUploadQuota } from '@/server/portal/features/fi
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
+import { claimRateSlot, clearRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * Every export here is an endpoint anyone can call with any arguments, so each one starts by
@@ -39,13 +39,6 @@ import { storeUpload } from '@/server/portal/storage';
  */
 
 const NOT_FOUND = 'This contract could not be found. Reload the page and try again.';
-
-// fields.checkbox rejects an unticked box under Zod 4 (a missing key reads as "nonoptional");
-// optional() before the transform lets the key be absent
-const checkbox = z
-  .union([z.literal('on'), z.literal('true')])
-  .optional()
-  .transform((value) => value !== undefined);
 
 // Parses the form and adds checks the schema cannot express, so every problem shows at once
 function parseWithChecks<S extends z.ZodType>(schema: S, formData: FormData, extra: Record<string, string>): z.infer<S> {
@@ -155,8 +148,8 @@ const createSchema = z.object({
   contractId: fields.uuid,
   contractFileId: fields.uuid,
   ...contractFields,
-  requiresSignature: checkbox,
-  emailClient: checkbox,
+  requiresSignature: fields.checkbox,
+  emailClient: fields.checkbox,
 });
 
 export async function createContract(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -213,7 +206,7 @@ export async function createContract(_prev: ActionState, formData: FormData): Pr
     }
 
     // Starts the 10-minute gap before "Email again" can send another
-    if (input.requiresSignature) await claimEmailSlot(input.contractId);
+    const slot = input.requiresSignature ? await claimRateSlot(contractEmailKey(input.contractId), CONTRACT_EMAIL_GAP_MS) : null;
     const { subject, content } = askEmail({
       projectName: actor.project.name,
       clientName: actor.project.clientName,
@@ -230,9 +223,9 @@ export async function createContract(_prev: ActionState, formData: FormData): Pr
       target: 'contracts',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    if (emailStatus !== 'sent' && input.requiresSignature) await releaseEmailSlot(input.contractId);
+    if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
     return done(
-      `${added(input.title, input.requiresSignature)}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`,
+      `${added(input.title, input.requiresSignature)}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`,
     );
   });
 }
@@ -246,7 +239,7 @@ const replaceSchema = z.object({
   // The original the studio had on screen, so two replacements at once cannot both land
   expectedFileId: fields.uuid,
   note: fields.optionalText('the note', 1000),
-  emailClient: checkbox,
+  emailClient: fields.checkbox,
 });
 
 export async function replaceContractDocument(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -289,7 +282,7 @@ export async function replaceContractDocument(_prev: ActionState, formData: Form
       await recordActivity({ projectId, actorId: actor.user.id, kind, summary, target: 'contracts' });
       return done(`${replaced} No email was sent.`);
     }
-    if (result.requiresSignature) await claimEmailSlot(input.contractId);
+    const slot = result.requiresSignature ? await claimRateSlot(contractEmailKey(input.contractId), CONTRACT_EMAIL_GAP_MS) : null;
     const { subject, content } = askEmail({
       projectName: actor.project.name,
       clientName: actor.project.clientName,
@@ -307,8 +300,8 @@ export async function replaceContractDocument(_prev: ActionState, formData: Form
       target: 'contracts',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    if (emailStatus !== 'sent' && result.requiresSignature) await releaseEmailSlot(input.contractId);
-    return done(`${replaced}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`);
+    if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
+    return done(`${replaced}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`);
   });
 }
 
@@ -319,7 +312,7 @@ const countersignSchema = z.object({
   contractId: fields.uuid,
   contractFileId: fields.uuid,
   note: fields.optionalText('the note', 1000),
-  emailClient: checkbox,
+  emailClient: fields.checkbox,
 });
 
 export async function uploadCountersigned(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -380,7 +373,7 @@ export async function uploadCountersigned(_prev: ActionState, formData: FormData
       target: 'contracts',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    return done(`${added}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`);
+    return done(`${added}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`);
   });
 }
 
@@ -390,9 +383,9 @@ const editSchema = z.object({
   projectId: fields.uuid,
   contractId: fields.uuid,
   ...contractFields,
-  requiresSignature: checkbox,
+  requiresSignature: fields.checkbox,
   // The signature box is only on the form while nothing is signed
-  signatureEditable: checkbox,
+  signatureEditable: fields.checkbox,
 });
 
 export async function editContract(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -449,7 +442,7 @@ export async function emailContractAgain(_prev: ActionState, formData: FormData)
         locked.status === 'reference' ? `${locked.title} doesn't ask for a signature.` : `${signedReason(locked, clientName)} already.`,
       );
     }
-    const slot = await claimEmailSlot(input.contractId);
+    const slot = await claimRateSlot(contractEmailKey(input.contractId), CONTRACT_EMAIL_GAP_MS);
     if (!slot.ok) {
       throw new ActionError(
         `${clientName} was emailed about this a few minutes ago. You can send another in ${plural(slot.waitMinutes, 'minute')}.`,
@@ -476,8 +469,8 @@ export async function emailContractAgain(_prev: ActionState, formData: FormData)
     });
     refresh(projectId);
     if (emailStatus === 'sent') return done(`Emailed ${clientName}${again ? ' again' : ''}.`);
-    await releaseEmailSlot(input.contractId);
-    if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName).trim());
+    await releaseRateSlot(slot);
+    if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName, contractKind('reminded', input.contractId)).trim());
     throw new ActionError(`The email to ${clientName} could not be sent. It is flagged on your dashboard; try again in a minute.`);
   });
 }
@@ -595,7 +588,7 @@ export async function recordContractSignature(_prev: ActionState, formData: Form
       email: { to: actor.project.clientEmail, subject, content },
     });
     return done(
-      `${recorded(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName)}`,
+      `${recorded(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName, contractKind('recorded', input.contractId))}`,
     );
   });
 }
@@ -619,7 +612,7 @@ export async function deleteContract(_prev: ActionState, formData: FormData): Pr
       // The bytes stay in storage for the studio; the files no longer download for the client
       const fileIds = files.map((entry) => entry.fileId);
       if (fileIds.length) await tx.update(file).set({ removedAt: new Date() }).where(inArray(file.id, fileIds));
-      await tx.delete(rateLimit).where(eq(rateLimit.key, `portal:contract-email:${locked.id}`));
+      await clearRateSlot(contractEmailKey(locked.id), tx);
       return locked.title;
     });
 
@@ -644,7 +637,7 @@ const signSchema = z.object({
   // What the client had on screen: if the document or its title changed, the signature is refused
   shownFileId: fields.uuid,
   shownTitle: z.string().max(400),
-  confirm: checkbox,
+  confirm: fields.checkbox,
   signedName: fields.requiredText('your full name', 120).pipe(z.string().min(2, { error: 'Enter your full name, as you would sign it.' })),
   note: fields.optionalText('the note', 2000),
 });
@@ -723,6 +716,7 @@ export async function signContract(_prev: ActionState, formData: FormData): Prom
     const clientName = clientNameOf(actor);
     const emails = signedEmails({
       clientName,
+      projectName: actor.project.name,
       title: result.title,
       filename: result.filename,
       sha256: result.sha256,
@@ -863,6 +857,7 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
     const clientName = clientNameOf(actor);
     const { subject, content } = signedCopyEmail({
       clientName,
+      projectName: actor.project.name,
       title: result.title,
       filename: result.filename,
       sha256: result.sha256,
@@ -948,21 +943,21 @@ export async function returnSignedCopy(_prev: ActionState, formData: FormData): 
     await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: returnedKind('returned', input.contractId, input.contractFileId),
+      kind: contractKind('returned', input.contractId, input.contractFileId),
       summary: `Sent back the signed copy of ${result.title}`,
       target: 'contracts',
     });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
-      kind: returnedKind('returnedNote', input.contractId, input.contractFileId),
+      kind: contractKind('returnedNote', input.contractId, input.contractFileId),
       summary: returnedNoteSummary(clientName, result.title, input.reason),
       target: 'contracts',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
     });
     return done(
-      `${sentBack(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName)}`,
+      `${sentBack(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName, contractKind('returnedNote', input.contractId, input.contractFileId))}`,
     );
   });
 }

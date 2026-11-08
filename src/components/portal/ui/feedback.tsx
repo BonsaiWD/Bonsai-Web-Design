@@ -1,8 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import styled, { css } from 'styled-components';
-import { FiAlertCircle, FiCheck, FiInfo } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiInfo, FiLock } from 'react-icons/fi';
 import { radius, space, tint, type } from './tokens';
 
 /*
@@ -167,5 +167,87 @@ export function Notice({ tone = 'info', children }: { tone?: 'info' | 'alert'; c
       {tone === 'alert' ? <FiAlertCircle aria-hidden="true" /> : <FiInfo aria-hidden="true" />}
       <div>{children}</div>
     </NoticeWrap>
+  );
+}
+
+/* ---------- Status line ---------- */
+
+const StatusText = styled.p<{ $error: boolean }>`
+  ${type.meta}
+  display: flex;
+  align-items: flex-start;
+  gap: ${space[2]};
+  color: ${({ $error, theme }) => ($error ? theme.colors.error : theme.colors.text)};
+
+  &:focus {
+    outline: none;
+  }
+
+  /* Out of the layout while empty, so it adds no gap, but still in the page to announce */
+  &[data-empty='true'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 0.2em;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+// Always rendered, so a screen reader hears each new message. Dialogs that close on success
+// move focus here, since the button that opened them may be gone.
+export const StatusLine = forwardRef<HTMLParagraphElement, { message: string; error?: boolean; className?: string }>(function StatusLine(
+  { message, error = false, className },
+  ref,
+) {
+  return (
+    <StatusText ref={ref} className={className} role="status" aria-live="polite" tabIndex={-1} data-empty={!message} $error={error}>
+      {message && !error && <FiCheck aria-hidden="true" />}
+      {message}
+    </StatusText>
+  );
+});
+
+export type Announce = (message: string, focus?: boolean, error?: boolean) => void;
+
+// A status line and the function that fills it. Focus moves in an effect, after React has
+// committed: by then an item that changed group has moved, and focus stays on it.
+export function useAnnouncer() {
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const [status, setStatus] = useState({ message: '', error: false, focus: false, at: 0 });
+  useEffect(() => {
+    if (status.focus) statusRef.current?.focus();
+  }, [status]);
+  const announce = useCallback<Announce>((message, focus = true, error = false) => setStatus({ message, error, focus, at: Date.now() }), []);
+  return { statusRef, message: status.message, error: status.error, announce };
+}
+
+/* ---------- Client-only actions, in the studio's preview ---------- */
+
+const OnlyClientText = styled.p`
+  ${type.meta}
+  display: flex;
+  align-items: flex-start;
+  gap: ${space[2]};
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 0.2em;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+// "Only Jane Doe can approve this.": what an admin previewing as the client sees instead of a
+// button the server would refuse
+export function ClientOnlyNote({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <OnlyClientText className={className}>
+      <FiLock aria-hidden="true" />
+      <span>{children}</span>
+    </OnlyClientText>
   );
 }

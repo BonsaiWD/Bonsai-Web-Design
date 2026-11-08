@@ -22,6 +22,7 @@ import {
   PanelHeader,
   PHONE,
   Rows,
+  sansHeading,
   space,
   Split,
   Stack,
@@ -34,7 +35,6 @@ import {
 } from '@/components/portal/ui';
 import { HowToPay } from './HowToPay';
 import { METHOD_DETAILS, METHOD_LABELS } from './labels';
-import { sansHeading } from './parts';
 import type { PaymentMethodView } from './types';
 
 const Header = styled.header`
@@ -184,7 +184,8 @@ export default function PaymentSettingsView({ methods, version }: { methods: Pay
       </Header>
 
       <Split>
-        <ActionForm action={savePaymentSettings} aria-labelledby={listHeadingId}>
+        {/* The view compares the draft with the saved settings itself */}
+        <ActionForm action={savePaymentSettings} aria-labelledby={listHeadingId} guardUnsaved={false}>
           <ListPanel aria-labelledby={listHeadingId}>
             <PanelHeader>
               <H2 id={listHeadingId}>How clients can pay</H2>

@@ -2,10 +2,12 @@ import { betterAuth } from 'better-auth/minimal';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { magicLink } from 'better-auth/plugins/magic-link';
 import { waitUntil } from '@vercel/functions';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import * as schema from '@/db/schema';
 import { sendEmail } from '@/lib/email';
+// Only the rate_limit helpers, which depend on nothing else in the portal
+import { countInWindow } from '@/server/portal/throttle';
 
 export const LINK_LIFETIME_MINUTES = 15;
 
@@ -35,16 +37,8 @@ const ADDRESS_CAPS = [
 async function withinAddressCaps(email: string): Promise<boolean> {
     const now = Date.now();
     for (const cap of ADDRESS_CAPS) {
-        // One atomic upsert per window; last_request holds when the window started
-        const key = `portal:signin:${cap.window}:${email}`;
-        const result = await getDb().execute<{ count: number }>(sql`
-            INSERT INTO rate_limit (id, key, count, last_request)
-            VALUES (gen_random_uuid()::text, ${key}, 1, ${now})
-            ON CONFLICT (key) DO UPDATE SET
-                count = CASE WHEN rate_limit.last_request < ${now - cap.ms} THEN 1 ELSE rate_limit.count + 1 END,
-                last_request = CASE WHEN rate_limit.last_request < ${now - cap.ms} THEN ${now} ELSE rate_limit.last_request END
-            RETURNING count`);
-        if (Number(result.rows[0]?.count ?? 0) > cap.max) return false;
+        const { count } = await countInWindow(`portal:signin:${cap.window}:${email}`, 1, cap.ms, { now });
+        if (count > cap.max) return false;
     }
     return true;
 }

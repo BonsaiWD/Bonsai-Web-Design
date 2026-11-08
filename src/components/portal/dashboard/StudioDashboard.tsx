@@ -14,6 +14,7 @@ import {
   focusRing,
   H1,
   ListPanel,
+  MetaLine,
   Notice,
   PHONE,
   Panel,
@@ -23,7 +24,7 @@ import {
   tint,
   type,
 } from '../ui';
-import { ActivityPanel, AttentionPanel, DeadlinePanel, itemHref, MetaLine, PanelTitle, sinceLabel, ToneMarker } from './parts';
+import { ActivityPanel, AttentionPanel, DeadlinePanel, itemHref, PanelTitle, sinceLabel, ToneMarker } from './parts';
 import { ProjectsTable } from './ProjectsTable';
 import type { ActivityView, AttentionItem, DeadlineItem, ProjectCardView, StudioStats } from './types';
 
@@ -420,7 +421,6 @@ export default function StudioDashboard({
                 id="dashboard-activity"
                 title="Recent activity"
                 items={activity}
-                perspective="studio"
                 showProject
                 empty="Nothing has happened yet. Changes, decisions and emails are logged here."
                 note="Across every project, studio-only entries included"

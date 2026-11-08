@@ -123,6 +123,12 @@ export const type = {
 
 // The portal is an app: people point at small targets, so the native cursor comes back
 // (the marketing site's CursorGlow hides it on wide, fine-pointer screens)
+// Small headings (h4, h5) in the portal's sans; the site's global rule would set them in Playfair
+export const sansHeading = css`
+  font-family: ${({ theme }) => theme.fonts.main};
+  letter-spacing: 0;
+`;
+
 export const nativeCursor = css`
   @media ${CUSTOM_CURSOR_QUERY} {
     &,
