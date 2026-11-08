@@ -6,8 +6,8 @@ import { FiArrowLeft, FiPrinter } from 'react-icons/fi';
 import { projectHref } from '@/components/portal/tabs';
 import { Button, H3, Meta, Panel, PHONE, space, Split, Stack, TextLink } from '@/components/portal/ui';
 import { ClientPayment } from './ClientPayment';
-import { HowToPay } from './HowToPay';
 import { InvoiceEditor } from './InvoiceEditor';
+import { listMethods } from './labels';
 import { StatusLine, useAnnouncer } from './parts';
 import { PrintStyles } from './PrintStyles';
 import { Statement } from './Statement';
@@ -61,6 +61,7 @@ export default function InvoiceView({ projectId, perspective, canPay, today, inv
   const [editing, setEditing] = useState(false);
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const editorHeadingId = useId();
+  const payHeadingId = useId();
   const editorPanel = useRef<HTMLElement>(null);
 
   // A draft that has just been sent cannot be edited any more
@@ -134,16 +135,16 @@ export default function InvoiceView({ projectId, perspective, canPay, today, inv
                 statusRef={statusRef}
               />
               {invoice.status !== 'paid' && invoice.status !== 'void' && (
-                <Panel>
-                  <HowToPay
-                    methods={methods}
-                    invoiceNumber={invoice.number}
-                    note={
-                      <Meta data-print-hide>
-                        As {parties.clientName} sees it. <TextLink href="/portal/admin/settings">Edit payment settings</TextLink>
-                      </Meta>
-                    }
-                  />
+                <Panel aria-labelledby={payHeadingId} data-print-hide>
+                  <Stack $gap={2}>
+                    <H3 id={payHeadingId}>How to pay</H3>
+                    <Meta>
+                      {methods.length
+                        ? `${parties.clientName} sees ${methods.length === 1 ? 'one way' : `${methods.length} ways`} to pay: ${listMethods(methods.map((method) => method.method))}, each with a Copy button.`
+                        : `No methods are turned on, so ${parties.clientName} is told you'll send payment details separately.`}{' '}
+                      <TextLink href="/portal/admin/settings">Edit payment settings</TextLink>
+                    </Meta>
+                  </Stack>
                 </Panel>
               )}
             </>

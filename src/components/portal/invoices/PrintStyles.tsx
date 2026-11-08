@@ -73,6 +73,17 @@ export const PrintStyles = createGlobalStyle`
       break-inside: avoid;
     }
 
+    /* Payment details start on a fresh page rather than leave their heading behind */
+    [data-print-root] aside {
+      break-inside: avoid;
+    }
+
+    [data-print-root] h2,
+    [data-print-root] h3,
+    [data-print-root] h4 {
+      break-after: avoid;
+    }
+
     [data-print-root] [data-statement] {
       gap: 8mm !important;
     }

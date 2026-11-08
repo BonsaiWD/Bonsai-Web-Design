@@ -144,8 +144,8 @@ function parseLines(formData: FormData): { lines: ParsedLine[]; errors: Record<s
   const errors: Record<string, string> = {};
   for (const [key, row] of rows) {
     const description = row.description.replace(/\s+/g, ' ').trim();
-    // A row left completely empty is a spare, not a mistake
-    if (!description && !row.quantity.trim() && !row.unitPrice.trim()) continue;
+    // A row with no description and no price is a spare (its quantity starts at 1), not a mistake
+    if (!description && !row.unitPrice.trim()) continue;
     const name = (field: string) => `item.${key}.${field}`;
     if (!description) errors[name('description')] = 'Describe this line.';
     else if (description.length > 300) errors[name('description')] = 'Keep the description under 300 characters.';
@@ -461,6 +461,8 @@ export async function markInvoicePaid(_prev: ActionState, formData: FormData): P
       target: 'invoices',
       email: { to: actor.project.clientEmail, subject, content },
     });
+    // A receipt that did not go out must not hold up "Email the receipt again"
+    if (emailStatus !== 'sent') await releaseEmailSlot(row.id);
     return done(
       `Marked ${row.number} paid.${emailStatus === 'sent' ? ` We emailed ${clientName} a receipt.` : emailNote(emailStatus, clientName)}`,
     );
@@ -501,6 +503,7 @@ export async function markPaymentNotReceived(_prev: ActionState, formData: FormD
       target: 'invoices',
       email: { to: actor.project.clientEmail, subject, content },
     });
+    if (emailStatus !== 'sent') await releaseEmailSlot(row.id);
     return done(`Reopened ${row.number}.${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName)}`);
   });
 }

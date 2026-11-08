@@ -432,7 +432,7 @@ export function InvoiceEditor({ mode, projectId, clientName, today, saved, onCan
                     label="Description"
                     line={index + 1}
                     saved={row.saved.description}
-                    placeholder="Homepage design"
+                    placeholder={index === 0 ? 'Homepage design' : undefined}
                     inputRef={(element) => {
                       if (element) descriptionInputs.current.set(row.key, element);
                       else descriptionInputs.current.delete(row.key);
