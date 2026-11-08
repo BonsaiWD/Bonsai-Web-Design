@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useState } from 'react';
 import styled from 'styled-components';
 import { FiChevronRight, FiUserPlus } from 'react-icons/fi';
 import { createProject } from '@/app/portal/_actions/projects';
@@ -14,6 +14,7 @@ import {
   FormActions,
   FormMessage,
   FormStack,
+  GuardedLink,
   H1,
   H2,
   LAPTOP,
@@ -27,6 +28,7 @@ import {
   TextLink,
   tint,
   type,
+  useUnsavedChanges,
 } from '../ui';
 import { FreshFields, sansHeading } from './parts';
 import ProjectFields from './ProjectFields';
@@ -124,6 +126,9 @@ interface NewProjectViewProps {
 }
 
 export default function NewProjectView({ formId, clients, preselect }: NewProjectViewProps) {
+  // Leaving with a half-filled form asks first: the breadcrumb, Cancel, the shell or a reload
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
   const initialClient =
     preselect && clients.some((client) => client.id === preselect) ? preselect : clients.length === 1 ? clients[0].id : '';
 
@@ -133,7 +138,7 @@ export default function NewProjectView({ formId, clients, preselect }: NewProjec
         <Crumbs aria-label="Breadcrumb">
           <ol>
             <li>
-              <Link href="/portal">Overview</Link>
+              <GuardedLink href="/portal">Overview</GuardedLink>
               <FiChevronRight aria-hidden="true" />
             </li>
             <li aria-current="page">New project</li>
@@ -160,7 +165,8 @@ export default function NewProjectView({ formId, clients, preselect }: NewProjec
           <Panel aria-labelledby="new-project-heading">
             <Stack $gap={6}>
               <H2 id="new-project-heading">Project details</H2>
-              <ActionForm action={createProject}>
+              {/* A successful create redirects to the new project, which unmounts the guard */}
+              <ActionForm action={createProject} onChange={() => setDirty(true)}>
                 <FormStack>
                   <FreshFields>
                     <Field
