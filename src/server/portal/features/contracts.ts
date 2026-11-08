@@ -308,7 +308,9 @@ export async function claimEmailSlot(contractId: string): Promise<{ ok: true } |
 
 // An email that did not go out should not block the next try
 export async function releaseEmailSlot(contractId: string): Promise<void> {
-  await getDb().delete(rateLimit).where(eq(rateLimit.key, throttleKey(contractId)));
+  await getDb()
+    .delete(rateLimit)
+    .where(eq(rateLimit.key, throttleKey(contractId)));
 }
 
 /* ---------- Emails ---------- */
@@ -368,7 +370,12 @@ export function askEmail(input: AskEmailInput): { subject: string; content: Emai
   return {
     subject,
     content: {
-      heading: input.kind === 'reminder' ? `${input.title} is waiting for your signature` : `${input.title} is ready for your signature`,
+      heading:
+        input.kind === 'reminder'
+          ? `${input.title} is waiting for your signature`
+          : input.kind === 'replaced'
+            ? `A new version of ${input.title} is ready for your signature`
+            : `${input.title} is ready for your signature`,
       paragraphs: [
         greeting(input.clientName),
         opening,
@@ -551,11 +558,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       .innerJoin(project, eq(project.id, contract.projectId))
       .innerJoin(user, eq(user.id, project.clientId))
       .where(
-        and(
-          eq(contractSignature.source, 'client'),
-          gte(contractSignature.signedAt, sql`now() - interval '7 days'`),
-          projectScope(context),
-        ),
+        and(eq(contractSignature.source, 'client'), gte(contractSignature.signedAt, sql`now() - interval '7 days'`), projectScope(context)),
       ),
     db
       .select({

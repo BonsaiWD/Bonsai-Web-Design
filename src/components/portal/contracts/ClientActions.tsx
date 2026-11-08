@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import styled from 'styled-components';
+import MetaDot from '@/components/common/MetaDot';
 import { FiEdit3, FiLock, FiUpload } from 'react-icons/fi';
 import { signContract, uploadSignedCopy } from '@/app/portal/_actions/contracts';
 import { formatBytes } from '@/components/portal/deliverables/copy';
@@ -55,6 +56,10 @@ const Signing = styled.div`
     align-self: flex-start;
     margin-top: ${space[1]};
   }
+`;
+
+const Dot = styled(MetaDot)`
+  margin: 0 ${space[1]};
 `;
 
 const StatementBox = styled.div`
@@ -145,51 +150,51 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
       {/* The form mounts on opening, in the browser, so each opening gets its own id */}
       <InsetPanel id={panelId} ref={panelRef} hidden={!uploadOpen || !awaiting}>
         {uploadOpen && (
-        <ActionForm
-          action={uploadSignedCopy}
-          onSuccess={(state) => {
-            setUploadOpen(false);
-            landed(state);
-          }}
-        >
-          <FormStack>
-            <UploadField
-              label="Your signed copy"
-              hint={`Signed on paper? Upload a scan or photo of the signed pages, or the signed PDF, up to ${Math.round(limits.maxUploadBytes / (1024 * 1024))} MB.`}
-              acceptedExtensions={limits.acceptedExtensions}
-              maxUploadBytes={limits.maxUploadBytes}
-            />
-            <Field label="Note" name="note" optional>
-              {(control) => (
-                <Textarea
-                  id={control.id}
-                  name={control.name}
-                  defaultValue={control.defaultValue}
-                  aria-describedby={control.describedBy}
-                  aria-invalid={control.invalid || undefined}
-                  rows={2}
-                  maxLength={1000}
-                />
-              )}
-            </Field>
-            <FormActions>
-              <SubmitButton pendingLabel="Uploading…">Upload signed copy</SubmitButton>
-              <Button
-                $variant="quiet"
-                onClick={() => {
-                  setUploadOpen(false);
-                  uploadButtonRef.current?.focus();
-                }}
-              >
-                Cancel
-              </Button>
-              <FormMessage />
-            </FormActions>
-          </FormStack>
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="contractId" value={contract.id} />
-          <FreshId name="contractFileId" />
-        </ActionForm>
+          <ActionForm
+            action={uploadSignedCopy}
+            onSuccess={(state) => {
+              setUploadOpen(false);
+              landed(state);
+            }}
+          >
+            <FormStack>
+              <UploadField
+                label="Your signed copy"
+                hint={`Signed on paper? Upload a scan or photo of the signed pages, or the signed PDF, up to ${Math.round(limits.maxUploadBytes / (1024 * 1024))} MB.`}
+                acceptedExtensions={limits.acceptedExtensions}
+                maxUploadBytes={limits.maxUploadBytes}
+              />
+              <Field label="Note" name="note" optional>
+                {(control) => (
+                  <Textarea
+                    id={control.id}
+                    name={control.name}
+                    defaultValue={control.defaultValue}
+                    aria-describedby={control.describedBy}
+                    aria-invalid={control.invalid || undefined}
+                    rows={2}
+                    maxLength={1000}
+                  />
+                )}
+              </Field>
+              <FormActions>
+                <SubmitButton pendingLabel="Uploading…">Upload signed copy</SubmitButton>
+                <Button
+                  $variant="quiet"
+                  onClick={() => {
+                    setUploadOpen(false);
+                    uploadButtonRef.current?.focus();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <FormMessage />
+              </FormActions>
+            </FormStack>
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="contractId" value={contract.id} />
+            <FreshId name="contractFileId" />
+          </ActionForm>
         )}
       </InsetPanel>
 
@@ -217,7 +222,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             <span>You are signing</span>
             <strong>{original.filename}</strong>
             <span>
-              {formatBytes(original.sizeBytes)} · SHA-256 {shortSha(original.sha256)}…
+              {formatBytes(original.sizeBytes)} <Dot aria-hidden="true" /> SHA-256 {shortSha(original.sha256)}…
             </span>
             {original.previewable ? (
               <TextAnchor href={fileHref(original.fileId, true)} target="_blank" rel="noopener noreferrer">

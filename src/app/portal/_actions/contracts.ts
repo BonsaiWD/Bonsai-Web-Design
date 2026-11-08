@@ -116,7 +116,11 @@ async function withUpload<T extends { duplicate: boolean }>(
   const db = getDb();
   const stored = upload ? await storeUpload({ projectId: actor.project.id, purpose: 'contract', uploadedBy: actor.user.id, upload }) : null;
   const drop = async () => {
-    if (stored) await db.delete(file).where(eq(file.id, stored.id)).catch(() => undefined);
+    if (stored)
+      await db
+        .delete(file)
+        .where(eq(file.id, stored.id))
+        .catch(() => undefined);
   };
   let result: T;
   try {
@@ -335,7 +339,13 @@ export async function uploadCountersigned(_prev: ActionState, formData: FormData
       const inserted = stored
         ? await tx
             .insert(contractFile)
-            .values({ id: input.contractFileId, contractId: locked.id, fileId: stored.id, label: 'countersigned', uploadedBy: actor.user.id })
+            .values({
+              id: input.contractFileId,
+              contractId: locked.id,
+              fileId: stored.id,
+              label: 'countersigned',
+              uploadedBy: actor.user.id,
+            })
             .onConflictDoNothing({ target: contractFile.id })
             .returning({ id: contractFile.id })
         : [];
@@ -539,7 +549,13 @@ export async function recordContractSignature(_prev: ActionState, formData: Form
       if (stored) {
         await tx
           .insert(contractFile)
-          .values({ id: input.contractFileId, contractId: locked.id, fileId: stored.id, label: 'client_signed', uploadedBy: actor.user.id });
+          .values({
+            id: input.contractFileId,
+            contractId: locked.id,
+            fileId: stored.id,
+            label: 'client_signed',
+            uploadedBy: actor.user.id,
+          });
       }
       return {
         duplicate: false as const,
@@ -572,7 +588,9 @@ export async function recordContractSignature(_prev: ActionState, formData: Form
       target: 'contracts',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    return done(`${recorded(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName)}`);
+    return done(
+      `${recorded(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName)}`,
+    );
   });
 }
 
@@ -621,9 +639,7 @@ const signSchema = z.object({
   shownFileId: fields.uuid,
   shownTitle: z.string().max(400),
   confirm: checkbox,
-  signedName: fields
-    .requiredText('your full name', 120)
-    .pipe(z.string().min(2, { error: 'Enter your full name, as you would sign it.' })),
+  signedName: fields.requiredText('your full name', 120).pipe(z.string().min(2, { error: 'Enter your full name, as you would sign it.' })),
   note: fields.optionalText('the note', 2000),
 });
 
@@ -649,7 +665,7 @@ export async function signContract(_prev: ActionState, formData: FormData): Prom
       const original = locked.original;
       if (!original) throw new ActionError('This contract has no document to sign yet. Reload the page.');
       if (original.fileId !== input.shownFileId) {
-        throw new ActionError('We just replaced this document with a new version. Please read it, then sign again.');
+        throw new ActionError('We just replaced this document with a new version. Reload the page, read the new one, then sign it.');
       }
       if (locked.title !== input.shownTitle) {
         throw new ActionError(`This contract was just renamed to ${locked.title}. Reload the page, check it, then sign again.`);
@@ -769,7 +785,13 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
       const inserted = stored
         ? await tx
             .insert(contractFile)
-            .values({ id: input.contractFileId, contractId: locked.id, fileId: stored.id, label: 'client_signed', uploadedBy: actor.user.id })
+            .values({
+              id: input.contractFileId,
+              contractId: locked.id,
+              fileId: stored.id,
+              label: 'client_signed',
+              uploadedBy: actor.user.id,
+            })
             .onConflictDoNothing({ target: contractFile.id })
             .returning({ id: contractFile.id })
         : [];

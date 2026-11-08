@@ -4,31 +4,36 @@ import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiTrash2 } from 'react-icons/fi';
 import { removeProjectFile } from '@/app/portal/_actions/files';
+import MetaDot from '@/components/common/MetaDot';
 import { formatBytes } from '@/components/portal/deliverables/copy';
-import { MetaLine } from '@/components/portal/deliverables/parts';
 import {
   ActionForm,
   Button,
   FormMessage,
+  IconButton,
   LocalTime,
   PHONE,
   space,
   SubmitButton,
   tint,
   type,
-  VisuallyHidden,
   type ActionState,
 } from '@/components/portal/ui';
 import { FileButtons, FileGlyph } from './parts';
 import type { ProjectFileView } from './types';
 
+// Name on the left, actions on the right at every width but phones, where they stack below
 const Item = styled.li`
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: ${space[3]} ${space[5]};
   padding: ${space[5]} ${space[6]};
   scroll-margin-top: ${space[8]};
+
+  /* The removal question takes its own line */
+  &[data-asking='true'] {
+    flex-wrap: wrap;
+  }
 
   /* Arriving from an email or a dashboard link */
   &:target {
@@ -36,6 +41,7 @@ const Item = styled.li`
   }
 
   @media (max-width: ${PHONE}) {
+    flex-wrap: wrap;
     padding: ${space[4]} ${space[5]};
   }
 `;
@@ -44,7 +50,7 @@ const Main = styled.div`
   display: flex;
   align-items: flex-start;
   gap: ${space[4]};
-  flex: 1 1 20rem;
+  flex: 1 1 auto;
   min-width: 0;
 `;
 
@@ -61,6 +67,21 @@ const Body = styled.div`
   }
 `;
 
+// Size and uploader on one line, the time on the next: the text column beside the actions is
+// narrow, and this way no dot is ever left dangling at the end of a wrapped line
+const FileMeta = styled.p`
+  ${type.meta}
+  ${type.figures}
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 ${space[3]};
+
+  > [data-break] {
+    flex-basis: 100%;
+  }
+`;
+
 // What the uploader wrote with it, as a quiet quotation under the name
 const Note = styled.p`
   ${type.meta}
@@ -74,16 +95,32 @@ const Note = styled.p`
 `;
 
 const Actions = styled.div`
+  flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: ${space[2]};
 
   @media (max-width: ${PHONE}) {
     width: 100%;
 
-    > * {
+    > [role='group'] {
       flex: 1 1 auto;
+      width: auto;
+    }
+  }
+`;
+
+// Quiet until hovered, and set apart from Download by a little more space
+const RemoveButton = styled(IconButton)`
+  margin-left: ${space[1]};
+  border-color: transparent;
+  color: ${({ theme }) => theme.colors.textSecondary};
+
+  @media (hover: hover) {
+    &:hover:not([aria-disabled='true']) {
+      color: ${({ theme }) => theme.colors.error};
+      border-color: ${({ theme }) => tint(theme.colors.error, 45)};
+      background: ${({ theme }) => tint(theme.colors.error, 8)};
     }
   }
 `;
@@ -144,16 +181,23 @@ export function FileItem({ projectId, item, byline, canRemove, removeQuestion, o
   };
 
   return (
-    <Item id={`file-${item.id}`}>
+    <Item id={`file-${item.id}`} data-asking={asking}>
       <Main>
         <FileGlyph filename={item.filename} />
         <Body>
           <p>{item.filename}</p>
-          <MetaLine>
-            {formatBytes(item.sizeBytes)}
-            {byline}
-            <LocalTime value={item.uploadedAt} />
-          </MetaLine>
+          <FileMeta>
+            <span>{formatBytes(item.sizeBytes)}</span>
+            {byline && (
+              <>
+                <MetaDot aria-hidden="true" />
+                <span>{byline}</span>
+              </>
+            )}
+            <span data-break>
+              <LocalTime value={item.uploadedAt} />
+            </span>
+          </FileMeta>
           {item.note && <Note>{item.note}</Note>}
         </Body>
       </Main>
@@ -162,11 +206,9 @@ export function FileItem({ projectId, item, byline, canRemove, removeQuestion, o
         <Actions>
           <FileButtons fileId={item.id} filename={item.filename} previewable={item.previewable} />
           {canRemove && (
-            <Button ref={triggerRef} $variant="quiet" onClick={() => setAsking(true)}>
+            <RemoveButton ref={triggerRef} aria-label={`Remove ${item.filename}`} title="Remove" onClick={() => setAsking(true)}>
               <FiTrash2 aria-hidden="true" />
-              Remove
-              <VisuallyHidden> {item.filename}</VisuallyHidden>
-            </Button>
+            </RemoveButton>
           )}
         </Actions>
       )}

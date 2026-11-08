@@ -121,7 +121,16 @@ interface StudioActionsProps {
 
 const limitText = (limits: UploadLimits) => `${Math.round(limits.maxUploadBytes / (1024 * 1024))} MB`;
 
-export function StudioActions({ projectId, contract, clientName, limits, announce, statusRef, lastMessage, onDeleted }: StudioActionsProps) {
+export function StudioActions({
+  projectId,
+  contract,
+  clientName,
+  limits,
+  announce,
+  statusRef,
+  lastMessage,
+  onDeleted,
+}: StudioActionsProps) {
   const replace = useDialog();
   const record = useDialog();
   const countersign = useDialog();
@@ -153,25 +162,21 @@ export function StudioActions({ projectId, contract, clientName, limits, announc
     return result;
   };
 
-  const blockedBy = signature
-    ? signature.source === 'client'
-      ? (
-          <>
-            signed by {signature.byName || clientName} on <LocalTime value={signature.signedAt} />
-          </>
-        )
-      : (
-          <>
-            signature recorded on <LocalTime value={signature.signedAt} />
-          </>
-        )
-    : contract.signedCopy
-      ? (
-          <>
-            {clientName} uploaded a signed copy on <LocalTime value={contract.signedCopy.uploadedAt} />
-          </>
-        )
-      : null;
+  const blockedBy = signature ? (
+    signature.source === 'client' ? (
+      <>
+        signed by {signature.byName || clientName} on <LocalTime value={signature.signedAt} />
+      </>
+    ) : (
+      <>
+        signature recorded on <LocalTime value={signature.signedAt} />
+      </>
+    )
+  ) : contract.signedCopy ? (
+    <>
+      {clientName} uploaded a signed copy on <LocalTime value={contract.signedCopy.uploadedAt} />
+    </>
+  ) : null;
 
   const row = (
     <CardActions>
@@ -239,7 +244,10 @@ export function StudioActions({ projectId, contract, clientName, limits, announc
           <Tool>
             <div>
               <h5>Record a signature</h5>
-              <p>For when {clientName} signed outside the portal, on paper or by email. Add a note saying how, and attach their signed copy if you have it.</p>
+              <p>
+                For when {clientName} signed outside the portal, on paper or by email. Add a note saying how, and attach their signed copy
+                if you have it.
+              </p>
             </div>
             <div>
               <Button $variant="secondary" onClick={record.openDialog}>

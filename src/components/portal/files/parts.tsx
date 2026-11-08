@@ -38,9 +38,7 @@ export const GlyphTile = styled.span`
 export function FileGlyph({ filename }: { filename: string }) {
   const extension = extensionOf(filename);
   return (
-    <GlyphTile aria-hidden="true">
-      {IMAGE.has(extension) ? <FiImage /> : extension === 'zip' ? <FiArchive /> : <FiFileText />}
-    </GlyphTile>
+    <GlyphTile aria-hidden="true">{IMAGE.has(extension) ? <FiImage /> : extension === 'zip' ? <FiArchive /> : <FiFileText />}</GlyphTile>
   );
 }
 
@@ -50,6 +48,7 @@ const Group = styled.div`
   gap: ${space[2]};
 
   @media (max-width: ${PHONE}) {
+    flex-wrap: nowrap;
     width: 100%;
 
     > a {

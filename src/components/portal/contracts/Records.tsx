@@ -84,7 +84,15 @@ function Entry({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function SignatureRecord({ contract, perspective, clientName }: { contract: ContractView; perspective: Perspective; clientName: string }) {
+export function SignatureRecord({
+  contract,
+  perspective,
+  clientName,
+}: {
+  contract: ContractView;
+  perspective: Perspective;
+  clientName: string;
+}) {
   const studio = perspective === 'studio';
   const signature = contract.signature;
 
@@ -124,7 +132,8 @@ export function SignatureRecord({ contract, perspective, clientName }: { contrac
         ) : (
           <>
             <RecordLine>
-              Signature recorded by {studio && signature.byName ? signature.byName : 'the studio'} on <LocalTime value={signature.signedAt} />
+              Signature recorded by {studio && signature.byName ? signature.byName : 'the studio'} on{' '}
+              <LocalTime value={signature.signedAt} />
             </RecordLine>
             <MetaLine>Signed outside the portal</MetaLine>
           </>
@@ -211,7 +220,15 @@ function stateOf(entry: ContractFileView, contract: ContractView): string | null
   return 'Replaced';
 }
 
-export function FileHistory({ contract, perspective, clientName }: { contract: ContractView; perspective: Perspective; clientName: string }) {
+export function FileHistory({
+  contract,
+  perspective,
+  clientName,
+}: {
+  contract: ContractView;
+  perspective: Perspective;
+  clientName: string;
+}) {
   const files = contract.files;
   if (files.length === 0) return null;
   return (

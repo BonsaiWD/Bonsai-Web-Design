@@ -52,7 +52,8 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
       input = parseForm(uploadSchema, formData);
     } catch (error) {
       // Report a missing file alongside any other problem
-      if (error instanceof ActionError && !chosen) throw new ActionError(error.message, { file: 'Choose a file to upload.', ...error.fieldErrors });
+      if (error instanceof ActionError && !chosen)
+        throw new ActionError(error.message, { file: 'Choose a file to upload.', ...error.fieldErrors });
       throw error;
     }
     if (!chosen) throw new ActionError('Choose a file to upload.', { file: 'Choose a file to upload.' });
@@ -146,7 +147,10 @@ export async function removeProjectFile(_prev: ActionState, formData: FormData):
       }
       // A second click: it is already gone
       if (row.removedAt) return { filename: row.filename, repeat: true };
-      await tx.update(file).set({ removedAt: sql`now()` }).where(eq(file.id, row.id));
+      await tx
+        .update(file)
+        .set({ removedAt: sql`now()` })
+        .where(eq(file.id, row.id));
       return { filename: row.filename, repeat: false };
     });
 

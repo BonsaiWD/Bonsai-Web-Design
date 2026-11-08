@@ -102,14 +102,13 @@ export async function loadProjectFiles(projectId: string, perspective: Perspecti
       previewable: INLINE_TYPES.has(row.contentType),
       uploadedAt: row.createdAt.toISOString(),
       side: row.uploaderRole === 'admin' ? 'studio' : 'client',
-      uploadedByName: row.uploaderName,
+      // Which of the two of us uploaded it matters to the studio only
+      uploadedByName: studio || row.uploaderRole !== 'admin' ? row.uploaderName : 'the studio',
       mine: row.uploadedBy === viewerId,
       note: summary ? noteFromSummary(summary, row.filename) : null,
       ...(studio
         ? {
-            removed: row.removedAt
-              ? (removedBy.get(row.id) ?? { at: row.removedAt.toISOString(), byName: null })
-              : null,
+            removed: row.removedAt ? (removedBy.get(row.id) ?? { at: row.removedAt.toISOString(), byName: null }) : null,
           }
         : {}),
     } satisfies ProjectFileView;
@@ -138,7 +137,9 @@ export async function claimUpload(uploadId: string): Promise<boolean> {
 
 // A failed upload must not block the corrected retry from the same form
 export async function releaseUpload(uploadId: string): Promise<void> {
-  await getDb().delete(rateLimit).where(eq(rateLimit.key, uploadKey(uploadId)));
+  await getDb()
+    .delete(rateLimit)
+    .where(eq(rateLimit.key, uploadKey(uploadId)));
 }
 
 /* ---------- Attention ---------- */
@@ -183,7 +184,8 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       tab: 'files' as const,
       anchor: list.length === 1 ? fileAnchor(newest.id) : undefined,
       title: list.length === 1 ? `${who} shared ${newest.filename}` : `${who} shared ${list.length} files`,
-      detail: list.length > 1 ? `${shown.join(', ')}${list.length > shown.length ? `, and ${list.length - shown.length} more` : ''}` : undefined,
+      detail:
+        list.length > 1 ? `${shown.join(', ')}${list.length > shown.length ? `, and ${list.length - shown.length} more` : ''}` : undefined,
       since: newest.createdAt.toISOString(),
       tone: 'info' as const,
     };

@@ -1,6 +1,7 @@
 'use client';
 
 import styled from 'styled-components';
+import MetaDot from '@/components/common/MetaDot';
 import { formatBytes } from '@/components/portal/deliverables/copy';
 import { LocalTime, PHONE, space, tint, type } from '@/components/portal/ui';
 import { FileButtons, FileGlyph } from '../files/parts';
@@ -59,6 +60,26 @@ const Body = styled.span`
     ${type.figures}
     overflow-wrap: anywhere;
   }
+
+  /* On phones the second fact takes its own line instead of leaving a dot at a line end */
+  @media (max-width: ${PHONE}) {
+    small [data-break] {
+      display: block;
+    }
+
+    small [data-dot] {
+      display: none;
+    }
+  }
+`;
+
+// Inline in running meta text, so it sits on the text's midline
+const Dot = styled(MetaDot)`
+  margin: 0 ${space[1]};
+`;
+
+const Nowrap = styled.span`
+  white-space: nowrap;
 `;
 
 // The short fingerprint, with the full one on hover; the record lists it in full
@@ -72,15 +93,21 @@ function detail(entry: ContractFileView, perspective: Perspective) {
   if (entry.label === 'original') {
     return (
       <>
-        {size} · SHA-256 <Sha title={entry.sha256}>{shortSha(entry.sha256)}…</Sha>
+        {size} <Dot aria-hidden="true" data-dot />{' '}
+        <Nowrap data-break>
+          SHA-256 <Sha title={entry.sha256}>{shortSha(entry.sha256)}…</Sha>
+        </Nowrap>
       </>
     );
   }
   const who = perspective === 'studio' && entry.uploadedByName ? ` by ${entry.uploadedByName}` : '';
   return (
     <>
-      {size} · Added <LocalTime value={entry.uploadedAt} />
-      {who}
+      {size} <Dot aria-hidden="true" data-dot />{' '}
+      <span data-break>
+        Added <LocalTime value={entry.uploadedAt} />
+        {who}
+      </span>
     </>
   );
 }

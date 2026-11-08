@@ -201,7 +201,10 @@ function StudioGuide({ clientFirst, maxMb }: { clientFirst: string; maxMb: numbe
         <H3 id="contracts-guide">How contracts work</H3>
         <Tips>
           <li>Replace a document freely until it is signed. After that it is part of the record.</li>
-          <li>When {clientFirst} signs here, we keep the name they type, the time, their email and the file&apos;s SHA-256, and email you both.</li>
+          <li>
+            When {clientFirst} signs here, we keep the name they type, the time, their email and the file&apos;s SHA-256, and email you
+            both.
+          </li>
           <li>Signed on paper? {clientFirst} can upload the copy, or you can record it with a note.</li>
           <li>Files up to {maxMb} MB. A PDF opens right in the browser.</li>
         </Tips>
@@ -264,13 +267,13 @@ export default function ContractsView({ projectId, perspective, canSign, clientN
                   </Button>
                 }
               >
-                Upload an agreement for {clientFirst} to sign, or a document for their records. Signatures are kept with the exact file
-                they cover.
+                Upload an agreement for {clientFirst} to sign, or a document for their records. Signatures are kept with the exact file they
+                cover.
               </EmptyState>
             ) : (
               <EmptyState title="No contracts yet">
-                When we have an agreement for you to sign, or a document for your records, it appears here with a way to read, download
-                and sign it. We will email you each time.
+                When we have an agreement for you to sign, or a document for your records, it appears here with a way to read, download and
+                sign it. We will email you each time.
               </EmptyState>
             )
           ) : (

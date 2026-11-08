@@ -28,7 +28,7 @@ export function fileLabel(label: ContractFileLabel, perspective: 'client' | 'stu
     case 'original':
       return requiresSignature ? 'Agreement' : 'Document';
     case 'client_signed':
-      return perspective === 'client' ? 'Your signed copy' : 'Signed copy from the client';
+      return perspective === 'client' ? 'Your signed copy' : "Client's signed copy";
     case 'countersigned':
       return 'Countersigned copy';
     default:

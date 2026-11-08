@@ -207,7 +207,15 @@ function UploadDialog({
   );
 }
 
-export default function FilesView({ projectId, perspective, canUpload, clientName, files, acceptedExtensions, maxUploadBytes }: FilesViewProps) {
+export default function FilesView({
+  projectId,
+  perspective,
+  canUpload,
+  clientName,
+  files,
+  acceptedExtensions,
+  maxUploadBytes,
+}: FilesViewProps) {
   const studio = perspective === 'studio';
   const upload = useDialog();
   const { statusRef, message, announce } = useAnnouncer();
@@ -236,11 +244,12 @@ export default function FilesView({ projectId, perspective, canUpload, clientNam
     },
   ];
 
-  // Who uploaded a row, where its group does not already say
+  // Who uploaded a row, where its group does not already say: which of the two of us, for the
+  // studio, or someone other than the viewer on the client's side
   const byline = (item: ProjectFileView): string | null => {
-    if (studio) return item.uploadedByName;
-    if (item.side === 'client' && !item.mine) return item.uploadedByName;
-    return null;
+    if (item.side === 'studio') return studio ? item.uploadedByName : null;
+    if (studio) return item.uploadedByName === clientName ? null : item.uploadedByName;
+    return item.mine ? null : item.uploadedByName;
   };
 
   const removeQuestion = (item: ProjectFileView) =>
@@ -372,8 +381,8 @@ export default function FilesView({ projectId, perspective, canUpload, clientNam
                   </div>
                 </DataList>
                 <Meta>
-                  Removed files disappear for {clientFirst} but stay downloadable for the studio. Files up to {mb} MB; for larger ones, ask for a
-                  link in <TextLink href={projectHref(projectId, 'messages')}>Messages</TextLink>.
+                  Removed files disappear for {clientFirst} but stay downloadable for the studio. Files up to {mb} MB; for larger ones, ask
+                  for a link in <TextLink href={projectHref(projectId, 'messages')}>Messages</TextLink>.
                 </Meta>
               </Stack>
             </Panel>
