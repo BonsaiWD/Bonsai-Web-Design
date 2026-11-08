@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { getDb } from '@/db';
 import { deliverable, milestone, milestoneSignoff, milestoneStatus, project, user, type MilestoneStatus } from '@/db/schema';
 import { projectHref } from '@/components/portal/tabs';
-import { firstName, formatDate, formatUtcMoment } from '@/lib/portal-format';
+import { firstName, formatDate, formatUtcMoment, todayIso } from '@/lib/portal-format';
 import { assertStillClient, projectActor, studioProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import { emailNote, portalOrigin, receiptSummary, recordActivity, STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '@/server/portal/notify';
@@ -338,7 +338,6 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
         const input = parseForm(askSchema, formData);
         const projectId = actor.project.id;
         const clientName = actor.project.clientName || actor.project.clientEmail;
-        const clientFirst = firstName(clientName) ?? clientName;
 
         const row = await getDb().transaction(async (tx) => {
             const [current] = await tx
@@ -365,7 +364,7 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
             // ask for something they cannot do yet
             const review = await pendingReview(tx, current.id);
             if (review) {
-                throw new ActionError(`${clientFirst} is still reviewing ${review}. Once it's approved, ${clientFirst} is asked to initial ${current.title}.`);
+                throw new ActionError(`${clientName} is still reviewing ${review}. Once it's approved, ${clientName} is asked to initial ${current.title}.`);
             }
 
             // At most one request email per milestone every ten minutes, so a double click or
@@ -373,7 +372,7 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
             // email does not go out.
             const slot = await claimRateSlot(signoffAskKey(current.id), SIGNOFF_ASK_INTERVAL_MS, tx);
             if (!slot.ok) {
-                throw new ActionError(`${clientFirst} was emailed about this in the last 10 minutes. Give it a little while before sending a reminder.`);
+                throw new ActionError(`${clientName} was emailed about this in the last 10 minutes. Give it a little while before sending a reminder.`);
             }
 
             await tx
@@ -398,7 +397,8 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                     paragraphs: [
                         ...(greeting ? [`Hi ${greeting},`] : []),
                         `${row.title} on ${actor.project.name} is ready for your sign-off. When you're happy it's complete, add your initials in the portal and we'll move on to the next step.`,
-                        ...(row.dueDate ? [`It's due ${formatDate(row.dueDate)}.`] : []),
+                        // A date that has passed was the studio's to meet, not something to press the client with
+                        ...(row.dueDate && row.dueDate >= todayIso() ? [`It's due ${formatDate(row.dueDate)}.`] : []),
                     ],
                     action: { label: 'Review and initial', url: await milestoneUrl(projectId, row.id) },
                     footnotes: ['Your initials and the time are recorded with your sign-off. If something needs another look, message us in the portal instead.'],
@@ -407,8 +407,13 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
         });
         if (emailStatus !== 'sent') await releaseRateSlot(row.slot);
         refresh(projectId);
-        const verb = row.requiresSignoff && row.status === 'waiting_on_client' ? 'Reminded' : 'Asked';
-        return done(`${verb} ${clientName} to initial ${row.title}.${emailNote(emailStatus, clientName, milestoneKind('signoff_requested', row.id))}`);
+        if (emailStatus !== 'sent') {
+            // The step waits on the client either way; what matters now is that the email did not go
+            return done(`${row.title} is waiting for ${clientName}'s initials.${emailNote(emailStatus, clientName, milestoneKind('signoff_requested', row.id))}`);
+        }
+        // A reminder only if an earlier request reached them (a failed one gives its slot back)
+        const reminded = row.slot.ok && row.slot.previousAt !== null && row.requiresSignoff && row.status === 'waiting_on_client';
+        return done(`${reminded ? 'Reminded' : 'Asked'} ${clientName} to initial ${row.title}.`);
     });
 }
 

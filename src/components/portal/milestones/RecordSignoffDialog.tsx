@@ -11,10 +11,9 @@ interface RecordSignoffDialogProps {
   milestoneId: string;
   title: string;
   clientName: string;
-  clientFirst: string;
 }
 
-export default function RecordSignoffDialog({ dialog, onRecorded, projectId, milestoneId, title, clientName, clientFirst }: RecordSignoffDialogProps) {
+export default function RecordSignoffDialog({ dialog, onRecorded, projectId, milestoneId, title, clientName }: RecordSignoffDialogProps) {
   return (
     <FormDialog
       dialog={dialog}
@@ -42,7 +41,7 @@ export default function RecordSignoffDialog({ dialog, onRecorded, projectId, mil
           </Select>
         )}
       </Field>
-      <Field label="What they said, and when" name="note" hint={`For example: ${clientFirst} replied to our Nov 7 email saying it's good to go.`}>
+      <Field label="What they said, and when" name="note" hint={`For example: ${clientName} replied to our Nov 7 email saying it's good to go.`}>
         {({ id, name, describedBy, invalid, defaultValue }) => (
           <Textarea
             id={id}
@@ -57,7 +56,7 @@ export default function RecordSignoffDialog({ dialog, onRecorded, projectId, mil
       </Field>
       <Notice>
         <p>
-          This marks {title} done and emails {clientFirst} a copy. Signed records can&apos;t be changed or deleted later.
+          This marks {title} done and emails {clientName} a copy. Signed records can&apos;t be changed or deleted later.
         </p>
       </Notice>
     </FormDialog>

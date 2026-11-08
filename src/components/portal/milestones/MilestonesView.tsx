@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiPlus } from 'react-icons/fi';
-import { firstName, plural } from '@/lib/portal-format';
+import { plural } from '@/lib/portal-format';
 import { Button, EmptyState, H2, ListPanel, MetaText, PanelHeader, space, Stack, useDialog, useUnsavedChanges, VisuallyHidden } from '../ui';
 import AddMilestoneDialog from './AddMilestoneDialog';
 import MilestoneItem from './MilestoneItem';
@@ -31,7 +31,6 @@ export default function MilestonesView({
   previewingAsClient,
   isClient,
 }: MilestonesPageProps) {
-  const clientFirst = firstName(clientName) ?? clientName;
   const addDialog = useDialog();
   const headingRef = useRef<HTMLHeadingElement>(null);
   // Set when the empty state's button opens the add dialog: that button is gone afterwards
@@ -112,7 +111,7 @@ export default function MilestonesView({
             </Button>
           }
         >
-          Add the steps from kickoff to launch, each with a due date. {clientFirst} sees them here and can initial the ones you ask them to sign off.
+          Add the steps from kickoff to launch, each with a due date. {clientName} sees them here and can initial the ones you ask them to sign off.
         </EmptyState>
       ) : (
         <ListPanel aria-labelledby="milestones-heading">
@@ -176,7 +175,7 @@ export default function MilestonesView({
             addingFirst.current = false;
           }}
           projectId={projectId}
-          clientFirst={clientFirst}
+          clientName={clientName}
           nextNumber={milestones.length + 1}
         />
       )}

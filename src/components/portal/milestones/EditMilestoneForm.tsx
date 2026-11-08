@@ -53,13 +53,13 @@ interface EditMilestoneFormProps {
   hidden: boolean;
   milestone: MilestoneView;
   projectId: string;
-  clientFirst: string;
+  clientName: string;
   onDirtyChange: (dirty: boolean) => void;
   onSaved: (message: string) => void;
   onCancel: () => void;
 }
 
-export default function EditMilestoneForm({ id, hidden, milestone, projectId, clientFirst, onDirtyChange, onSaved, onCancel }: EditMilestoneFormProps) {
+export default function EditMilestoneForm({ id, hidden, milestone, projectId, clientName, onDirtyChange, onSaved, onCancel }: EditMilestoneFormProps) {
   // Bumped on save and cancel: a fresh form drops the last result and any submitted values
   const [generation, setGeneration] = useState(0);
   const [dirty, setDirty] = useState(false);
@@ -103,7 +103,7 @@ export default function EditMilestoneForm({ id, hidden, milestone, projectId, cl
       >
         <FormStack>
           <FreshFields saved={String(generation)}>
-            <MilestoneFields saved={saved} clientFirst={clientFirst} />
+            <MilestoneFields saved={saved} clientName={clientName} />
             <VersionInput version={milestone.version} />
             <DirtyCheck onCheck={check} />
           </FreshFields>

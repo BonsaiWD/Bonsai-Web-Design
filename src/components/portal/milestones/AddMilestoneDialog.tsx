@@ -10,11 +10,11 @@ interface AddMilestoneDialogProps {
   dialog: ReturnType<typeof useDialog>;
   onAdded: (message: string) => void;
   projectId: string;
-  clientFirst: string;
+  clientName: string;
   nextNumber: number;
 }
 
-export default function AddMilestoneDialog({ dialog, onAdded, projectId, clientFirst, nextNumber }: AddMilestoneDialogProps) {
+export default function AddMilestoneDialog({ dialog, onAdded, projectId, clientName, nextNumber }: AddMilestoneDialogProps) {
   return (
     <FormDialog
       dialog={dialog}
@@ -32,7 +32,7 @@ export default function AddMilestoneDialog({ dialog, onAdded, projectId, clientF
         </>
       }
     >
-      <MilestoneFields saved={EMPTY} clientFirst={clientFirst} />
+      <MilestoneFields saved={EMPTY} clientName={clientName} />
     </FormDialog>
   );
 }

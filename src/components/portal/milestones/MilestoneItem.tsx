@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiArrowDown, FiArrowUp, FiCheck, FiChevronDown, FiChevronRight, FiClipboard, FiEdit2, FiSend, FiTrash2 } from 'react-icons/fi';
 import { askForSignoff, deleteMilestone, moveMilestone } from '@/app/portal/_actions/milestones';
-import { dueInfo, firstName } from '@/lib/portal-format';
+import { dueInfo } from '@/lib/portal-format';
 import type { ActionState } from '@/server/portal/actions';
 import { MILESTONE_LABELS } from '../labels';
 import { projectHref } from '../tabs';
@@ -25,6 +25,7 @@ import {
   StatusBadge,
   StatusLine,
   SubmitButton,
+  TextButton,
   TextLink,
   useAnnouncer,
   useDialog,
@@ -185,7 +186,6 @@ export default function MilestoneItem({
 }: MilestoneItemProps) {
   const titleId = useId();
   const editorId = useId();
-  const clientFirst = firstName(clientName) ?? clientName;
   const labels = MILESTONE_LABELS[m.status];
   const done = m.status === 'done';
   const waiting = m.status === 'waiting_on_client';
@@ -241,6 +241,18 @@ export default function MilestoneItem({
     setEditing((open) => !open);
   }
 
+  // "Change the due date first" opens the editor on the due date: on the next frame, once the
+  // editor's own effect has put focus on its first field
+  const focusDueDate = useRef(false);
+  useEffect(() => {
+    if (!editing || !focusDueDate.current) return;
+    const frame = requestAnimationFrame(() => {
+      focusDueDate.current = false;
+      document.getElementById(editorId)?.querySelector<HTMLInputElement>('input[name="dueDate"]')?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editing, editorId]);
+
   function closeAsk() {
     setConfirmingAsk(false);
     askButtonRef.current?.focus();
@@ -253,6 +265,12 @@ export default function MilestoneItem({
 
   const dueLabel = m.dueDate ? dueInfo(m.dueDate, today) : null;
   const statusLabel = showStudio ? labels.studio : labels.client;
+  // A request has gone out before (and not failed): the next one is a reminder
+  const asked = waiting && m.requiresSignoff && Boolean(m.signoffRequestedAt);
+  // Asking moves the step to Waiting on client, and its date becomes the client's: a date that
+  // has already passed would show them as overdue the moment the email lands
+  const pastDue = Boolean(m.dueDate && m.dueDate < today);
+  const askConfirms = done || (pastDue && !waiting);
 
   return (
     <Item id={`milestone-${m.id}`} $done={done} aria-labelledby={titleId}>
@@ -278,8 +296,9 @@ export default function MilestoneItem({
           <MetaLine>
             {m.dueDate && dueLabel ? (
               done ? (
+                // Finished ahead of time: the date has not passed, so it was not missed
                 <span>
-                  Was due <DateText value={m.dueDate} />
+                  {m.dueDate < today ? 'Was due' : 'Due'} <DateText value={m.dueDate} />
                 </span>
               ) : (
                 <DueText value={m.dueDate} today={today} />
@@ -298,7 +317,7 @@ export default function MilestoneItem({
             hidden={!editing}
             milestone={m}
             projectId={projectId}
-            clientFirst={clientFirst}
+            clientName={clientName}
             onDirtyChange={setRowDirty}
             onSaved={(text) => {
               setEditing(false);
@@ -338,34 +357,34 @@ export default function MilestoneItem({
           needsSignoff &&
           (waiting && review ? (
             <Callout $tone="quiet">
-              <h4>Waiting on {clientFirst}&apos;s review</h4>
+              <h4>Waiting on {clientName}&apos;s review</h4>
               <p>
-                {clientFirst} is asked to initial this step once {review.title} is approved.
+                {clientName} is asked to initial this step once {review.title} is approved.
               </p>
             </Callout>
           ) : waiting ? (
             <Callout $tone="quiet">
-              <h4>Waiting for {clientFirst}&apos;s initials</h4>
+              <h4>Waiting for {clientName}&apos;s initials</h4>
               <p>
                 {m.signoffRequestedAt ? (
                   <>
-                    Emailed <LocalTime value={m.signoffRequestedAt} />. {clientFirst} sees the request on this page.
+                    Emailed <LocalTime value={m.signoffRequestedAt} />. {clientName} sees the request on this page.
                   </>
                 ) : (
-                  <>Not emailed yet. {clientFirst} sees the request on this page; use Remind {clientFirst} to email them a link.</>
+                  <>Not emailed yet. {clientName} sees the request on this page; use Ask for sign-off to email them a link.</>
                 )}
               </p>
             </Callout>
           ) : done ? (
             <Callout $tone="quiet">
-              <h4>Done without {clientFirst}&apos;s initials</h4>
-              <p>If you still want them on record, Ask for sign-off moves this step back to Waiting on client and emails {clientFirst}.</p>
+              <h4>Done without {clientName}&apos;s initials</h4>
+              <p>If you still want them on record, Ask for sign-off moves this step back to Waiting on client and emails {clientName}.</p>
             </Callout>
           ) : (
             <Callout $tone="quiet">
-              <h4>Needs {clientFirst}&apos;s initials when done</h4>
+              <h4>Needs {clientName}&apos;s initials when done</h4>
               <p>
-                {clientFirst} isn&apos;t asked yet. When the work is ready, Ask for sign-off emails {clientFirst} and moves this step to
+                {clientName} isn&apos;t asked yet. When the work is ready, Ask for sign-off emails {clientName} and moves this step to
                 Waiting on client.
               </p>
             </Callout>
@@ -428,7 +447,7 @@ export default function MilestoneItem({
                 <>
                   {/* While a linked review is open the client can't initial yet, so there is
                       nothing to ask for; a finished step asks before it is reopened */}
-                  {review ? null : done ? (
+                  {review ? null : askConfirms ? (
                     <Button
                       ref={askButtonRef}
                       $variant="quiet"
@@ -446,7 +465,7 @@ export default function MilestoneItem({
                       <input type="hidden" name="projectId" value={projectId} />
                       <SubmitButton variant="quiet" size="sm" pendingLabel="Sending…">
                         <FiSend aria-hidden="true" />
-                        {waiting && m.requiresSignoff ? `Remind ${clientFirst}` : 'Ask for sign-off'}
+                        {asked ? `Remind ${clientName}` : 'Ask for sign-off'}
                       </SubmitButton>
                     </ActionForm>
                   )}
@@ -490,12 +509,37 @@ export default function MilestoneItem({
           <InlineConfirm
             tone="primary"
             size="sm"
-            question={`Ask ${clientFirst} to initial ${m.title}?`}
-            detail={`This emails ${clientFirst} and moves it back to Waiting on client until it's initialled.`}
+            question={`Ask ${clientName} to initial ${m.title}?`}
+            detail={
+              <>
+                This emails {clientName} and moves it {done ? 'back ' : ''}to Waiting on client until it&apos;s initialled.
+                {pastDue && m.dueDate && dueLabel && (
+                  <>
+                    {' '}
+                    Its due date, <DateText value={m.dueDate} />, has passed, so {clientName} will see it as {dueLabel.label} as soon
+                    as it arrives.{' '}
+                    <TextButton
+                      type="button"
+                      onClick={() => {
+                        setConfirmingAsk(false);
+                        if (editing) {
+                          document.getElementById(editorId)?.querySelector<HTMLInputElement>('input[name="dueDate"]')?.focus();
+                        } else {
+                          focusDueDate.current = true;
+                          openEditor();
+                        }
+                      }}
+                    >
+                      Change the due date first
+                    </TextButton>
+                  </>
+                )}
+              </>
+            }
             action={askForSignoff}
-            confirmLabel={`Ask ${clientFirst}`}
+            confirmLabel={`Ask ${clientName}`}
             pendingLabel="Sending…"
-            keepLabel="Keep it done"
+            keepLabel={done ? 'Keep it done' : 'Not now'}
             onKeep={closeAsk}
             // Its button changes once the step is waiting again, so the result takes focus
             onSuccess={(state) => {
@@ -506,7 +550,7 @@ export default function MilestoneItem({
               <>
                 <input type="hidden" name="id" value={m.id} />
                 <input type="hidden" name="projectId" value={projectId} />
-                <input type="hidden" name="confirmReopen" value="on" />
+                {done && <input type="hidden" name="confirmReopen" value="on" />}
               </>
             }
           />
@@ -581,7 +625,6 @@ export default function MilestoneItem({
           milestoneId={m.id}
           title={m.title}
           clientName={clientName}
-          clientFirst={clientFirst}
         />
       )}
     </Item>

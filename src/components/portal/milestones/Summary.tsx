@@ -2,7 +2,7 @@
 
 import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';
-import { dueInfo, firstName } from '@/lib/portal-format';
+import { dueInfo } from '@/lib/portal-format';
 import { projectHref } from '../tabs';
 import { DateText, DueText, Eyebrow, focusRing, GuardedLink, MetaLine, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
 import { asksForInitials } from './signoff';
@@ -185,7 +185,6 @@ export default function Summary({ projectId, milestones, today, forClient, clien
   const waiting = waitingItems(milestones, projectId, forClient);
   const shown = waiting.slice(0, 3);
   const nextDue = next?.dueDate ? dueInfo(next.dueDate, today) : null;
-  const clientFirst = firstName(clientName) ?? clientName;
 
   return (
     <Panel aria-labelledby="milestone-summary-heading">
@@ -226,7 +225,7 @@ export default function Summary({ projectId, milestones, today, forClient, clien
         </Cell>
 
         <Cell>
-          <Eyebrow>{forClient ? 'Waiting on you' : `Waiting on ${clientFirst}`}</Eyebrow>
+          <Eyebrow>{forClient ? 'Waiting on you' : `Waiting on ${clientName}`}</Eyebrow>
           {shown.length > 0 ? (
             <WaitList>
               {shown.map((item) => (
@@ -253,7 +252,7 @@ export default function Summary({ projectId, milestones, today, forClient, clien
               {waiting.length > shown.length && <MetaText as="li">and {waiting.length - shown.length} more below</MetaText>}
             </WaitList>
           ) : (
-            <MetaText>{forClient ? "Nothing right now. We'll email you when something needs you." : `Nothing is waiting on ${clientFirst}.`}</MetaText>
+            <MetaText>{forClient ? "Nothing right now. We'll email you when something needs you." : `Nothing is waiting on ${clientName}.`}</MetaText>
           )}
         </Cell>
       </Cells>

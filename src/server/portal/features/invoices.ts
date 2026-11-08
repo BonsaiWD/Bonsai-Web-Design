@@ -478,7 +478,7 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
       items.push({
         ...base(row),
         key: `invoice-overdue:${row.id}`,
-        title: `Waiting on ${firstName(client) ?? client} to pay ${row.number}`,
+        title: `Waiting on ${client} to pay ${row.number}`,
         detail: `${formatMoney(row.totalCents)} · ${row.title}`,
         due: row.dueOn,
         tone: 'alert',
