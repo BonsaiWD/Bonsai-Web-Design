@@ -1,12 +1,12 @@
-import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import ProjectSettingsView from '@/components/portal/admin/ProjectSettingsView';
 import { Notice } from '@/components/portal/ui';
 import { getViewer, requireProject } from '@/server/portal/access';
 import { loadClientOptions } from '@/server/portal/features/clients';
 import { loadProjectSettings } from '@/server/portal/features/projects';
+import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const metadata: Metadata = { title: 'Project settings' };
+export const generateMetadata = projectTabMetadata('Project settings');
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;

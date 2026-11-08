@@ -38,6 +38,11 @@ export interface AttentionItem {
     // When it started waiting (ISO timestamp), for "waiting 5 days" and ordering
     since?: string | null;
     tone: 'action' | 'alert' | 'info';
+    // A portal path to link to instead of the tab + anchor, e.g. an invoice's own page
+    href?: string;
+    // A studio item that is really waiting on the client (an overdue sign-off or invoice):
+    // it stays in the studio's list as a follow-up but is not counted as waiting on the studio
+    blockedOn?: 'client';
 }
 
 export interface DeadlineItem {
@@ -51,6 +56,8 @@ export interface DeadlineItem {
     kind: 'milestone' | 'review' | 'invoice' | 'launch' | 'contract';
     // Who the deadline is for, so each side can see its own first
     owner: Perspective;
+    // A portal path to link to instead of the tab + anchor
+    href?: string;
 }
 
 export interface PortalFeature {

@@ -1,11 +1,11 @@
-import type { Metadata } from 'next';
 import MessagesView from '@/components/portal/messages/MessagesView';
 import { getViewer, requireProject } from '@/server/portal/access';
 import { featureContext } from '@/server/portal/collect';
 import { loadStudioThreadInfo, loadThread, MESSAGE_MAX_LENGTH } from '@/server/portal/features/messages';
 import { MAX_UPLOAD_BYTES } from '@/server/portal/storage';
+import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const metadata: Metadata = { title: 'Messages' };
+export const generateMetadata = projectTabMetadata('Messages');
 
 export default async function MessagesPage({
   params,

@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import styled, { css } from 'styled-components';
 import { DURATION, ease, focusRing, space, tint } from './tokens';
+import { GuardedLink } from './unsaved';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
 export type ButtonSize = 'md' | 'sm';
@@ -108,7 +108,7 @@ export const Button = styled.button.attrs<ButtonStyleProps>((props) => ({
 `;
 
 // A link that looks like a button (navigation, downloads)
-export const ButtonLink = styled(Link)<ButtonStyleProps>`
+export const ButtonLink = styled(GuardedLink)<ButtonStyleProps>`
   ${buttonStyles}
 `;
 
@@ -173,7 +173,7 @@ export const TextButton = styled.button.attrs((props) => ({ type: props.type ?? 
   ${textAction}
 `;
 
-export const TextLink = styled(Link)`
+export const TextLink = styled(GuardedLink)`
   ${textAction}
 `;
 

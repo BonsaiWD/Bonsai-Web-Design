@@ -1,10 +1,10 @@
-import type { Metadata } from 'next';
 import InvoicesView from '@/components/portal/invoices/InvoicesView';
 import { requireProject } from '@/server/portal/access';
 import { featureContext } from '@/server/portal/collect';
 import { loadEnabledPaymentMethods, loadInvoiceList } from '@/server/portal/features/invoices';
+import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const metadata: Metadata = { title: 'Invoices' };
+export const generateMetadata = projectTabMetadata('Invoices');
 
 export default async function InvoicesPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;

@@ -20,5 +20,8 @@ export async function setPortalView(formData: FormData) {
     } else {
         store.delete({ name: VIEW_COOKIE, path: '/portal' });
     }
-    redirect(safePortalPath(formData.get('back')) ?? '/portal');
+    const back = safePortalPath(formData.get('back')) ?? '/portal';
+    // Studio-only pages have no client version, so previewing from one starts at the dashboard
+    const studioOnly = back.startsWith('/portal/admin') || /^\/portal\/projects\/[^/]+\/settings/.test(back);
+    redirect(formData.get('mode') === 'client' && studioOnly ? '/portal' : back);
 }

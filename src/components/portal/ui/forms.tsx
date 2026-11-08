@@ -10,6 +10,7 @@ import {
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from 'react';
+import { unstable_isUnrecognizedActionError, unstable_rethrow } from 'next/navigation';
 import styled, { css } from 'styled-components';
 import { FiCheck, FiChevronDown } from 'react-icons/fi';
 import type { ActionState } from '@/server/portal/actions';
@@ -56,8 +57,35 @@ interface ActionFormProps extends Omit<ComponentPropsWithoutRef<'form'>, 'action
   onSuccess?: (state: NonNullable<ActionState>) => void;
 }
 
+// What was typed, so the form can put it back after a request that never reached the action
+function typedValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith('$ACTION') && typeof value === 'string') values[key] = value;
+  }
+  return values;
+}
+
 export function ActionForm({ action, children, onSuccess, ...formProps }: ActionFormProps) {
-  const [state, formAction, pending] = useActionState(action, null);
+  // A request can fail before the action runs: a dropped connection, a body over the upload
+  // limit, or a new deploy that no longer knows this action. Without this the whole page
+  // would be replaced by an error and everything typed would be lost.
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(async (previous, formData) => {
+    try {
+      return await action(previous, formData);
+    } catch (error) {
+      // redirect() and notFound() from an action arrive as errors; let Next handle them
+      unstable_rethrow(error);
+      return {
+        ok: false,
+        message: unstable_isUnrecognizedActionError(error)
+          ? 'The portal was just updated. Copy anything you typed, reload the page and try again.'
+          : "We couldn't reach the server. Check your connection and try again. If you attached a file, it may be over 4 MB.",
+        values: typedValues(formData),
+        at: Date.now(),
+      };
+    }
+  }, null);
   const formRef = useRef<HTMLFormElement>(null);
   const lastHandled = useRef<number | null>(null);
   const onSuccessRef = useRef(onSuccess);
@@ -252,6 +280,12 @@ const lineControl = css`
     box-shadow: 0 1px 0 ${({ theme }) => theme.colors.primary};
   }
 
+  /* Keyboard focus also tints the field, so it stands out from its neighbours */
+  &:focus-visible {
+    background: ${({ theme }) => tint(theme.colors.primary, 9)};
+    box-shadow: 0 2px 0 ${({ theme }) => theme.colors.primary};
+  }
+
   &:-webkit-autofill,
   &:-webkit-autofill:hover,
   &:-webkit-autofill:focus {
@@ -294,6 +328,10 @@ export const Textarea = styled.textarea`
     outline: 2px solid transparent;
     border-color: ${({ theme }) => theme.colors.primary};
     box-shadow: inset 0 0 0 1px ${({ theme }) => theme.colors.primary};
+  }
+
+  &:focus-visible {
+    background: ${({ theme }) => tint(theme.colors.primary, 7)};
   }
 `;
 

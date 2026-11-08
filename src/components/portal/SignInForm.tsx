@@ -3,7 +3,6 @@
 import { useId, useState } from 'react';
 import styled from 'styled-components';
 import { FiMail } from 'react-icons/fi';
-import { z } from 'zod';
 import { authClient } from '@/lib/auth-client';
 import { Button, Eyebrow, H1, Input, Lead, Meta, Notice, Stack, TextAnchor, TextButton, TextLink, space, type } from './ui';
 
@@ -29,7 +28,8 @@ const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.error};
 `;
 
-const emailSchema = z.email();
+// A light check (the server is the real gate); zod here would add ~30 KB to the sign-in page
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface SignInFormProps {
   initialError: string | null;
@@ -49,7 +49,7 @@ export default function SignInForm({ initialError, initialEmail, next, linkMinut
     event.preventDefault();
     if (sending) return;
     const address = email.trim();
-    if (!emailSchema.safeParse(address).success) {
+    if (!EMAIL_PATTERN.test(address) || address.length > 254) {
       setError('Enter the email address we have on file for you, such as name@company.com.');
       return;
     }

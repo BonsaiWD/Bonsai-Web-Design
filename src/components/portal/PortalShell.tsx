@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import styled from 'styled-components';
@@ -8,7 +7,7 @@ import { FiEye, FiLogOut } from 'react-icons/fi';
 import Footer from '../layout/Footer';
 import { authClient } from '@/lib/auth-client';
 import { setPortalView } from '@/app/portal/_actions/view';
-import { Button, focusRing, nativeCursor, PHONE, space, tint, type } from './ui';
+import { Button, focusRing, GuardedLink, nativeCursor, PHONE, space, tint, type, UnsavedChangesProvider } from './ui';
 
 const LOGO_SUB = 0.39; // em, as in the site header's lockup
 const LOGO_GAP = 0.25; // em
@@ -47,7 +46,7 @@ const BarInner = styled.div`
 `;
 
 // The site's wordmark with "Client portal" where the header puts "Web Design"
-const Wordmark = styled(Link)`
+const Wordmark = styled(GuardedLink)`
   flex-shrink: 0;
   display: inline-block;
   font-family: ${({ theme }) => theme.fonts.heading};
@@ -88,7 +87,7 @@ const Nav = styled.nav`
   }
 `;
 
-const NavLink = styled(Link)<{ $active: boolean }>`
+const NavLink = styled(GuardedLink)<{ $active: boolean }>`
   display: inline-flex;
   align-items: center;
   min-height: 2.5rem;
@@ -133,6 +132,7 @@ const PreviewBar = styled.div`
   border-bottom: 1px solid ${({ theme }) => tint(theme.colors.primary, 30)};
 
   > div {
+    ${type.body}
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -141,13 +141,16 @@ const PreviewBar = styled.div`
     max-width: 72rem;
     margin: 0 auto;
     padding: ${space[3]} ${space[6]};
-    ${type.body}
     font-size: 0.9375rem;
     color: ${({ theme }) => theme.colors.text};
 
     @media (max-width: ${PHONE}) {
       padding: ${space[3]} ${space[4]};
     }
+  }
+
+  p {
+    margin: 0;
   }
 
   svg {
@@ -203,10 +206,11 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
   }
 
   return (
+    <UnsavedChangesProvider>
     <Frame>
       <Bar>
         <BarInner>
-          <Wordmark href={email ? '/portal' : '/'}>
+          <Wordmark href={email ? '/portal' : '/'} prefetch={email ? undefined : false}>
             Bonsai <span>Client portal</span>
           </Wordmark>
           {email && (
@@ -226,7 +230,8 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
               {isAdmin && !previewingAsClient && (
                 <form action={setPortalView}>
                   <input type="hidden" name="mode" value="client" />
-                  <input type="hidden" name="back" value={pathname} />
+                  {/* Studio-only pages have no client version: preview the client's dashboard */}
+                  <input type="hidden" name="back" value={pathname.startsWith('/portal/admin') || pathname.endsWith('/settings') ? '/portal' : pathname} />
                   <Button type="submit" $variant="quiet" $size="sm">
                     <FiEye aria-hidden="true" />
                     View as client
@@ -269,5 +274,6 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
         <Footer />
       </FooterAlign>
     </Frame>
+    </UnsavedChangesProvider>
   );
 }

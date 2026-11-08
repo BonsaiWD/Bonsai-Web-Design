@@ -9,7 +9,8 @@ import { loadActivity } from '@/server/portal/features/activity';
 import { hasAnyClient } from '@/server/portal/features/clients';
 import { collectWaitingOnClients, loadProjectCards } from '@/server/portal/features/projects';
 
-export const metadata: Metadata = { title: 'Overview' };
+// The layout's title template only reaches child segments, so this page names the brand itself
+export const metadata: Metadata = { title: { absolute: 'Overview | Bonsai Web Design client portal' } };
 
 export default async function PortalHome({ searchParams }: { searchParams: Promise<{ deleted?: string | string[] }> }) {
   const viewer = await getViewer();

@@ -1,11 +1,11 @@
-import type { Metadata } from 'next';
 import FilesView from '@/components/portal/files/FilesView';
 import { getViewer, requireProject } from '@/server/portal/access';
 import { featureContext } from '@/server/portal/collect';
 import { loadProjectFiles } from '@/server/portal/features/files';
 import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/server/portal/storage';
+import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const metadata: Metadata = { title: 'Files' };
+export const generateMetadata = projectTabMetadata('Files');
 
 export default async function FilesPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;

@@ -68,7 +68,8 @@ export async function runAction(formData: FormData | null, body: () => Promise<A
         if (pg?.hint === 'bonsai:record_locked') {
             return { ok: false, message: 'This is part of the signed record, so it can no longer be changed or deleted.', values, at: Date.now() };
         }
-        if (pg?.code === '23505' || pg?.hint === 'bonsai:bad_transition' || pg?.hint === 'bonsai:version_fixed') {
+        // 40P01/40001: a deadlock or serialisation failure with another request; a retry works
+        if (pg?.code === '23505' || pg?.code === '40P01' || pg?.code === '40001' || pg?.hint === 'bonsai:bad_transition' || pg?.hint === 'bonsai:version_fixed') {
             return { ok: false, message: STALE, values, at: Date.now() };
         }
         if (pg?.code === '23503') {

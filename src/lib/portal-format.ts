@@ -5,6 +5,15 @@ const dayFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numer
 const shortDayFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 const monthFormat = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const utcMomentFormat = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+});
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -47,6 +56,11 @@ export function dueInfo(isoDate: string, today: string): { label: string; tone: 
     if (days === 1) return { label: 'Due tomorrow', tone: 'soon' };
     if (days <= 7) return { label: `Due in ${days} days`, tone: 'soon' };
     return { label: `Due ${formatDate(isoDate)}`, tone: 'later' };
+}
+
+// A moment for emails and receipts, which have no viewer time zone: "Nov 8, 2026, 4:59 AM UTC"
+export function formatUtcMoment(value: Date | string): string {
+    return utcMomentFormat.format(typeof value === 'string' ? new Date(value) : value);
 }
 
 // Whole cents to "$1,500.00"

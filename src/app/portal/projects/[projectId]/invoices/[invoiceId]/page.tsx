@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   if (!project) return { title: 'Invoice' };
   const context = await featureContext(project.id);
   const invoice = await loadInvoice(project.id, invoiceId, context.perspective);
-  return { title: invoice ? `Invoice ${invoice.number}` : 'Invoice' };
+  return { title: invoice ? `Invoice ${invoice.number} · ${project.name}` : `Invoice · ${project.name}` };
 }
 
 export default async function InvoicePage({ params }: { params: Params }) {

@@ -79,14 +79,14 @@ const Chip = styled.span<{ $overdue: boolean }>`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
   border: 1px solid ${({ $overdue, theme }) => tint($overdue ? theme.colors.error : theme.colors.primary, $overdue ? 60 : 30)};
   border-radius: ${radius.panel};
   background: ${({ theme }) => theme.colors.background};
 
   span:first-child {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;

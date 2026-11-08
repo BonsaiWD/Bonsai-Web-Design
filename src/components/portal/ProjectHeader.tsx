@@ -1,14 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiChevronRight, FiSettings } from 'react-icons/fi';
 import type { ProjectStage } from '@/db/schema';
 import { formatDate } from '@/lib/portal-format';
 import { STAGE_LABELS, STAGE_SEQUENCE, STAGE_TONES } from './labels';
 import { PROJECT_TABS, projectHref, type ProjectTab } from './tabs';
-import { ButtonLink, CountBadge, focusRing, H1, MetaText, PHONE, space, StatusBadge, tint, type, VisuallyHidden } from './ui';
+import { ButtonLink, CountBadge, focusRing, GuardedLink, H1, MetaText, PHONE, space, StatusBadge, tint, type, VisuallyHidden } from './ui';
 
 const Header = styled.header`
   display: flex;
@@ -126,9 +126,8 @@ const Step = styled.li<{ $state: 'done' | 'current' | 'next' }>`
 
 /* ---------- Tabs ---------- */
 
-const TabBar = styled.nav`
+const TabBar = styled.nav<{ $moreLeft: boolean; $moreRight: boolean }>`
   position: relative;
-  margin: 0 -${space[2]};
   border-bottom: 1px solid ${({ theme }) => tint(theme.colors.primary, 14)};
   overflow-x: auto;
   scrollbar-width: none;
@@ -137,24 +136,32 @@ const TabBar = styled.nav`
     display: none;
   }
 
+  /* When tabs run past an edge, that edge fades out, so it is clear there is more to scroll */
+  mask-image: ${({ $moreLeft, $moreRight }) =>
+    $moreLeft || $moreRight
+      ? `linear-gradient(to right, ${$moreLeft ? 'transparent, #000 2.5rem' : '#000'}, ${$moreRight ? '#000 calc(100% - 2.5rem), transparent' : '#000'})`
+      : 'none'};
+
   ul {
     display: flex;
     gap: ${space[1]};
-    margin: 0;
-    padding: 0 ${space[2]};
+    margin: 0 0 0 -${space[3]};
+    padding: 0;
     list-style: none;
   }
 
+  /* On phones the bar runs edge to edge and scrolls */
   @media (max-width: ${PHONE}) {
     margin: 0 -${space[4]};
 
     ul {
-      padding: 0 ${space[3]};
+      margin: 0;
+      padding: 0 ${space[1]};
     }
   }
 `;
 
-const Tab = styled(Link)<{ $active: boolean }>`
+const Tab = styled(GuardedLink)<{ $active: boolean }>`
   display: inline-flex;
   align-items: center;
   gap: ${space[2]};
@@ -196,6 +203,28 @@ export interface ProjectHeaderProps {
 
 export default function ProjectHeader({ project, showStudio, badges }: ProjectHeaderProps) {
   const pathname = usePathname();
+  const barRef = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  // Keep the active tab in view (a deep link to Invoices opens with the bar scrolled to the
+  // start on phones), and mark which edges have more tabs beyond them
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const measure = () =>
+      setEdges({ left: bar.scrollLeft > 1, right: bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 1 });
+    const active = bar.querySelector<HTMLElement>('[aria-current="page"]');
+    if (active && bar.scrollWidth > bar.clientWidth) {
+      bar.scrollTo({ left: active.offsetLeft - (bar.clientWidth - active.offsetWidth) / 2 });
+    }
+    measure();
+    bar.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      bar.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [pathname]);
   const base = projectHref(project.id);
   const currentIndex = STAGE_SEQUENCE.indexOf(project.stage);
   const clientLabel = [project.clientName || project.clientEmail, project.clientCompany].filter(Boolean).join(' · ');
@@ -205,7 +234,7 @@ export default function ProjectHeader({ project, showStudio, badges }: ProjectHe
       <Crumbs aria-label="Breadcrumb">
         <ol>
           <li>
-            <Link href="/portal">{showStudio ? 'Overview' : 'Projects'}</Link>
+            <GuardedLink href="/portal">{showStudio ? 'Overview' : 'Projects'}</GuardedLink>
             <FiChevronRight aria-hidden="true" />
           </li>
           <li aria-current="page">{project.name}</li>
@@ -245,7 +274,7 @@ export default function ProjectHeader({ project, showStudio, badges }: ProjectHe
         </TrackFrame>
       )}
 
-      <TabBar aria-label="Project sections">
+      <TabBar ref={barRef} aria-label="Project sections" $moreLeft={edges.left} $moreRight={edges.right}>
         <ul>
           {PROJECT_TABS.map((tab) => {
             const href = `${base}${tab.path}`;

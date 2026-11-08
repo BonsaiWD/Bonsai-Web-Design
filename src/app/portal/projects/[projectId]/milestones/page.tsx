@@ -1,10 +1,10 @@
-import type { Metadata } from 'next';
 import MilestonesView from '@/components/portal/milestones/MilestonesView';
 import { getViewer, requireProject } from '@/server/portal/access';
 import { featureContext } from '@/server/portal/collect';
 import { loadMilestones } from '@/server/portal/features/milestones';
+import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const metadata: Metadata = { title: 'Milestones' };
+export const generateMetadata = projectTabMetadata('Milestones');
 
 export default async function MilestonesPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;

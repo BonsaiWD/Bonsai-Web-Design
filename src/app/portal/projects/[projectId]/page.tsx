@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import OverviewView from '@/components/portal/overview/OverviewView';
 import { firstName } from '@/lib/portal-format';
 import { requireProject } from '@/server/portal/access';
@@ -6,8 +5,9 @@ import { collectAttention, collectDeadlines, featureContext } from '@/server/por
 import { loadActivity } from '@/server/portal/features/activity';
 import { loadClientContact } from '@/server/portal/features/clients';
 import { collectWaitingOnClients, loadNextMilestone } from '@/server/portal/features/projects';
+import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const metadata: Metadata = { title: 'Overview' };
+export const generateMetadata = projectTabMetadata('Overview');
 
 export default async function OverviewPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
