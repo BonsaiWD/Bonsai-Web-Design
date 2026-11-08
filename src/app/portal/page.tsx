@@ -19,13 +19,16 @@ export default async function PortalHome({ searchParams }: { searchParams: Promi
 
   if (context.perspective === 'studio') {
     const waiting = await collectWaitingOnClients(context);
+    // A studio follow-up that waits on the client (an overdue sign-off or invoice) is already
+    // on that client's list in `waiting`, so it is not also work for the studio
+    const ours = attention.filter((item) => item.blockedOn !== 'client');
     const [projects, activity, hasClients, params] = await Promise.all([
-      loadProjectCards(context, { attention, deadlines, waitingOnClients: waiting }),
+      loadProjectCards(context, { attention: ours, deadlines, waitingOnClients: waiting }),
       loadActivity(context, { limit: 12 }),
       hasAnyClient(),
       searchParams,
     ]);
-    const open = attention.filter((item) => item.tone !== 'info');
+    const open = ours.filter((item) => item.tone !== 'info');
     return (
       <Page>
         <StudioDashboard

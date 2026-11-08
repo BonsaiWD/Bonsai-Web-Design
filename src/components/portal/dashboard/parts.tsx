@@ -111,16 +111,22 @@ const HeaderText = styled.div`
   min-width: 0;
 `;
 
-// "Waiting 3 days", "Yesterday": how long an item has been open, in calendar days
+// "Waiting 3 days", "Yesterday": how long an item has been open, in calendar days. An open
+// item says "Waiting", so it can't be read as a due date next to "3 days overdue".
 export function sinceLabel(since: string, today: string, waiting: boolean): string {
   const days = Math.max(0, daysBetween(since.slice(0, 10), today));
-  if (waiting) return days === 0 ? 'Since today' : `Waiting ${plural(days, 'day')}`;
+  if (waiting) return days === 0 ? 'Waiting since today' : `Waiting ${plural(days, 'day')}`;
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
   return `${days} days ago`;
 }
 
 const TONE_WORDS = { alert: 'Urgent', action: 'To do', info: 'Update' } as const;
+
+// Where an item opens: its own page when it has one (an invoice), else the tab and anchor
+export function itemHref(item: Pick<AttentionItem, 'projectId' | 'tab' | 'anchor' | 'href'>): string {
+  return item.href ?? projectHref(item.projectId, item.tab, item.anchor);
+}
 
 const Dot = styled.span<{ $tone: 'action' | 'info' }>`
   display: block;
@@ -258,7 +264,7 @@ function AttentionRows({ items, today, showProject }: { items: AttentionItem[]; 
         <LinkRow key={item.key}>
           <ToneMarker tone={item.tone} />
           <div>
-            <RowLink href={projectHref(item.projectId, item.tab, item.anchor)}>
+            <RowLink href={itemHref(item)}>
               <VisuallyHidden>{TONE_WORDS[item.tone]}: </VisuallyHidden>
               {item.title}
             </RowLink>
@@ -266,7 +272,7 @@ function AttentionRows({ items, today, showProject }: { items: AttentionItem[]; 
             <MetaLine>
               {showProject && item.projectName}
               {item.due && <DueText value={item.due} today={today} />}
-              {item.since && sinceLabel(item.since, today, item.tone === 'action')}
+              {item.since && sinceLabel(item.since, today, item.tone !== 'info')}
             </MetaLine>
           </div>
           <FiArrowRight aria-hidden="true" />
@@ -313,11 +319,15 @@ interface AttentionPanelProps {
   // Shown when nothing needs the reader
   calm: { title: string; text?: string };
   note?: ReactNode;
+  // Heading for studio follow-ups that are waiting on the client
+  followUpTitle?: string;
 }
 
-// Things to act on first, then a quieter list of recent news
-export function AttentionPanel({ id, title, items, today, showProject, calm, note }: AttentionPanelProps) {
-  const open = items.filter((item) => item.tone !== 'info');
+// Things to act on first, then follow-ups that wait on the client, then a quieter list of news
+export function AttentionPanel({ id, title, items, today, showProject, calm, note, followUpTitle = 'To follow up with clients' }: AttentionPanelProps) {
+  // Counted with the client's to-do list, not as work for the reader
+  const followUps = items.filter((item) => item.tone !== 'info' && item.blockedOn === 'client');
+  const open = items.filter((item) => item.tone !== 'info' && item.blockedOn !== 'client');
   const news = items.filter((item) => item.tone === 'info');
   return (
     <ListPanel aria-labelledby={id}>
@@ -332,6 +342,12 @@ export function AttentionPanel({ id, title, items, today, showProject, calm, not
             {calm.text && <p>{calm.text}</p>}
           </div>
         </CaughtUpRow>
+      )}
+      {followUps.length > 0 && (
+        <>
+          <SubHeading>{followUpTitle}</SubHeading>
+          <AttentionRows items={followUps} today={today} showProject={showProject} />
+        </>
       )}
       {news.length > 0 && (
         <>
@@ -395,7 +411,7 @@ export function DeadlinePanel({ id, title, items, today, perspective, showProjec
             <DeadlineRow key={item.key}>
               <DateChip value={item.date} overdue={item.date < today} />
               <div>
-                <RowLink href={projectHref(item.projectId, item.tab, item.anchor)}>
+                <RowLink href={itemHref(item)}>
                   <VisuallyHidden>
                     <DateText value={item.date} />:{' '}
                   </VisuallyHidden>
