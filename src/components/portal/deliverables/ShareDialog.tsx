@@ -8,7 +8,6 @@ import {
   Checkbox,
   Field,
   FieldRow,
-  FileInput,
   Input,
   Select,
   space,
@@ -17,9 +16,9 @@ import {
   type,
   useDialog,
   useField,
-  useFormStatusState,
   type ActionState,
 } from '@/components/portal/ui';
+import { UploadField } from '../files/UploadField';
 import { linkWarning } from './copy';
 import { FormDialog } from './parts';
 import type { DeliverableView, MilestoneOption } from './types';
@@ -65,7 +64,7 @@ export interface ShareContext {
   clientName: string;
   milestones: MilestoneOption[];
   acceptedExtensions: string;
-  maxUploadMb: number;
+  maxUploadBytes: number;
 }
 
 function ShareFields({ context, deliverable }: { context: ShareContext; deliverable: DeliverableView | null }) {
@@ -74,10 +73,6 @@ function ShareFields({ context, deliverable }: { context: ShareContext; delivera
   const [warning, setWarning] = useState(() => linkWarning(link.defaultValue));
   const savedNeeds = deliverable ? deliverable.lastNeedsApproval : true;
   const [needsApproval, setNeedsApproval] = useState(() => needsField.defaultChecked(savedNeeds));
-  // The browser clears a chosen file whenever the form comes back with a problem
-  const { state } = useFormStatusState();
-  const [chosenFile, setChosenFile] = useState<{ name: string; at: number | null } | null>(null);
-  const fileCleared = Boolean(chosenFile && state && !state.ok && state.at !== chosenFile.at);
   const next = (deliverable?.latestVersion ?? 0) + 1;
 
   return (
@@ -140,30 +135,16 @@ function ShareFields({ context, deliverable }: { context: ShareContext; delivera
 
       <Or>or</Or>
 
-      <Field
+      {/* A file over the limit is cleared as soon as it is chosen: sent, it would be refused
+          before the action runs, after a long upload */}
+      <UploadField
         label="Upload a file"
         name="file"
-        hint={
-          fileCleared && chosenFile
-            ? `Choose ${chosenFile.name} again: files are cleared when the form needs a correction.`
-            : `PDF, image, Office file or ZIP, up to ${context.maxUploadMb} MB. PDFs and images open in the browser.`
-        }
-      >
-        {(control) => (
-          <FileInput
-            id={control.id}
-            name={control.name}
-            accept={context.acceptedExtensions}
-            aria-describedby={control.describedBy}
-            aria-invalid={control.invalid || undefined}
-            onChange={(event) => {
-              const picked = event.target.files?.[0];
-              // Remember which result this choice came after, so the hint shows only once it is cleared
-              setChosenFile(picked ? { name: picked.name, at: state?.at ?? null } : null);
-            }}
-          />
-        )}
-      </Field>
+        acceptedExtensions={context.acceptedExtensions}
+        maxUploadBytes={context.maxUploadBytes}
+        hint={`PDF, image, Office file or ZIP, up to ${Math.floor(context.maxUploadBytes / (1024 * 1024))} MB. PDFs and images open in the browser.`}
+        tooLargeAdvice="for anything larger, share a link to it above instead."
+      />
 
       <Field label={next > 1 ? 'What changed' : 'Note for the client'} name="note" optional>
         {(control) => (

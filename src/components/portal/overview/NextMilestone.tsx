@@ -118,7 +118,8 @@ export default function NextMilestone({ projectId, perspective, today, clientFir
             {next.dueDate && <DueText value={next.dueDate} today={today} />}
             {/* "Due Mar 4, 2027" already names the day; the relative labels need it added */}
             {next.dueDate && due && due.tone !== 'later' && <DateText value={next.dueDate} />}
-            {next.requiresSignoff && !next.signed && (
+            {/* Initials are asked for only once the step is waiting on the client */}
+            {next.requiresSignoff && !next.signed && next.status === 'waiting_on_client' && (
               <StatusBadge tone="action">{client ? 'Your sign-off is needed' : `Waiting for ${clientFirst}'s initials`}</StatusBadge>
             )}
           </MetaLine>

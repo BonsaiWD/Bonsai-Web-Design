@@ -29,7 +29,7 @@ export default async function DeliverablesPage({ params }: { params: Promise<{ p
       deliverables={deliverables}
       milestones={milestones}
       acceptedExtensions={studio ? ACCEPTED_EXTENSIONS : ''}
-      maxUploadMb={Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}
+      maxUploadBytes={MAX_UPLOAD_BYTES}
     />
   );
 }

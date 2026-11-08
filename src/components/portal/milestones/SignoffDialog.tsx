@@ -15,6 +15,7 @@ import {
   SubmitButton,
   Textarea,
 } from '../ui';
+import { UnsavedFormGuard } from '../deliverables/parts';
 import { FreshFields, PendingReporter } from './formParts';
 import { InitialsInput, StatementBox } from './styles';
 
@@ -62,6 +63,7 @@ export default function SignoffDialog({
     >
       <ActionForm action={signOffMilestone} onSuccess={(state) => onSigned(state.message)}>
         <PendingReporter onChange={onPendingChange} />
+        <UnsavedFormGuard />
         <FormStack>
           <FreshFields>
             <StatementBox>

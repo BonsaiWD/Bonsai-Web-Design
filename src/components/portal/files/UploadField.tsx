@@ -27,6 +27,8 @@ interface UploadFieldProps {
   maxUploadBytes: number;
   name?: string;
   optional?: boolean;
+  // What to do instead with a file over the limit
+  tooLargeAdvice?: string;
 }
 
 /*
@@ -35,7 +37,15 @@ interface UploadFieldProps {
  * after a failed submit the hint says to choose the file again: browsers clear file inputs
  * whenever a form is reset.
  */
-export function UploadField({ label, hint, acceptedExtensions, maxUploadBytes, name = 'file', optional }: UploadFieldProps) {
+export function UploadField({
+  label,
+  hint,
+  acceptedExtensions,
+  maxUploadBytes,
+  name = 'file',
+  optional,
+  tooLargeAdvice = 'for anything larger, share a link in Messages instead.',
+}: UploadFieldProps) {
   const { state } = useFormStatusState();
   const [chosen, setChosen] = useState<{ name: string; at: number | null } | null>(null);
   const [tooLarge, setTooLarge] = useState<{ name: string; size: number } | null>(null);
@@ -76,8 +86,7 @@ export function UploadField({ label, hint, acceptedExtensions, maxUploadBytes, n
       {tooLarge && (
         <TooLarge id={warningId} role="alert">
           <FiAlertCircle aria-hidden="true" />
-          {tooLarge.name} is {formatBytes(tooLarge.size)}. Files can be up to {limit}: for anything larger, share a link in Messages
-          instead.
+          {tooLarge.name} is {formatBytes(tooLarge.size)}. Files can be up to {limit}: {tooLargeAdvice}
         </TooLarge>
       )}
     </div>

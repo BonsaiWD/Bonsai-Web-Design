@@ -7,6 +7,7 @@ import MetaDot from '@/components/common/MetaDot';
 import { dueInfo, firstName } from '@/lib/portal-format';
 import { projectHref } from '../tabs';
 import { DateText, DueText, Eyebrow, focusRing, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
+import { asksForInitials } from './signoff';
 import type { MilestoneView } from './types';
 
 const Cells = styled.div`
@@ -155,10 +156,7 @@ function waitingItems(milestones: MilestoneView[], projectId: string, forClient:
   const items: WaitingItem[] = [];
   for (const m of milestones) {
     const anchor = `#milestone-${m.id}`;
-    if (m.requiresSignoff && !m.signoff) {
-      items.push({ key: m.id, href: anchor, label: forClient ? `Initial ${m.title}` : `${m.title}: initials`, due: m.dueDate });
-      continue;
-    }
+    // Only steps waiting on the client, and a linked review comes before any initials
     if (m.status !== 'waiting_on_client') continue;
     const review = m.linked.find((d) => d.status === 'in_review');
     if (review) {
@@ -168,6 +166,8 @@ function waitingItems(milestones: MilestoneView[], projectId: string, forClient:
         label: forClient ? `Review ${review.title}` : `${m.title}: review of ${review.title}`,
         due: m.dueDate,
       });
+    } else if (asksForInitials({ requiresSignoff: m.requiresSignoff, signed: Boolean(m.signoff), status: m.status, reviewPending: false })) {
+      items.push({ key: m.id, href: anchor, label: forClient ? `Sign off ${m.title}` : `${m.title}: initials`, due: m.dueDate });
     } else {
       items.push({ key: m.id, href: anchor, label: m.title, due: m.dueDate });
     }

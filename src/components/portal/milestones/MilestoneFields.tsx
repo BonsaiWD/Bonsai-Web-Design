@@ -77,9 +77,9 @@ export default function MilestoneFields({ saved, clientFirst }: { saved: Milesto
       <Checkbox
         name="requiresSignoff"
         savedChecked={saved.requiresSignoff}
-        hint={`${clientFirst} sees "Your sign-off is needed" on it in the portal. To email them as well, use Ask for sign-off on the milestone.`}
+        hint={`${clientFirst} is asked to initial it once it's Waiting on client and any linked review is approved. Ask for sign-off on the milestone also emails them.`}
       >
-        Ask {clientFirst} to initial it off
+        Needs {clientFirst}&apos;s initials when done
       </Checkbox>
     </>
   );

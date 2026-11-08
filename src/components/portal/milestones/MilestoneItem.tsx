@@ -24,6 +24,7 @@ import {
   SubmitButton,
   TextLink,
   space,
+  tint,
   type,
   useDialog,
   useFormStatusState,
@@ -33,6 +34,7 @@ import EditMilestoneForm from './EditMilestoneForm';
 import { DELIVERABLE_LABELS, indexLabel } from './labels';
 import RecordSignoffDialog from './RecordSignoffDialog';
 import SignoffDialog from './SignoffDialog';
+import { asksForInitials } from './signoff';
 import { signoffStatement } from './statement';
 import {
   Badges,
@@ -63,6 +65,16 @@ const RowStatus = styled.p<{ $error: boolean }>`
   &:empty {
     display: none;
   }
+
+  &:focus {
+    outline: none;
+  }
+`;
+
+// Asking again on a finished step is a confirmation, not a danger: bronze, not red
+const AskConfirm = styled(InlineConfirm)`
+  border-color: ${({ theme }) => tint(theme.colors.primary, 40)};
+  background: ${({ theme }) => tint(theme.colors.primary, 6)};
 `;
 
 const MoveForm = styled(ActionForm)`
@@ -70,12 +82,14 @@ const MoveForm = styled(ActionForm)`
   gap: ${space[2]};
 `;
 
+// Doubled class: InlineConfirm's "> div" rule would otherwise centre the lines
 const ConfirmText = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: ${space[1]};
-  min-width: 0;
+  && {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${space[1]};
+    min-width: 0;
+  }
 `;
 
 // Hands each result of a small one-button form to the row, which shows it in one place
@@ -204,14 +218,22 @@ export default function MilestoneItem({
   const clientFirst = firstName(clientName) ?? clientName;
   const labels = MILESTONE_LABELS[m.status];
   const done = m.status === 'done';
+  const waiting = m.status === 'waiting_on_client';
+  // Needs initials at some point; they are asked for only once the step waits on the client
+  // and any linked review is finished
   const needsSignoff = m.requiresSignoff && !m.signoff;
-  const canSign = isClient && !previewingAsClient;
   const review = m.linked.find((d) => d.status === 'in_review');
+  const initialsDue = asksForInitials({ requiresSignoff: m.requiresSignoff, signed: Boolean(m.signoff), status: m.status, reviewPending: Boolean(review) });
+  const canSign = isClient && !previewingAsClient;
 
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
+  // A new key remounts the editor, so it starts from the latest saved values and version
+  const [editorKey, setEditorKey] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingAsk, setConfirmingAsk] = useState(false);
+  const [focusStatus, setFocusStatus] = useState(0);
   const [dialogBusy, setDialogBusy] = useState(false);
   const signDialog = useDialog();
   const recordDialog = useDialog();
@@ -219,17 +241,23 @@ export default function MilestoneItem({
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const keepButtonRef = useRef<HTMLButtonElement>(null);
+  const askButtonRef = useRef<HTMLButtonElement>(null);
+  const keepAskRef = useRef<HTMLButtonElement>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
   const lastMove = useRef<'up' | 'down'>('up');
   // After a sign-off lands, focus moves once to the new record so it is read out in place
   const focusRecordPending = useRef(false);
   const [focusTick, setFocusTick] = useState(0);
   const signoffId = m.signoff?.id;
 
+  // The revalidated row (with the record) can arrive while the dialog is still open, when the
+  // record behind it is inert and cannot take focus; wait until the dialog has closed
+  const anyDialogOpen = signDialog.open || recordDialog.open;
   useEffect(() => {
-    if (!focusRecordPending.current || !signoffId) return;
+    if (!focusRecordPending.current || !signoffId || anyDialogOpen) return;
     focusRecordPending.current = false;
     recordRef.current?.focus();
-  }, [focusTick, signoffId]);
+  }, [focusTick, signoffId, anyDialogOpen]);
 
   function focusRecordSoon() {
     focusRecordPending.current = true;
@@ -240,12 +268,29 @@ export default function MilestoneItem({
     if (confirmingDelete) keepButtonRef.current?.focus();
   }, [confirmingDelete]);
 
+  useEffect(() => {
+    if (confirmingAsk) keepAskRef.current?.focus();
+  }, [confirmingAsk]);
+
+  // After asking on a finished step its button changes, so the result takes focus instead
+  useEffect(() => {
+    if (focusStatus > 0) statusRef.current?.focus();
+  }, [focusStatus]);
+
   const report = useCallback((state: NonNullable<ActionState>) => setMessage({ text: state.message, error: !state.ok }), []);
   const setRowDirty = useCallback((value: boolean) => onDirtyChange(m.id, value), [onDirtyChange, m.id]);
 
   function openEditor() {
     setEditorMounted(true);
+    // Edits only collapsed with this toggle are kept; with none, open a fresh editor, since
+    // asking for or recording a sign-off may have changed the milestone since it was last open
+    if (!editing && !dirty) setEditorKey((key) => key + 1);
     setEditing((open) => !open);
+  }
+
+  function closeAsk() {
+    setConfirmingAsk(false);
+    askButtonRef.current?.focus();
   }
 
   function closeDelete() {
@@ -258,7 +303,7 @@ export default function MilestoneItem({
 
   return (
     <Item id={`milestone-${m.id}`} $done={done} aria-labelledby={titleId}>
-      <Node aria-hidden="true" $status={m.status} $asking={needsSignoff} />
+      <Node aria-hidden="true" $status={m.status} $asking={initialsDue} />
       <Body>
         <ItemHeader>
           <TitleGroup>
@@ -302,6 +347,7 @@ export default function MilestoneItem({
 
         {showStudio && editorMounted && (
           <EditMilestoneForm
+            key={editorKey}
             id={editorId}
             hidden={!editing}
             milestone={m}
@@ -342,8 +388,16 @@ export default function MilestoneItem({
 
         {m.signoff ? (
           <SignoffRecordView signoff={m.signoff} studio={showStudio} recordRef={recordRef} />
-        ) : needsSignoff ? (
-          showStudio ? (
+        ) : showStudio ? (
+          needsSignoff &&
+          (waiting && review ? (
+            <Callout $tone="quiet">
+              <h4>Waiting on {clientFirst}&apos;s review</h4>
+              <p>
+                {clientFirst} is asked to initial this step once {review.title} is approved.
+              </p>
+            </Callout>
+          ) : waiting ? (
             <Callout $tone="quiet">
               <h4>Waiting for {clientFirst}&apos;s initials</h4>
               <p>
@@ -356,40 +410,55 @@ export default function MilestoneItem({
                 )}
               </p>
             </Callout>
+          ) : done ? (
+            <Callout $tone="quiet">
+              <h4>Done without {clientFirst}&apos;s initials</h4>
+              <p>If you still want them on record, Ask for sign-off moves this step back to Waiting on client and emails {clientFirst}.</p>
+            </Callout>
           ) : (
-            <Callout>
-              <h4>Your sign-off is needed</h4>
-              <p>When you&apos;re happy {m.title} is complete, add your initials so we can move on to the next step.</p>
-              <div>
-                {canSign ? (
-                  <Button onClick={signDialog.openDialog}>Initial to sign off</Button>
-                ) : (
-                  <MetaText>Only {clientName} can initial this.</MetaText>
-                )}
-              </div>
+            <Callout $tone="quiet">
+              <h4>Needs {clientFirst}&apos;s initials when done</h4>
+              <p>
+                {clientFirst} isn&apos;t asked yet. When the work is ready, Ask for sign-off emails {clientFirst} and moves this step to
+                Waiting on client.
+              </p>
             </Callout>
-          )
-        ) : (
-          !showStudio &&
-          m.status === 'waiting_on_client' && (
-            <Callout>
-              <h4>This step is waiting on you</h4>
-              {review ? (
-                <>
-                  <p>Once you&apos;ve reviewed {review.title}, we can move this on.</p>
-                  <div>
-                    <ButtonLink href={projectHref(projectId, 'deliverables', `deliverable-${review.id}`)} $variant="secondary" $size="sm">
-                      Go to the review
-                    </ButtonLink>
-                  </div>
-                </>
+          ))
+        ) : waiting && review ? (
+          <Callout>
+            <h4>This step is waiting on you</h4>
+            <p>
+              {needsSignoff
+                ? `Once you've approved ${review.title}, you'll be asked to initial this step.`
+                : `Once you've reviewed ${review.title}, we can move this on.`}
+            </p>
+            <div>
+              <ButtonLink href={projectHref(projectId, 'deliverables', `deliverable-${review.id}`)} $variant="secondary" $size="sm">
+                Go to the review
+              </ButtonLink>
+            </div>
+          </Callout>
+        ) : initialsDue ? (
+          <Callout>
+            <h4>Your sign-off is needed</h4>
+            <p>When you&apos;re happy {m.title} is complete, add your initials so we can move on to the next step.</p>
+            <div>
+              {canSign ? (
+                <Button onClick={signDialog.openDialog}>Initial to sign off</Button>
               ) : (
-                <p>
-                  If you&apos;re not sure what we need from you, <TextLink href={projectHref(projectId, 'messages')}>message us</TextLink>.
-                </p>
+                <MetaText>Only {clientName} can initial this.</MetaText>
               )}
-            </Callout>
-          )
+            </div>
+          </Callout>
+        ) : waiting ? (
+          <Callout>
+            <h4>This step is waiting on you</h4>
+            <p>
+              If you&apos;re not sure what we need from you, <TextLink href={projectHref(projectId, 'messages')}>message us</TextLink>.
+            </p>
+          </Callout>
+        ) : (
+          needsSignoff && !done && <MetaText>We&apos;ll ask you to initial this step when it&apos;s ready.</MetaText>
         )}
 
         {showStudio && (
@@ -411,15 +480,30 @@ export default function MilestoneItem({
               </Button>
               {!m.signoff && (
                 <>
-                  <ActionForm action={askForSignoff}>
-                    <ResultReporter onResult={report} />
-                    <input type="hidden" name="id" value={m.id} />
-                    <input type="hidden" name="projectId" value={projectId} />
-                    <SubmitButton variant="quiet" size="sm" pendingLabel="Sending…">
+                  {/* While a linked review is open the client can't initial yet, so there is
+                      nothing to ask for; a finished step asks before it is reopened */}
+                  {review ? null : done ? (
+                    <Button
+                      ref={askButtonRef}
+                      $variant="quiet"
+                      $size="sm"
+                      aria-expanded={confirmingAsk}
+                      onClick={() => setConfirmingAsk((open) => !open)}
+                    >
                       <FiSend aria-hidden="true" />
-                      {m.requiresSignoff ? `Remind ${clientFirst}` : 'Ask for sign-off'}
-                    </SubmitButton>
-                  </ActionForm>
+                      Ask for sign-off
+                    </Button>
+                  ) : (
+                    <ActionForm action={askForSignoff}>
+                      <ResultReporter onResult={report} />
+                      <input type="hidden" name="id" value={m.id} />
+                      <input type="hidden" name="projectId" value={projectId} />
+                      <SubmitButton variant="quiet" size="sm" pendingLabel="Sending…">
+                        <FiSend aria-hidden="true" />
+                        {waiting && m.requiresSignoff ? `Remind ${clientFirst}` : 'Ask for sign-off'}
+                      </SubmitButton>
+                    </ActionForm>
+                  )}
                   <Button $variant="quiet" $size="sm" onClick={recordDialog.openDialog}>
                     <FiClipboard aria-hidden="true" />
                     Record sign-off
@@ -454,6 +538,36 @@ export default function MilestoneItem({
               </Button>
             </div>
           </Toolbar>
+        )}
+
+        {showStudio && confirmingAsk && (
+          <ActionForm
+            action={askForSignoff}
+            onSuccess={() => {
+              setConfirmingAsk(false);
+              setFocusStatus((value) => value + 1);
+            }}
+          >
+            <ResultReporter onResult={report} />
+            <AskConfirm>
+              <ConfirmText>
+                <p>
+                  Ask {clientFirst} to initial {m.title}?
+                </p>
+                <MetaText>This emails {clientFirst} and moves it back to Waiting on client until it&apos;s initialled.</MetaText>
+              </ConfirmText>
+              <div>
+                <SubmitButton size="sm" pendingLabel="Sending…">
+                  Ask {clientFirst}
+                </SubmitButton>
+                <Button ref={keepAskRef} $variant="secondary" $size="sm" onClick={closeAsk}>
+                  Keep it done
+                </Button>
+              </div>
+            </AskConfirm>
+            <input type="hidden" name="id" value={m.id} />
+            <input type="hidden" name="projectId" value={projectId} />
+          </ActionForm>
         )}
 
         {showStudio && confirmingDelete && (
@@ -499,7 +613,7 @@ export default function MilestoneItem({
           )
         )}
 
-        <RowStatus role="status" aria-live="polite" $error={Boolean(message?.error)}>
+        <RowStatus ref={statusRef} role="status" aria-live="polite" tabIndex={-1} $error={Boolean(message?.error)}>
           {message?.text ?? ''}
         </RowStatus>
       </Body>
