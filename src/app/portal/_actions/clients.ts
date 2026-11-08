@@ -138,11 +138,13 @@ export async function addClient(_prev: ActionState, formData: FormData): Promise
                 throw new ActionError('This form was already used. Close it and open Add client again.');
             });
         } catch (error) {
-            // Two people adding the same address at once: the second hears whose it is
             if (!isUniqueViolation(error)) throw error;
             const owner = await ownerOf(input.email);
-            if (owner) throw takenError(owner);
-            throw error;
+            // The same form landing twice at once: the first one added this client
+            if (owner?.id === input.id) repeat = true;
+            // Two people adding the same address at once: the second hears whose it is
+            else if (owner) throw takenError(owner);
+            else throw error;
         }
 
         const added = `Added ${input.name} (${input.email}).`;

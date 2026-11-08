@@ -67,8 +67,9 @@ export async function createProject(_prev: ActionState, formData: FormData): Pro
 
         const created = await getDb().transaction(async (tx) => {
             const client = await lockClient(tx, input.clientId);
-            if (!client)
+            if (!client) {
                 throw new ActionError('That client could not be found. Reload the page.', { clientId: 'Choose a client from the list.' });
+            }
             const inserted = await tx
                 .insert(project)
                 .values({
@@ -225,8 +226,9 @@ export async function reassignProject(_prev: ActionState, formData: FormData): P
             }
             const [from] = await tx.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, current.clientId));
             const to = await lockClient(tx, input.clientId);
-            if (!to)
+            if (!to) {
                 throw new ActionError('That client could not be found. Reload the page.', { clientId: 'Choose a client from the list.' });
+            }
 
             // Decisions and signatures belong to the person who made them; they cannot move
             const records = await countProjectRecords(tx, projectId);
