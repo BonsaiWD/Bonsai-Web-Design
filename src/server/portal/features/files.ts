@@ -11,7 +11,7 @@ import { projectScope, type AttentionItem, type FeatureContext, type Perspective
 import { INLINE_TYPES, MAX_UPLOAD_BYTES } from '../storage';
 import { failedEmails, failedEmailTitle } from './failed-emails';
 import { countInWindow, uncountInWindow } from '../throttle';
-import { kindItemId, kindMaker } from '../kinds';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker } from '../kinds';
 import { summaryWithText, textFromSummary } from '../notify';
 
 /* ---------- Activity ----------
@@ -251,7 +251,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
 // Failed emails about shared files, flagged as every feature flags them (failed-emails.ts).
 // One about a file that has since been removed no longer matters.
 async function failedEmailItems(context: FeatureContext): Promise<AttentionItem[]> {
-  const emails = await failedEmails(context, { kinds: ['file.'], subjectOf: kindItemId });
+  const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.file, subjectOf: kindItemId });
   const ids = [...new Set(emails.map((row) => row.subject).filter((id): id is string => Boolean(id)))];
   if (ids.length === 0) return [];
   const files = await getDb()

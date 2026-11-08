@@ -7,7 +7,7 @@ import { getDb } from '@/db';
 import { deliverable, deliverableVersion, file } from '@/db/schema';
 import { approvalStatement, changesStatement, studioApprovalStatement } from '@/components/portal/deliverables/copy';
 import { projectHref } from '@/components/portal/tabs';
-import { plural, todayIso } from '@/lib/portal-format';
+import { plural, todayIso, versionName } from '@/lib/portal-format';
 import { adminActor, assertStillClient, projectActor, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
@@ -216,7 +216,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
       .from(deliverableVersion)
       .innerJoin(deliverable, eq(deliverable.id, deliverableVersion.deliverableId))
       .where(and(eq(deliverableVersion.id, input.versionId), eq(deliverable.projectId, projectId)));
-    if (already) return done(`Shared ${already.title} (version ${already.version}).`);
+    if (already) return done(`Shared ${versionName(already.title, already.version)}.`);
 
     // Cheap checks before the upload, so a stale form does not store a file for nothing
     const [existing] = await db
@@ -322,8 +322,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     refresh(projectId);
     const clientName = clientNameOf(actor);
     const kind = deliverableKind('shared', input.deliverableId);
-    // Worded as the attention items and dashboards word a version: "<title> (version N)"
-    const summary = `Shared ${shared.title} (version ${shared.version})`;
+    const summary = `Shared ${versionName(shared.title, shared.version)}`;
     if (!input.emailClient) {
       await recordActivity({ projectId, actorId: actor.user.id, kind, summary, target: 'deliverables' });
       return done(`${summary}. No email was sent.`);
@@ -351,7 +350,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     });
     if (emailStatus !== 'sent') await releaseRateSlot(slot);
     return done(
-      `${summary}.${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`,
+      `${summary}.${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`,
     );
   });
 }
@@ -440,7 +439,7 @@ export async function fixVersionLink(_prev: ActionState, formData: FormData): Pr
       projectId,
       actorId: actor.user.id,
       kind: deliverableKind('linkFixed', result.deliverableId),
-      summary: `Updated the link for ${result.title} (version ${result.version.version})`,
+      summary: `Updated the link for ${versionName(result.title, result.version.version)}`,
       target: 'deliverables',
     });
     return done(`Saved the new link for version ${result.version.version}.`);
@@ -488,7 +487,7 @@ export async function withdrawVersion(_prev: ActionState, formData: FormData): P
       projectId,
       actorId: actor.user.id,
       kind: deliverableKind('withdrawn', result.deliverableId),
-      summary: `Withdrew ${result.title} (version ${result.version.version})`,
+      summary: `Withdrew ${versionName(result.title, result.version.version)}`,
       target: 'deliverables',
       visibility: 'studio',
     });
@@ -544,7 +543,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
       projectId,
       actorId: actor.user.id,
       kind: deliverableKind('reminded', locked.deliverableId),
-      summary: `Emailed ${clientName}${again ? ' again' : ''} about ${locked.title} (version ${version.version})`,
+      summary: `Emailed ${clientName}${again ? ' again' : ''} about ${versionName(locked.title, version.version)}`,
       target: 'deliverables',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -552,7 +551,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
     refresh(projectId);
     if (emailStatus === 'sent') return done(`Emailed ${clientName}${again ? ' again' : ''}.`);
     await releaseRateSlot(slot);
-    if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName).trim());
+    if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName, deliverableKind('reminded', locked.deliverableId)).trim());
     throw new ActionError(`The email to ${clientName} could not be sent. It is flagged on your dashboard; try again in a minute.`);
   });
 }
@@ -603,6 +602,7 @@ export async function recordApproval(_prev: ActionState, formData: FormData): Pr
     refresh(projectId);
     const { subject, content } = recordedApprovalEmail({
       clientName,
+      projectName: actor.project.name,
       recordedBy,
       title: result.version.titleSnapshot,
       version: result.version.version,
@@ -619,12 +619,12 @@ export async function recordApproval(_prev: ActionState, formData: FormData): Pr
       projectId,
       actorId: admin.id,
       kind: deliverableKind('approved', result.deliverableId),
-      summary: `Recorded ${clientName}'s approval of ${result.title} (version ${result.version.version}), given outside the portal`,
+      summary: `Recorded ${clientName}'s approval of ${versionName(result.title, result.version.version)}, given outside the portal`,
       target: 'deliverables',
       email: { to: actor.project.clientEmail, subject, content },
     });
     return done(
-      `Recorded the approval of version ${result.version.version}.${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName)}`,
+      `Recorded the approval of ${versionName(result.title, result.version.version)}.${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName, deliverableKind('approved', result.deliverableId))}`,
     );
   });
 }
@@ -744,13 +744,14 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
       return { ...locked, statement, duplicate: false as const, decidedAt: updated[0].decidedAt ?? new Date() };
     });
 
-    const thanks = `Thanks, ${result.version.titleSnapshot} (version ${result.version.version}) is approved.`;
+    const thanks = `Thanks. ${versionName(result.version.titleSnapshot, result.version.version)} is approved.`;
     if (result.duplicate) return done(thanks);
 
     refresh(projectId);
     const clientName = clientNameOf(actor);
     const emails = approvalEmails({
       clientName,
+      projectName: actor.project.name,
       title: result.version.titleSnapshot,
       version: result.version.version,
       statement: result.statement,
@@ -767,7 +768,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: deliverableKind('approved', result.deliverableId),
-        summary: `${clientName} approved ${result.title} (version ${result.version.version})`,
+        summary: `${clientName} approved ${versionName(result.title, result.version.version)}`,
         target: 'deliverables',
         email: { to: STUDIO_EMAIL, replyTo: actor.user.email, ...emails.studio },
       }),
@@ -775,7 +776,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: deliverableKind('receipt', result.deliverableId),
-        summary: `Receipt emailed to ${clientName}: approval of ${result.title} (version ${result.version.version})`,
+        summary: `Receipt emailed to ${clientName}: approval of ${versionName(result.title, result.version.version)}`,
         target: 'deliverables',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },
@@ -850,6 +851,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
     const clientName = clientNameOf(actor);
     const emails = changesEmails({
       clientName,
+      projectName: actor.project.name,
       title: result.version.titleSnapshot,
       version: result.version.version,
       nextVersion,
@@ -867,7 +869,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: deliverableKind('changes', result.deliverableId),
-        summary: `${clientName} asked for changes on ${result.title} (version ${result.version.version})`,
+        summary: `${clientName} asked for changes on ${versionName(result.title, result.version.version)}`,
         target: 'deliverables',
         email: { to: STUDIO_EMAIL, replyTo: actor.user.email, ...emails.studio },
       }),
@@ -875,7 +877,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: deliverableKind('receipt', result.deliverableId),
-        summary: `Receipt emailed to ${clientName}: changes requested on ${result.title} (version ${result.version.version})`,
+        summary: `Receipt emailed to ${clientName}: changes requested on ${versionName(result.title, result.version.version)}`,
         target: 'deliverables',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },

@@ -122,7 +122,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
 
     if (!fromStudio) return done(CLIENT_SENT);
-    return done(emailStatus === 'sent' ? `Sent. We emailed ${clientFirst}.` : `Sent.${emailNote(emailStatus, clientFirst)}`);
+    return done(emailStatus === 'sent' ? `Sent. We emailed ${clientFirst}.` : `Sent.${emailNote(emailStatus, clientFirst, MESSAGE_KIND)}`);
   });
 }
 

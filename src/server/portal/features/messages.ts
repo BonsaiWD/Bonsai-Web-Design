@@ -9,7 +9,9 @@ import { firstName } from '@/lib/portal-format';
 import type { PortalProject } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
 import { claimRateSlot, type RateSlot } from '../throttle';
-import { STUDIO_NAME } from '../notify';
+import { STUDIO_NAME, studioSubject } from '../notify';
+import { FLAGGED_EMAIL_KINDS } from '../kinds';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -271,7 +273,7 @@ interface ClientMessageEmailInput {
 export function clientMessageEmail(input: ClientMessageEmailInput): { subject: string; content: EmailContent } {
   const { quote, cut } = quoted(input.body);
   return {
-    subject: `${input.clientName} sent a message about ${input.projectName}`,
+    subject: studioSubject(`${input.clientName} sent a message`, input.projectName),
     content: {
       heading: `${input.clientName} sent a message`,
       paragraphs: [`${input.clientName} wrote about ${input.projectName}:`],
@@ -355,35 +357,15 @@ function excerpt(body: string): string {
   return flat.length > 140 ? `${flat.slice(0, 140).trimEnd()}…` : flat;
 }
 
+// Message emails that never arrived, flagged as every feature flags them (failed-emails.ts)
 async function failedEmailItems(context: FeatureContext): Promise<AttentionItem[]> {
-  const rows = await getDb()
-    .select({
-      id: activity.id,
-      summary: activity.summary,
-      emailTo: activity.emailTo,
-      emailStatus: activity.emailStatus,
-      createdAt: activity.createdAt,
-      projectId: project.id,
-      projectName: project.name,
-    })
-    .from(activity)
-    .innerJoin(project, eq(project.id, activity.projectId))
-    .where(
-      and(
-        eq(activity.kind, MESSAGE_KIND),
-        isNotNull(activity.emailTo),
-        inArray(activity.emailStatus, ['sent', 'failed']),
-        gte(activity.createdAt, sql`now() - interval '14 days'`),
-        projectScope(context),
-      ),
-    )
-    .orderBy(asc(activity.createdAt));
-  return unresolvedFailures(rows).map((row) => ({
+  const rows = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.message, subjectOf: () => null });
+  return rows.map((row) => ({
     key: `message-email:${row.id}`,
     projectId: row.projectId,
     projectName: row.projectName,
     tab: 'messages' as const,
-    title: `A message email to ${row.emailTo} could not be sent`,
+    title: failedEmailTitle(row.who, 'a new message'),
     detail: row.summary,
     since: row.createdAt.toISOString(),
     tone: 'alert' as const,

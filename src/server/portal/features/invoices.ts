@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import { and, asc, desc, eq, inArray, isNotNull, like, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, ne, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { activity, invoice, invoiceItem, paymentMethodSetting, project, rateLimit, user, type PaymentMethod } from '@/db/schema';
 import { isOverdue, METHOD_LABELS, METHOD_ORDER } from '@/components/portal/invoices/labels';
@@ -18,8 +18,9 @@ import type { EmailContent } from '@/lib/email';
 import { firstName, formatDate, formatMoney, formatUtcMoment } from '@/lib/portal-format';
 import { isUuid } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
-import { portalOrigin, STUDIO_NAME } from '../notify';
-import { kindMaker } from '../kinds';
+import { portalOrigin, STUDIO_NAME, studioSubject } from '../notify';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker } from '../kinds';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Shared by the pages, the provider and the actions ---------- */
 
@@ -55,7 +56,7 @@ const KINDS = {
 
 export const invoiceKind = kindMaker(KINDS);
 
-// Emails that go to the client; the newest one failing is flagged for the studio
+// Emails that go to the client (the dashboard flags their failures: FLAGGED_EMAIL_KINDS.invoice)
 const CLIENT_EMAIL_KINDS = [KINDS.sent, KINDS.reminded, KINDS.notReceived, KINDS.paid];
 
 /* ---------- Email throttle ----------
@@ -289,7 +290,7 @@ export function reminderEmail(facts: InvoiceFacts, today: string): Email {
 
 export function paymentReportedEmail(facts: InvoiceFacts & { reporter: string; reporterEmail: string; method: PaymentMethod; reference: string | null; at: Date }): Email {
   return {
-    subject: `${facts.reporter} reported a payment on ${facts.number}`,
+    subject: studioSubject(`${facts.reporter} reported a payment on ${facts.number}`, facts.projectName),
     content: {
       heading: `Payment reported on ${facts.number}`,
       paragraphs: [
@@ -423,42 +424,28 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
     }
   }
 
-  // The newest email to the client about each invoice; if it failed, the client may not know
-  const invoiceIdOfKind = sql<string>`split_part(${activity.kind}, ':', 2)`;
-  const newestEmails = await getDb()
-    .selectDistinctOn([invoiceIdOfKind], {
-      id: activity.id,
-      emailStatus: activity.emailStatus,
-      emailTo: activity.emailTo,
-      summary: activity.summary,
-      createdAt: activity.createdAt,
-      invoiceId: invoice.id,
-      number: invoice.number,
-      status: invoice.status,
-      projectId: project.id,
-      projectName: project.name,
-    })
-    .from(activity)
-    .innerJoin(invoice, and(sql`${invoice.id}::text = ${invoiceIdOfKind}`, eq(invoice.projectId, activity.projectId)))
-    .innerJoin(project, eq(project.id, invoice.projectId))
-    .where(
-      and(
-        projectScope(context),
-        isNotNull(activity.emailTo),
-        or(...CLIENT_EMAIL_KINDS.map((kind) => like(activity.kind, `${kind}:%`))),
-      ),
-    )
-    .orderBy(invoiceIdOfKind, desc(activity.createdAt));
-  for (const row of newestEmails) {
-    if (row.emailStatus !== 'failed' || row.status === 'void') continue;
+  // Emails to the client that never arrived, flagged as every feature flags them
+  // (failed-emails.ts): the newest failure per invoice, unless the invoice was voided since
+  const failures = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.invoice, subjectOf: kindItemId });
+  const newestFailure = new Map(failures.map((row) => [row.subject, row]));
+  const failedIds = [...newestFailure.keys()].filter((id): id is string => Boolean(id));
+  const failedInvoices = failedIds.length
+    ? await getDb()
+        .select({ id: invoice.id, number: invoice.number, status: invoice.status })
+        .from(invoice)
+        .where(inArray(invoice.id, failedIds))
+    : [];
+  for (const about of failedInvoices) {
+    const row = newestFailure.get(about.id);
+    if (!row || about.status === 'void') continue;
     items.push({
       key: `invoice-email:${row.id}`,
       projectId: row.projectId,
       projectName: row.projectName,
       tab: 'invoices',
-      anchor: invoiceAnchor(row.invoiceId),
-      href: invoicePath(row.projectId, row.invoiceId),
-      title: `The email about ${row.number} to ${row.emailTo} could not be sent`,
+      anchor: invoiceAnchor(about.id),
+      href: invoicePath(row.projectId, about.id),
+      title: failedEmailTitle(row.who, about.number),
       detail: row.summary,
       since: row.createdAt.toISOString(),
       tone: 'alert',

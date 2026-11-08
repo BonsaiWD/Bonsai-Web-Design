@@ -350,7 +350,7 @@ export async function sendInvoice(_prev: ActionState, formData: FormData): Promi
     });
     if (emailStatus !== 'sent') await releaseRateSlot(slot);
     return done(
-      `Sent ${row.number} to ${clientName}.${emailStatus === 'sent' ? ` We emailed ${actor.project.clientEmail} a link to it.` : emailNote(emailStatus, clientName)}`,
+      `Sent ${row.number} to ${clientName}.${emailStatus === 'sent' ? ` We emailed ${actor.project.clientEmail} a link to it.` : emailNote(emailStatus, clientName, invoiceKind('sent', row.id))}`,
     );
   });
 }
@@ -399,7 +399,7 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
       actorId: actor.user.id,
       kind: invoiceKind('reminded', row.id),
       // Worded as every other receipt row: "Receipt emailed to <name>: <what>"
-      summary: receipt ? `Receipt emailed to ${clientName} again: payment of ${row.number}` : `Reminder about ${row.number} emailed to ${clientName}`,
+      summary: receipt ? `Receipt emailed to ${clientName}: payment of ${row.number} (again)` : `Reminder about ${row.number} emailed to ${clientName}`,
       target: 'invoices',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -407,7 +407,7 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
     if (emailStatus !== 'sent') await releaseRateSlot(slot);
     refresh(projectId);
     if (emailStatus === 'sent') return done(receipt ? `Emailed the receipt to ${clientName} again.` : `Emailed ${clientName} a reminder about ${row.number}.`);
-    return done(`Nothing was sent.${emailNote(emailStatus, clientName)}`);
+    return done(`Nothing was sent.${emailNote(emailStatus, clientName, invoiceKind('reminded', row.id))}`);
   });
 }
 
@@ -462,7 +462,7 @@ export async function markInvoicePaid(_prev: ActionState, formData: FormData): P
     // A receipt that did not go out must not hold up "Email the receipt again"
     if (emailStatus !== 'sent') await releaseRateSlot(slot);
     return done(
-      `Marked ${row.number} paid.${emailStatus === 'sent' ? ` We emailed ${clientName} a receipt.` : emailNote(emailStatus, clientName)}`,
+      `Marked ${row.number} paid.${emailStatus === 'sent' ? ` We emailed ${clientName} a receipt.` : emailNote(emailStatus, clientName, invoiceKind('paid', row.id))}`,
     );
   });
 }
@@ -502,7 +502,7 @@ export async function markPaymentNotReceived(_prev: ActionState, formData: FormD
       email: { to: actor.project.clientEmail, subject, content },
     });
     if (emailStatus !== 'sent') await releaseRateSlot(slot);
-    return done(`Reopened ${row.number}.${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName)}`);
+    return done(`Reopened ${row.number}.${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName, invoiceKind('notReceived', row.id))}`);
   });
 }
 

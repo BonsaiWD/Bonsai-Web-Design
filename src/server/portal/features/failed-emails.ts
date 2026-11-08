@@ -33,13 +33,13 @@ export interface FailedEmail {
 }
 
 interface Options {
-  // Prefixes of the activity kinds whose failures are flagged, such as 'contract.'
-  kinds: string[];
+  // Prefixes of the activity kinds whose failures are flagged: the feature's FLAGGED_EMAIL_KINDS
+  kinds: readonly string[];
   // What an email is about, read from its kind. A failure clears once a later email about the
   // same thing reaches the same address; null means "this kind only".
   subjectOf: (kind: string) => string | null;
   // Prefixes of further kinds whose emails also clear a failure ('' for any email at all)
-  clearedBy?: string[];
+  clearedBy?: readonly string[];
 }
 
 export function failedEmailTitle(who: string, about: string | null | undefined): string {

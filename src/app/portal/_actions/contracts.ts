@@ -225,7 +225,7 @@ export async function createContract(_prev: ActionState, formData: FormData): Pr
     });
     if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
     return done(
-      `${added(input.title, input.requiresSignature)}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`,
+      `${added(input.title, input.requiresSignature)}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`,
     );
   });
 }
@@ -301,7 +301,7 @@ export async function replaceContractDocument(_prev: ActionState, formData: Form
       email: { to: actor.project.clientEmail, subject, content },
     });
     if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
-    return done(`${replaced}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`);
+    return done(`${replaced}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`);
   });
 }
 
@@ -373,7 +373,7 @@ export async function uploadCountersigned(_prev: ActionState, formData: FormData
       target: 'contracts',
       email: { to: actor.project.clientEmail, subject, content },
     });
-    return done(`${added}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`);
+    return done(`${added}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, kind)}`);
   });
 }
 
@@ -470,7 +470,7 @@ export async function emailContractAgain(_prev: ActionState, formData: FormData)
     refresh(projectId);
     if (emailStatus === 'sent') return done(`Emailed ${clientName}${again ? ' again' : ''}.`);
     await releaseRateSlot(slot);
-    if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName).trim());
+    if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName, contractKind('reminded', input.contractId)).trim());
     throw new ActionError(`The email to ${clientName} could not be sent. It is flagged on your dashboard; try again in a minute.`);
   });
 }
@@ -588,7 +588,7 @@ export async function recordContractSignature(_prev: ActionState, formData: Form
       email: { to: actor.project.clientEmail, subject, content },
     });
     return done(
-      `${recorded(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName)}`,
+      `${recorded(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} a copy.` : emailNote(emailStatus, clientName, contractKind('recorded', input.contractId))}`,
     );
   });
 }
@@ -716,6 +716,7 @@ export async function signContract(_prev: ActionState, formData: FormData): Prom
     const clientName = clientNameOf(actor);
     const emails = signedEmails({
       clientName,
+      projectName: actor.project.name,
       title: result.title,
       filename: result.filename,
       sha256: result.sha256,
@@ -856,6 +857,7 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
     const clientName = clientNameOf(actor);
     const { subject, content } = signedCopyEmail({
       clientName,
+      projectName: actor.project.name,
       title: result.title,
       filename: result.filename,
       sha256: result.sha256,
@@ -955,7 +957,7 @@ export async function returnSignedCopy(_prev: ActionState, formData: FormData): 
       email: { to: actor.project.clientEmail, subject, content },
     });
     return done(
-      `${sentBack(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName)}`,
+      `${sentBack(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName, contractKind('returnedNote', input.contractId, input.contractFileId))}`,
     );
   });
 }

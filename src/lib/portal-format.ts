@@ -63,6 +63,12 @@ export function formatUtcMoment(value: Date | string): string {
     return utcMomentFormat.format(typeof value === 'string' ? new Date(value) : value);
 }
 
+// How a version is named in titles, summaries and subjects: "Homepage design, version 2".
+// (The client's signed statements keep their own wording: "I approve version 2 of ...")
+export function versionName(title: string, version: number): string {
+    return `${title}, version ${version}`;
+}
+
 // Whole cents to "$1,500.00"
 export function formatMoney(cents: number): string {
     return money.format(cents / 100);

@@ -16,14 +16,14 @@ import {
 } from '@/db/schema';
 import type { DeliverableView, MilestoneOption, Perspective, VersionView } from '@/components/portal/deliverables/types';
 import type { EmailContent } from '@/lib/email';
-import { firstName, formatDate, formatUtcMoment } from '@/lib/portal-format';
+import { firstName, formatDate, formatUtcMoment, versionName } from '@/lib/portal-format';
 import { type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { failedEmails, failedEmailTitle } from './failed-emails';
 import { milestoneKind } from './milestones';
-import { STUDIO_EMAIL } from '../notify';
+import { STUDIO_EMAIL, studioSubject } from '../notify';
 import { INLINE_TYPES } from '../storage';
-import { kindItemId, kindMaker } from '../kinds';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker } from '../kinds';
 
 /* ---------- Activity kinds ----------
    Activity rows carry the deliverable's id in their kind ("deliverable.shared:<id>"), so the
@@ -464,17 +464,17 @@ interface ShareEmailInput {
 export function shareEmail(input: ShareEmailInput): { subject: string; content: EmailContent } {
   const name = firstName(input.clientName);
   const greeting = name ? `Hi ${name},` : 'Hello,';
-  const what = `version ${input.version} of ${input.title}`;
+  const what = versionName(input.title, input.version);
   const footnotes = [`You're getting this because you're the client on ${input.projectName}.`];
 
   if (!input.needsApproval) {
     return {
-      subject: input.reminder ? `In your portal: ${input.title} (version ${input.version})` : `Delivered: ${input.title} (version ${input.version})`,
+      subject: input.reminder ? `In your portal: ${what}` : `Delivered: ${what}`,
       content: {
         heading: `${input.title} is in your portal`,
         paragraphs: [
           greeting,
-          `We've delivered ${what} for ${input.projectName}. Nothing is needed from you; it's there whenever you want it.`,
+          `For ${input.projectName}, we've delivered ${what}. Nothing is needed from you; it's there whenever you want it.`,
         ],
         quote: input.note ?? undefined,
         action: { label: 'Open it in the portal', url: input.url },
@@ -487,14 +487,14 @@ export function shareEmail(input: ShareEmailInput): { subject: string; content: 
   return {
     subject: input.reminder
       ? `Reminder: ${input.title} is waiting for your review`
-      : `Ready for your review: ${input.title} (version ${input.version})`,
+      : `Ready for your review: ${what}`,
     content: {
       heading: input.reminder ? `${input.title} is waiting for your review` : `${input.title} is ready for your review`,
       paragraphs: [
         greeting,
         input.reminder
-          ? `A quick reminder that ${what} is in your portal for ${input.projectName}.${by}`
-          : `We've shared ${what} for ${input.projectName}.${by}`,
+          ? `A quick reminder: for ${input.projectName}, ${what} is in your portal.${by}`
+          : `For ${input.projectName}, we've shared ${what}.${by}`,
         'Have a look, then approve it or tell us what to change. Both take a minute in your portal.',
       ],
       quote: input.note ?? undefined,
@@ -506,6 +506,7 @@ export function shareEmail(input: ShareEmailInput): { subject: string; content: 
 
 interface DecisionEmailInput {
   clientName: string;
+  projectName: string;
   title: string;
   version: number;
   statement: string;
@@ -521,13 +522,14 @@ interface DecisionEmailInput {
 export function approvalEmails(input: DecisionEmailInput) {
   const reviewed = reviewedItem(input.linkUrl, input.filename);
   const signed = `${input.signedName ?? input.clientName} (${input.signerEmail})`;
+  const what = versionName(input.title, input.version);
   return {
     studio: {
-      subject: `${input.clientName} approved ${input.title} (version ${input.version})`,
+      subject: studioSubject(`${input.clientName} approved ${what}`, input.projectName),
       content: {
-        heading: `${input.clientName} approved ${input.title}`,
+        heading: `${input.clientName} approved ${what}`,
         paragraphs: [
-          `Version ${input.version}, signed as ${signed} at ${formatUtcMoment(input.at)}.`,
+          `On ${input.projectName}, signed as ${signed} at ${formatUtcMoment(input.at)}.`,
           `Statement: ${input.statement}`,
           `Reviewed: ${reviewed}`,
         ],
@@ -536,9 +538,9 @@ export function approvalEmails(input: DecisionEmailInput) {
       } satisfies EmailContent,
     },
     receipt: {
-      subject: `Your approval of ${input.title} (version ${input.version})`,
+      subject: `Your approval of ${what}`,
       content: {
-        heading: `You approved version ${input.version} of ${input.title}`,
+        heading: `You approved ${what}`,
         paragraphs: [
           'This is your copy of the sign-off recorded in your portal.',
           `Statement: ${input.statement}`,
@@ -556,22 +558,23 @@ export function approvalEmails(input: DecisionEmailInput) {
 
 export function changesEmails(input: DecisionEmailInput & { nextVersion: number }) {
   const reviewed = reviewedItem(input.linkUrl, input.filename);
+  const what = versionName(input.title, input.version);
   return {
     studio: {
-      subject: `${input.clientName} asked for changes on ${input.title}`,
+      subject: studioSubject(`${input.clientName} asked for changes on ${what}`, input.projectName),
       content: {
-        heading: `${input.clientName} asked for changes on ${input.title}`,
-        paragraphs: [`Version ${input.version}, sent by ${input.signerEmail} at ${formatUtcMoment(input.at)}.`, `Reviewed: ${reviewed}`],
+        heading: `${input.clientName} asked for changes on ${what}`,
+        paragraphs: [`On ${input.projectName}, sent by ${input.signerEmail} at ${formatUtcMoment(input.at)}.`, `Reviewed: ${reviewed}`],
         quote: input.note ?? undefined,
         action: { label: 'Open it in the portal', url: input.url },
       } satisfies EmailContent,
     },
     receipt: {
-      subject: `We have your notes on ${input.title}`,
+      subject: `We have your notes on ${what}`,
       content: {
-        heading: `We have your notes on ${input.title}`,
+        heading: `We have your notes on ${what}`,
         paragraphs: [
-          `Thanks. Here is a copy of what you sent about version ${input.version}, at ${formatUtcMoment(input.at)}.`,
+          `Thanks. Here is a copy of what you sent, at ${formatUtcMoment(input.at)}.`,
           `We'll email you when version ${input.nextVersion} is ready.`,
         ],
         quote: input.note ?? undefined,
@@ -582,12 +585,13 @@ export function changesEmails(input: DecisionEmailInput & { nextVersion: number 
 }
 
 export function recordedApprovalEmail(input: DecisionEmailInput & { recordedBy: string }): { subject: string; content: EmailContent } {
+  const what = versionName(input.title, input.version);
   return {
-    subject: `We recorded your approval of ${input.title}`,
+    subject: `We recorded your approval of ${what}`,
     content: {
-      heading: `We recorded your approval of ${input.title}`,
+      heading: `We recorded your approval of ${what}`,
       paragraphs: [
-        `${input.recordedBy} recorded that you approved version ${input.version} of ${input.title} outside the portal, at ${formatUtcMoment(input.at)}.`,
+        `${input.recordedBy} recorded your approval, given outside the portal, at ${formatUtcMoment(input.at)}.`,
         `What was approved: ${reviewedItem(input.linkUrl, input.filename)}`,
         'Our note is below. The record is in your portal with the rest of the project.',
       ],
@@ -685,7 +689,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
           projectScope(context),
         ),
       ),
-    failedEmails(context, { kinds: ['deliverable'], subjectOf: kindItemId }),
+    failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.deliverable, subjectOf: kindItemId }),
   ]);
 
   const items: AttentionItem[] = [];
@@ -709,7 +713,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       projectName: row.projectName,
       tab: 'deliverables',
       anchor: deliverableAnchor(row.deliverableId),
-      title: `${row.clientName} approved ${row.title} (version ${row.version})`,
+      title: `${row.clientName} approved ${versionName(row.title, row.version)}`,
       since: row.decidedAt?.toISOString() ?? null,
       tone: 'info',
     });
@@ -752,7 +756,7 @@ export const deliverablesFeature: PortalFeature = {
       projectName: row.projectName,
       tab: 'deliverables' as const,
       anchor: deliverableAnchor(row.deliverableId),
-      title: `Review ${row.title} (version ${row.version})`,
+      title: `Review ${versionName(row.title, row.version)}`,
       due: row.reviewBy,
       since: row.sharedAt.toISOString(),
       tone: row.reviewBy && row.reviewBy < context.today ? ('alert' as const) : ('action' as const),
@@ -769,7 +773,7 @@ export const deliverablesFeature: PortalFeature = {
         projectName: row.projectName,
         tab: 'deliverables' as const,
         anchor: deliverableAnchor(row.deliverableId),
-        title: `Review ${row.title} (version ${row.version})`,
+        title: `Review ${versionName(row.title, row.version)}`,
         date: row.reviewBy,
         kind: 'review' as const,
         owner: 'client' as const,

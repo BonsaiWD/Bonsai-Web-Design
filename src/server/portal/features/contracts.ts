@@ -15,10 +15,10 @@ import type { EmailContent } from '@/lib/email';
 import { firstName, formatUtcMoment } from '@/lib/portal-format';
 import { type Db, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
-import { STUDIO_EMAIL, summaryWithText, textFromSummary } from '../notify';
+import { STUDIO_EMAIL, studioSubject, summaryWithText, textFromSummary } from '../notify';
 import { INLINE_TYPES } from '../storage';
 import { failedEmails, failedEmailTitle } from './failed-emails';
-import { kindItemId, kindMaker, parseKind } from '../kinds';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker, parseKind } from '../kinds';
 
 /* ---------- Activity kinds ----------
    Rows carry the contract's id in their kind ("contract.added:<id>"), so the page can say when
@@ -453,6 +453,7 @@ export function askEmail(input: AskEmailInput): { subject: string; content: Emai
 
 interface SignedEmailInput {
   clientName: string;
+  projectName: string;
   title: string;
   filename: string;
   sha256: string;
@@ -474,10 +475,10 @@ export function signedEmails(input: SignedEmailInput) {
   ];
   return {
     studio: {
-      subject: `${input.clientName} signed ${input.title}`,
+      subject: studioSubject(`${input.clientName} signed ${input.title}`, input.projectName),
       content: {
         heading: `${input.clientName} signed ${input.title}`,
-        paragraphs: [`${input.clientName} signed ${input.title} in the portal.`, ...facts],
+        paragraphs: [`${input.clientName} signed ${input.title} for ${input.projectName} in the portal.`, ...facts],
         quote: input.note ?? undefined,
         action: { label: 'Open it in the portal', url: input.url },
       } satisfies EmailContent,
@@ -539,6 +540,7 @@ function signedCopyCheck(original: { filename: string; sha256: string; uploadedA
 
 export function signedCopyEmail(input: {
   clientName: string;
+  projectName: string;
   title: string;
   filename: string;
   sha256: string;
@@ -548,10 +550,11 @@ export function signedCopyEmail(input: {
   url: string;
 }): { subject: string; content: EmailContent } {
   return {
-    subject: `${input.clientName} uploaded a signed copy of ${input.title}`,
+    subject: studioSubject(`${input.clientName} uploaded a signed copy of ${input.title}`, input.projectName),
     content: {
       heading: `${input.clientName} uploaded a signed copy of ${input.title}`,
       paragraphs: [
+        `Project: ${input.projectName}`,
         `File: ${input.filename}`,
         `SHA-256: ${input.sha256}`,
         signedCopyCheck(input.original),
@@ -698,7 +701,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
           projectScope(context),
         ),
       ),
-    failedEmails(context, { kinds: ['contract.'], subjectOf: kindItemId }),
+    failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.contract, subjectOf: kindItemId }),
     awaitingContracts(context),
   ]);
 

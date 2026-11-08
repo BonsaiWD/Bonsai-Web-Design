@@ -15,6 +15,7 @@ import { failedEmails, failedEmailTitle } from './failed-emails';
 import { filesFeature } from './files';
 import { invoicesFeature } from './invoices';
 import { linkedReviewTitle, milestonesFeature } from './milestones';
+import { FLAGGED_EMAIL_KINDS } from '../kinds';
 
 /* ---------- Shared by the pages and the actions ---------- */
 
@@ -287,7 +288,7 @@ export const projectsFeature: PortalFeature = {
     // that reaches the same person on that project makes up for it.
     async attention(context) {
         if (context.perspective !== 'studio') return [];
-        const emails = await failedEmails(context, { kinds: ['project.'], clearedBy: [''], subjectOf: () => 'project' });
+        const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.project, clearedBy: [''], subjectOf: () => 'project' });
         return emails.map((row) => ({
             key: `project-email:${row.id}`,
             projectId: row.projectId,

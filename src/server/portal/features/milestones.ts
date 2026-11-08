@@ -10,7 +10,7 @@ import { type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
 import { STUDIO_NAME } from '../notify';
 import { failedEmails, failedEmailTitle } from './failed-emails';
-import { kindItemId, kindMaker, parseKind } from '../kinds';
+import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker, parseKind } from '../kinds';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -307,7 +307,7 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
 // them (failed-emails.ts). A request no longer matters once the milestone is signed off or
 // deleted; rows from before kinds carried the milestone's id match on their kind alone.
 async function failedEmailItems(context: FeatureContext, milestones: ScopedMilestone[]): Promise<AttentionItem[]> {
-    const emails = await failedEmails(context, { kinds: ['milestone'], subjectOf: kindItemId });
+    const emails = await failedEmails(context, { kinds: FLAGGED_EMAIL_KINDS.milestone, subjectOf: kindItemId });
     const byId = new Map(milestones.map((row) => [row.id, row]));
     const items: AttentionItem[] = [];
     for (const row of emails) {

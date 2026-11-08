@@ -9,7 +9,7 @@ import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate, formatUtcMoment } from '@/lib/portal-format';
 import { assertStillClient, projectActor, studioProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import {
   milestoneKind,
@@ -408,7 +408,7 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
         if (emailStatus !== 'sent') await releaseRateSlot(row.slot);
         refresh(projectId);
         const verb = row.requiresSignoff && row.status === 'waiting_on_client' ? 'Reminded' : 'Asked';
-        return done(`${verb} ${clientName} to initial ${row.title}.${emailNote(emailStatus, clientName)}`);
+        return done(`${verb} ${clientName} to initial ${row.title}.${emailNote(emailStatus, clientName, milestoneKind('signoff_requested', row.id))}`);
     });
 }
 
@@ -489,7 +489,7 @@ export async function recordSignoff(_prev: ActionState, formData: FormData): Pro
             },
         });
         refresh(projectId);
-        return done(`Recorded ${clientName}'s sign-off for ${record.title}.${emailNote(emailStatus, clientName)}`);
+        return done(`Recorded ${clientName}'s sign-off for ${record.title}.${emailNote(emailStatus, clientName, milestoneKind('signoff_recorded', input.id))}`);
     });
 }
 
@@ -599,7 +599,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             target: 'milestones',
             email: {
                 to: STUDIO_EMAIL,
-                subject: `${name} initialled ${result.title}`,
+                subject: studioSubject(`${name} initialled ${result.title}`, actor.project.name),
                 content: {
                     heading: `${result.title} is signed off`,
                     paragraphs: [`${name} (${actor.user.email}) initialled ${result.title} on ${actor.project.name}.`, ...facts],

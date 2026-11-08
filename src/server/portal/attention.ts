@@ -30,7 +30,7 @@ export interface AttentionItem {
     tab: ProjectTab;
     // Element id on the tab to jump to, e.g. "deliverable-<id>"
     anchor?: string;
-    // What needs doing, as a short sentence: "Review Homepage design (version 2)"
+    // What needs doing, as a short sentence: "Review Homepage design, version 2"
     title: string;
     detail?: string;
     // Calendar day it is due, if any

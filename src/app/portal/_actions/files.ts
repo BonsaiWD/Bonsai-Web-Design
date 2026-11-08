@@ -20,7 +20,7 @@ import {
   uploadEmailKey,
   type QuotaClaim,
 } from '@/server/portal/features/files';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, studioSubject } from '@/server/portal/notify';
 import { storeUpload } from '@/server/portal/storage';
 import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
@@ -110,7 +110,7 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
         email: {
           to: STUDIO_EMAIL,
           replyTo: actor.user.email,
-          subject: `${clientName} shared ${stored.filename}`,
+          subject: studioSubject(`${clientName} shared ${stored.filename}`, actor.project.name),
           content: {
             heading: `${clientName} shared a file`,
             paragraphs: [`${clientName} added ${stored.filename} to the files on ${actor.project.name}.`],
@@ -143,7 +143,7 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
         },
       },
     });
-    return done(`${thanks}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`);
+    return done(`${thanks}${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName, activity.kind)}`);
   });
 }
 

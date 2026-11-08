@@ -40,3 +40,23 @@ export function parseKind(kind: string): ParsedKind {
 export function kindItemId(kind: string): string | null {
   return parseKind(kind).id;
 }
+
+/*
+ * The kinds whose failed emails the studio's dashboard flags (failedEmails), by prefix. Every
+ * feature that sends email lists its kinds here and flags through failedEmails, and emailNote
+ * only says "flagged on your dashboard" for a kind listed here.
+ */
+export const FLAGGED_EMAIL_KINDS = {
+  contract: ['contract.'],
+  deliverable: ['deliverable'],
+  file: ['file.'],
+  milestone: ['milestone'],
+  project: ['project.'],
+  message: ['message'],
+  // Emails to the client; a reported payment is already on the dashboard as its own item
+  invoice: ['invoice.sent:', 'invoice.reminded:', 'invoice.not_received:', 'invoice.paid:'],
+} as const satisfies Record<string, readonly string[]>;
+
+export function isFlaggedEmailKind(kind: string): boolean {
+  return Object.values(FLAGGED_EMAIL_KINDS).some((prefixes) => prefixes.some((prefix) => kind.startsWith(prefix)));
+}
