@@ -1,9 +1,47 @@
 import type { Metadata } from 'next';
-import { EmptyState } from '@/components/portal/ui';
+import { notFound } from 'next/navigation';
+import InvoiceView from '@/components/portal/invoices/InvoiceView';
+import { getProjectForViewer, getViewer, requireProject } from '@/server/portal/access';
+import { featureContext } from '@/server/portal/collect';
+import { loadEnabledPaymentMethods, loadInvoice, STUDIO_NAME } from '@/server/portal/features/invoices';
+import { STUDIO_EMAIL } from '@/server/portal/notify';
 
-export const metadata: Metadata = { title: 'Invoice' };
+type Params = Promise<{ projectId: string; invoiceId: string }>;
 
-// Placeholder until the Invoice feature is built
-export default function Page() {
-  return <EmptyState title="Invoice">This invoice view is on its way.</EmptyState>;
+// The number names the tab, and the file when the invoice is saved as a PDF
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { projectId, invoiceId } = await params;
+  const project = await getProjectForViewer(projectId);
+  if (!project) return { title: 'Invoice' };
+  const context = await featureContext(project.id);
+  const invoice = await loadInvoice(project.id, invoiceId, context.perspective);
+  return { title: invoice ? `Invoice ${invoice.number}` : 'Invoice' };
+}
+
+export default async function InvoicePage({ params }: { params: Params }) {
+  const { projectId, invoiceId } = await params;
+  const project = await requireProject(projectId);
+  const [viewer, context] = await Promise.all([getViewer(), featureContext(project.id)]);
+
+  // Matched to this project, and drafts are left out for the client's perspective
+  const [invoice, methods] = await Promise.all([loadInvoice(project.id, invoiceId, context.perspective), loadEnabledPaymentMethods()]);
+  if (!invoice) notFound();
+
+  return (
+    <InvoiceView
+      projectId={project.id}
+      perspective={context.perspective}
+      canPay={viewer.user.id === project.clientId}
+      today={context.today}
+      invoice={invoice}
+      parties={{
+        studioName: STUDIO_NAME,
+        studioEmail: STUDIO_EMAIL,
+        clientName: project.clientName || project.clientEmail,
+        clientCompany: project.clientCompany,
+        clientEmail: project.clientEmail,
+      }}
+      methods={methods}
+    />
+  );
 }
