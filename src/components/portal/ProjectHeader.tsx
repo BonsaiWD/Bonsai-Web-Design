@@ -8,7 +8,7 @@ import type { ProjectStage } from '@/db/schema';
 import { formatDate } from '@/lib/portal-format';
 import { STAGE_LABELS, STAGE_SEQUENCE, STAGE_TONES } from './labels';
 import { PROJECT_TABS, projectHref, type ProjectTab } from './tabs';
-import { ButtonLink, CountBadge, focusRing, GuardedLink, H1, MetaText, PHONE, space, StatusBadge, tint, type, VisuallyHidden } from './ui';
+import { ButtonLink, CountBadge, focusRing, GuardedLink, H1, MetaText, PHONE, space, StatusBadge, tint, touchTarget, type, VisuallyHidden } from './ui';
 
 const Header = styled.header`
   display: flex;
@@ -39,6 +39,7 @@ const Crumbs = styled.nav`
   a {
     color: ${({ theme }) => theme.colors.textSecondary};
     ${focusRing}
+    ${touchTarget}
 
     @media (hover: hover) {
       &:hover {

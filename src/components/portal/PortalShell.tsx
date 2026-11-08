@@ -15,6 +15,8 @@ import {
   PHONE,
   space,
   tint,
+  TOUCH,
+  TOUCH_TARGET,
   type,
   UnsavedChangesProvider,
   useConfirmLeave,
@@ -73,6 +75,14 @@ const Wordmark = styled(GuardedLink)`
   transition: none;
   ${focusRing}
 
+  /* A full-size target on phones and touch screens: the lockup centred in 44px */
+  @media ${TOUCH} {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: ${TOUCH_TARGET};
+  }
+
   span {
     display: block;
     margin-top: ${(LOGO_GAP / LOGO_SUB).toFixed(3)}em;
@@ -111,6 +121,15 @@ const NavLink = styled(GuardedLink)<{ $active: boolean }>`
   box-shadow: inset 0 -2px 0 ${({ $active, theme }) => ($active ? theme.colors.primary : 'transparent')};
   transition: color 0.2s;
   ${focusRing}
+
+  /* Inset, as on the project tabs: on phones the nav scrolls and clips anything outside it */
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+
+  @media ${TOUCH} {
+    min-height: ${TOUCH_TARGET};
+  }
 
   @media (hover: hover) {
     &:hover {
@@ -174,6 +193,39 @@ const PreviewBar = styled.div`
 
 const Main = styled.main`
   flex: 1;
+
+  /* Focused by the skip link; the content itself shows where the reader is */
+  &:focus {
+    outline: none;
+  }
+`;
+
+// The first stop for the keyboard: past the header, the shell nav and a project's tabs
+const SkipLink = styled.a`
+  position: absolute;
+  top: ${space[2]};
+  left: ${space[2]};
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  min-height: ${TOUCH_TARGET};
+  padding: 0 ${space[4]};
+  background: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.background};
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  ${focusRing}
+
+  &:not(:focus) {
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
 `;
 
 // The shared site footer, aligned to the portal's narrower content column
@@ -184,6 +236,15 @@ const FooterAlign = styled.div`
 
     @media (max-width: ${PHONE}) {
       padding: 0 ${space[4]};
+    }
+  }
+
+  /* Its links get a full-size target on phones and touch screens, grown upwards so the
+     underline drawn at their foot stays put */
+  @media ${TOUCH} {
+    footer a {
+      padding-top: max(0px, ${TOUCH_TARGET} - 1lh - 0.25rem);
+      margin-top: min(0px, 1lh + 0.25rem - ${TOUCH_TARGET});
     }
   }
 `;
@@ -232,6 +293,16 @@ function Shell({ email, isAdmin, previewingAsClient, children }: PortalShellProp
 
   return (
     <Frame>
+      <SkipLink
+        href="#portal-main"
+        onClick={(event) => {
+          // Focus the content itself, so the next Tab starts there, without a history entry
+          event.preventDefault();
+          document.getElementById('portal-main')?.focus();
+        }}
+      >
+        Skip to content
+      </SkipLink>
       <Bar>
         <BarInner>
           <Wordmark href={email ? '/portal' : '/'} prefetch={email ? undefined : false}>
@@ -293,7 +364,9 @@ function Shell({ email, isAdmin, previewingAsClient, children }: PortalShellProp
           </div>
         </PreviewBar>
       )}
-      <Main>{children}</Main>
+      <Main id="portal-main" tabIndex={-1}>
+        {children}
+      </Main>
       <FooterAlign>
         <Footer />
       </FooterAlign>

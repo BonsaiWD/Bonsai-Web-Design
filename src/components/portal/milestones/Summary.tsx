@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';
 import { dueInfo, firstName } from '@/lib/portal-format';
 import { projectHref } from '../tabs';
-import { DateText, DueText, Eyebrow, focusRing, GuardedLink, MetaLine, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
+import { DateText, DueText, Eyebrow, focusRing, GuardedLink, inlineTouchTarget, MetaLine, MetaText, PHONE, Panel, space, tint, TOUCH, TOUCH_TARGET, type, VisuallyHidden } from '../ui';
 import { asksForInitials } from './signoff';
 import type { MilestoneView } from './types';
 
@@ -91,6 +91,7 @@ const JumpLink = styled.a`
   text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 45)};
   text-underline-offset: 0.2em;
   ${focusRing}
+  ${inlineTouchTarget}
 
   @media (hover: hover) {
     &:hover {
@@ -117,6 +118,11 @@ const WaitList = styled.ul`
     text-decoration: none;
     overflow-wrap: anywhere;
     ${focusRing}
+
+    /* Stacked links get real 44px rows on phones and touch screens, so targets never overlap */
+    @media ${TOUCH} {
+      padding-block: calc((${TOUCH_TARGET} - 1.4em) / 2);
+    }
 
     svg {
       flex-shrink: 0;

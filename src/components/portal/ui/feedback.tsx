@@ -45,14 +45,22 @@ const Marker = styled.span<{ $tone: StatusTone }>`
   }}
 `;
 
+// Badge text is 14px on a 1.3 line; the marker sits centred on the first line
+const BADGE_LINE = '(0.875rem * 1.3)';
+
+/* A badge never shrinks beside a title, as when it could not wrap. One longer than its whole
+   row ("Email to <address> failed") is held to the row's width and wraps, breaking an address
+   if it must, rather than running out of its panel. */
 const Badge = styled.span<{ $tone: StatusTone }>`
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: ${space[2]};
+  flex-shrink: 0;
+  max-width: 100%;
   font-size: 0.875rem;
   line-height: 1.3;
   font-weight: 500;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   color: ${({ $tone, theme }) =>
     $tone === 'alert'
       ? theme.colors.error
@@ -65,7 +73,12 @@ const Badge = styled.span<{ $tone: StatusTone }>`
   svg {
     flex-shrink: 0;
     font-size: 1rem;
+    margin-top: calc((${BADGE_LINE} - 1rem) / 2);
     color: ${({ $tone, theme }) => ($tone === 'alert' ? theme.colors.error : theme.colors.primary)};
+  }
+
+  ${Marker} {
+    margin-top: calc((${BADGE_LINE} - 0.625rem) / 2);
   }
 `;
 

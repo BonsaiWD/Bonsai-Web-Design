@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { firstName, plural } from '@/lib/portal-format';
 import { STAGE_LABELS, STAGE_TONES } from '../labels';
 import { projectHref } from '../tabs';
-import { DueText, focusRing, ListPanel, MetaText, StatusBadge, space, tint, type } from '../ui';
+import { DueText, focusRing, inlineTouchTarget, ListPanel, MetaText, StatusBadge, space, tint, type } from '../ui';
 import { PanelTitle } from './parts';
 import { Table } from './table';
 import type { ProjectCardView } from './types';
@@ -19,6 +19,7 @@ const ProjectLink = styled(Link)`
   text-underline-offset: 0.2em;
   overflow-wrap: anywhere;
   ${focusRing}
+  ${inlineTouchTarget}
 
   @media (hover: hover) {
     &:hover {

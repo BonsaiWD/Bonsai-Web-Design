@@ -13,6 +13,7 @@ import {
   Eyebrow,
   focusRing,
   H1,
+  inlineTouchTarget,
   ListPanel,
   MetaLine,
   Notice,
@@ -22,6 +23,7 @@ import {
   Split,
   Stack,
   tint,
+  TOUCH,
   type,
 } from '../ui';
 import { ActivityPanel, AttentionPanel, DeadlinePanel, itemHref, PanelTitle, sinceLabel, ToneMarker } from './parts';
@@ -196,6 +198,11 @@ const Group = styled.li`
   @media (max-width: ${PHONE}) {
     padding: ${space[4]} ${space[5]} ${space[5]};
   }
+
+  /* Room between the project link's target and the first item's */
+  @media ${TOUCH} {
+    gap: ${space[6]};
+  }
 `;
 
 const ProjectLink = styled(Link)`
@@ -203,6 +210,7 @@ const ProjectLink = styled(Link)`
   color: ${({ theme }) => theme.colors.textSecondary};
   text-decoration: none;
   ${focusRing}
+  ${inlineTouchTarget}
 
   @media (hover: hover) {
     &:hover {
@@ -241,6 +249,7 @@ const Waits = styled.ul`
     text-decoration: none;
     overflow-wrap: anywhere;
     ${focusRing}
+    ${inlineTouchTarget}
 
     @media (hover: hover) {
       &:hover {

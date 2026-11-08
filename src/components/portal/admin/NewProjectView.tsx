@@ -28,6 +28,7 @@ import {
   SubmitButton,
   TextLink,
   tint,
+  touchTarget,
   type,
 } from '../ui';
 import ProjectFields from './ProjectFields';
@@ -55,6 +56,7 @@ const Crumbs = styled.nav`
   a {
     color: ${({ theme }) => theme.colors.textSecondary};
     ${focusRing}
+    ${touchTarget}
 
     @media (hover: hover) {
       &:hover {

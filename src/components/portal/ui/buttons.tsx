@@ -1,7 +1,7 @@
 'use client';
 
 import styled, { css } from 'styled-components';
-import { DURATION, ease, focusRing, space, tint } from './tokens';
+import { DURATION, ease, focusRing, inlineTouchTarget, PHONE, space, tint, TOUCH, TOUCH_TARGET } from './tokens';
 import { GuardedLink } from './unsaved';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
@@ -40,6 +40,19 @@ const buttonStyles = css<ButtonStyleProps>`
   svg {
     flex-shrink: 0;
     font-size: 1.1em;
+  }
+
+  /* Small buttons keep a full-size target on phones and touch screens */
+  @media ${TOUCH} {
+    min-height: ${TOUCH_TARGET};
+  }
+
+  /* On a phone a label longer than the screen (a client's full name) wraps inside the button */
+  @media (max-width: ${PHONE}) {
+    padding-block: ${space[2]};
+    white-space: normal;
+    overflow-wrap: break-word;
+    text-align: center;
   }
 
   ${({ $variant = 'primary', theme }) => {
@@ -166,6 +179,12 @@ const textAction = css`
     &:hover {
       text-decoration-color: ${({ theme }) => theme.colors.primary};
     }
+  }
+
+  /* Standing on its own (the only element in its block, paragraph, list item or heading), it
+     gets a full-size touch target */
+  :is(div, p, li, dd, h2, h3, h4) > &:only-child {
+    ${inlineTouchTarget}
   }
 `;
 

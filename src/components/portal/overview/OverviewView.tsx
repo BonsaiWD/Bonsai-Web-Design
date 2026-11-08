@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/portal-format';
 import { ActivityPanel, AttentionPanel, DeadlinePanel } from '../dashboard/parts';
 import type { ActivityView, AttentionItem, DeadlineItem, NextMilestoneView, Perspective } from '../dashboard/types';
 import { projectHref } from '../tabs';
-import { ButtonLink, DataList, Eyebrow, H2, H3, LocalTime, MetaText, Panel, LAPTOP, space, Text, TextAnchor, TextLink, type } from '../ui';
+import { ButtonLink, DataList, Eyebrow, H2, H3, LocalTime, MetaText, Panel, LAPTOP, space, Text, TextAnchor, TextLink, touchTarget, type } from '../ui';
 import NextMilestone from './NextMilestone';
 
 const STUDIO_EMAIL = 'admin@bonsaiwebdesign.com';
@@ -83,6 +83,13 @@ const MailLink = styled(TextAnchor)`
   ${type.meta}
   font-weight: 500;
   overflow-wrap: anywhere;
+  ${touchTarget}
+`;
+
+// The client card's way to Clients, on its own line under the details
+const ManageLink = styled(TextLink)`
+  align-self: flex-start;
+  ${touchTarget}
 `;
 
 // Labels above values: the aside is too narrow for the usual two columns
@@ -166,9 +173,9 @@ function ContactCard({ projectId, client }: { projectId: string; client: ClientC
             <dd>{client.lastSignInAt ? <LocalTime value={client.lastSignInAt} /> : 'Never'}</dd>
           </div>
         </StackedList>
-        <TextLink href={`/portal/admin/clients#client-${client.id}`}>
+        <ManageLink href={`/portal/admin/clients#client-${client.id}`}>
           {client.lastSignInAt ? 'Manage in Clients' : 'Send an invite from Clients'}
-        </TextLink>
+        </ManageLink>
       </CardStack>
     </Panel>
   );
