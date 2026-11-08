@@ -6,7 +6,7 @@ import { loadClientOptions } from '@/server/portal/features/clients';
 import { loadProjectSettings } from '@/server/portal/features/projects';
 import { projectTabMetadata } from '@/server/portal/metadata';
 
-export const generateMetadata = projectTabMetadata('Project settings');
+export const generateMetadata = projectTabMetadata('Project settings', { studioOnly: true });
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;

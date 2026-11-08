@@ -12,10 +12,11 @@ type Params = Promise<{ projectId: string; invoiceId: string }>;
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { projectId, invoiceId } = await params;
   const project = await getProjectForViewer(projectId);
-  if (!project) return { title: 'Invoice' };
+  // The page renders the portal's not-found screen for either miss
+  if (!project) return { title: 'Page not found' };
   const context = await featureContext(project.id);
   const invoice = await loadInvoice(project.id, invoiceId, context.perspective);
-  return { title: invoice ? `Invoice ${invoice.number} · ${project.name}` : `Invoice · ${project.name}` };
+  return { title: invoice ? `Invoice ${invoice.number} · ${project.name}` : 'Page not found' };
 }
 
 export default async function InvoicePage({ params }: { params: Params }) {

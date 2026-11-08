@@ -13,6 +13,8 @@ export default function PortalError({ error, retry }: { error: unknown; retry: (
 
   return (
     <Page>
+      {/* An error boundary has no metadata, and the page's own may be what failed: React 19 hoists this */}
+      <title>Something went wrong | Bonsai Web Design client portal</title>
       <Stack $gap={6}>
         <Stack $gap={3}>
           <Eyebrow>Client portal</Eyebrow>
