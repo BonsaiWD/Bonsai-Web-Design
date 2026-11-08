@@ -67,7 +67,8 @@ export async function createProject(_prev: ActionState, formData: FormData): Pro
 
         const created = await getDb().transaction(async (tx) => {
             const client = await lockClient(tx, input.clientId);
-            if (!client) throw new ActionError('That client could not be found. Reload the page.', { clientId: 'Choose a client from the list.' });
+            if (!client)
+                throw new ActionError('That client could not be found. Reload the page.', { clientId: 'Choose a client from the list.' });
             const inserted = await tx
                 .insert(project)
                 .values({
@@ -82,7 +83,10 @@ export async function createProject(_prev: ActionState, formData: FormData): Pro
                 .onConflictDoNothing({ target: project.id })
                 .returning({ id: project.id });
             if (inserted.length) return { repeat: false as const, client };
-            const [existing] = await tx.select({ clientId: project.clientId, name: project.name }).from(project).where(eq(project.id, input.id));
+            const [existing] = await tx
+                .select({ clientId: project.clientId, name: project.name })
+                .from(project)
+                .where(eq(project.id, input.id));
             if (existing?.clientId === client.id && existing.name === input.name) return { repeat: true as const, client };
             throw new ActionError('This form was already used. Reload the page to start another project.');
         });
@@ -156,7 +160,9 @@ export async function updateProject(_prev: ActionState, formData: FormData): Pro
                 .for('update');
             if (!current) throw new ActionError('That project could not be found.');
             if (current.version !== input.version) {
-                throw new ActionError('This project changed after you opened the page. Reload to see the latest, then make your edit again.');
+                throw new ActionError(
+                    'This project changed after you opened the page. Reload to see the latest, then make your edit again.',
+                );
             }
             const unchanged =
                 current.name === input.name &&
@@ -219,7 +225,8 @@ export async function reassignProject(_prev: ActionState, formData: FormData): P
             }
             const [from] = await tx.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, current.clientId));
             const to = await lockClient(tx, input.clientId);
-            if (!to) throw new ActionError('That client could not be found. Reload the page.', { clientId: 'Choose a client from the list.' });
+            if (!to)
+                throw new ActionError('That client could not be found. Reload the page.', { clientId: 'Choose a client from the list.' });
 
             // Decisions and signatures belong to the person who made them; they cannot move
             const records = await countProjectRecords(tx, projectId);
@@ -230,7 +237,9 @@ export async function reassignProject(_prev: ActionState, formData: FormData): P
             }
             await tx.update(project).set({ clientId: to.id }).where(eq(project.id, projectId));
             // The previous client's read markers mean nothing to the new one
-            await tx.delete(projectReadState).where(and(eq(projectReadState.projectId, projectId), eq(projectReadState.userId, current.clientId)));
+            await tx
+                .delete(projectReadState)
+                .where(and(eq(projectReadState.projectId, projectId), eq(projectReadState.userId, current.clientId)));
             return { from: from ? displayName(from) : 'the previous client', to: displayName(to), name: current.name };
         });
 

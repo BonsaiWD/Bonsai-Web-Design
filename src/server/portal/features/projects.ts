@@ -227,7 +227,12 @@ export async function loadProjectCards(
             name: row.name,
             stage: row.stage,
             targetLaunch: row.targetLaunch,
-            client: { id: row.clientId, name: row.clientName.trim() || row.clientEmail, company: row.clientCompany, email: row.clientEmail },
+            client: {
+                id: row.clientId,
+                name: row.clientName.trim() || row.clientEmail,
+                company: row.clientCompany,
+                email: row.clientEmail,
+            },
             milestones: { done: row.done, total: row.total },
             nextMilestone: next.get(row.id) ?? null,
             needs: items.length,
@@ -310,7 +315,9 @@ export const projectsFeature: PortalFeature = {
         const rows = await getDb()
             .select({ id: project.id, name: project.name, targetLaunch: project.targetLaunch })
             .from(project)
-            .where(and(projectScope(context), notInArray(project.stage, ['launched', 'on_hold']), sql`${project.targetLaunch} IS NOT NULL`));
+            .where(
+                and(projectScope(context), notInArray(project.stage, ['launched', 'on_hold']), sql`${project.targetLaunch} IS NOT NULL`),
+            );
         return rows.map((row) => ({
             key: `project-launch:${row.id}`,
             projectId: row.id,

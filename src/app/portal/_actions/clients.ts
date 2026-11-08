@@ -69,7 +69,11 @@ function takenError(owner: { name: string | null; email: string }): ActionError 
 type InviteOutcome = 'sent' | 'failed' | 'skipped' | 'throttled';
 
 // Sends the invite if the 10-minute slot is free. A failed or skipped send gives the slot back.
-async function sendInvite(client: { id: string; name: string | null; email: string }): Promise<{ outcome: InviteOutcome; waitMinutes?: number }> {
+async function sendInvite(client: {
+    id: string;
+    name: string | null;
+    email: string;
+}): Promise<{ outcome: InviteOutcome; waitMinutes?: number }> {
     const slot = await claimInviteSlot(client.id);
     if (!slot.ok) return { outcome: 'throttled', waitMinutes: slot.waitMinutes };
     const { subject, content } = await inviteEmail(client, await clientProjectNames(client.id));
@@ -118,7 +122,14 @@ export async function addClient(_prev: ActionState, formData: FormData): Promise
                 if (existing) throw takenError(existing);
                 const inserted = await tx
                     .insert(user)
-                    .values({ id: input.id, name: input.name, company: input.company, email: input.email, role: 'client', emailVerified: false })
+                    .values({
+                        id: input.id,
+                        name: input.name,
+                        company: input.company,
+                        email: input.email,
+                        role: 'client',
+                        emailVerified: false,
+                    })
                     .onConflictDoNothing({ target: user.id })
                     .returning({ id: user.id });
                 if (inserted.length) return false;
@@ -137,7 +148,10 @@ export async function addClient(_prev: ActionState, formData: FormData): Promise
         const added = `Added ${input.name} (${input.email}).`;
         if (repeat) {
             // Same message as the first submit, and no second email
-            const [invited] = await getDb().select({ id: rateLimit.id }).from(rateLimit).where(eq(rateLimit.key, inviteKey(input.id)));
+            const [invited] = await getDb()
+                .select({ id: rateLimit.id })
+                .from(rateLimit)
+                .where(eq(rateLimit.key, inviteKey(input.id)));
             return done(invited ? `${added}${inviteSentence('sent', input.email)}` : added);
         }
 

@@ -153,7 +153,9 @@ export async function claimInviteSlot(clientId: string): Promise<{ ok: true } | 
 
 // An invite that did not go out should neither block the next try nor read as sent
 export async function releaseInviteSlot(clientId: string): Promise<void> {
-    await getDb().delete(rateLimit).where(eq(rateLimit.key, inviteKey(clientId)));
+    await getDb()
+        .delete(rateLimit)
+        .where(eq(rateLimit.key, inviteKey(clientId)));
 }
 
 export async function clientProjectNames(clientId: string): Promise<string[]> {
@@ -170,7 +172,10 @@ function listNames(names: string[]): string {
     return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
-export async function inviteEmail(client: { name: string | null; email: string }, projectNames: string[]): Promise<{ subject: string; content: EmailContent }> {
+export async function inviteEmail(
+    client: { name: string | null; email: string },
+    projectNames: string[],
+): Promise<{ subject: string; content: EmailContent }> {
     const name = firstName(client.name);
     const signIn = `${await portalOrigin()}/portal/sign-in?email=${encodeURIComponent(client.email)}`;
     return {
@@ -213,4 +218,26 @@ export async function sendStandaloneEmail(to: string, subject: string, content: 
         console.error('[portal email]', error);
         return 'failed';
     }
+}
+
+// Whether the studio has anyone to make a project for yet
+export async function hasAnyClient(): Promise<boolean> {
+    const [row] = await getDb().select({ id: user.id }).from(user).where(eq(user.role, 'client')).limit(1);
+    return Boolean(row);
+}
+
+// The client card on a project overview, for the studio
+export async function loadClientContact(clientId: string) {
+    const [row] = await getDb()
+        .select({ id: user.id, name: user.name, email: user.email, company: user.company, lastSignInAt: user.lastSignInAt })
+        .from(user)
+        .where(eq(user.id, clientId));
+    if (!row) return null;
+    return {
+        id: row.id,
+        name: displayName(row),
+        email: row.email,
+        company: row.company,
+        lastSignInAt: row.lastSignInAt?.toISOString() ?? null,
+    };
 }
