@@ -1,10 +1,11 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiMail } from 'react-icons/fi';
 import { authClient } from '@/lib/auth-client';
 import { Button, Eyebrow, H1, Input, Lead, Meta, Notice, Stack, TextAnchor, TextButton, TextLink, space, type } from './ui';
+import { signInHref } from './VerifyPanel';
 
 const STUDIO_EMAIL = 'admin@bonsaiwebdesign.com';
 
@@ -28,6 +29,13 @@ const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.error};
 `;
 
+// Takes focus when the confirmation replaces the form; the heading itself shows where focus is
+const SentHeading = styled(H1)`
+  &:focus {
+    outline: none;
+  }
+`;
+
 // A light check (the server is the real gate); zod here would add ~30 KB to the sign-in page
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -44,6 +52,21 @@ export default function SignInForm({ initialError, initialEmail, next, linkMinut
   const [error, setError] = useState<string | null>(initialError);
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const sentHeadingRef = useRef<HTMLHeadingElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  // Set when the person asks for the form back, so focus goes to the address field
+  const backToFormRef = useRef(false);
+
+  // The form and the confirmation replace each other, taking the focused control with them:
+  // move focus to the new view's heading, or back to the address, so it is not lost to the page
+  useEffect(() => {
+    if (sentTo) {
+      sentHeadingRef.current?.focus();
+    } else if (backToFormRef.current) {
+      backToFormRef.current = false;
+      emailRef.current?.focus();
+    }
+  }, [sentTo]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,7 +82,8 @@ export default function SignInForm({ initialError, initialEmail, next, linkMinut
     const { error: sendError } = await authClient.signIn.magicLink({
       email: address,
       callbackURL: next ?? '/portal',
-      errorCallbackURL: '/portal/sign-in',
+      // An expired or used link comes back here with ?error= added; next survives it
+      errorCallbackURL: signInHref(next),
     });
     setSending(false);
 
@@ -80,8 +104,10 @@ export default function SignInForm({ initialError, initialEmail, next, linkMinut
         <Stack $gap={6}>
           <Stack $gap={3}>
             <Eyebrow>Client portal</Eyebrow>
-            <H1>Check your email</H1>
-            <Lead>
+            <SentHeading ref={sentHeadingRef} tabIndex={-1} aria-describedby={`${id}-sent`}>
+              Check your email
+            </SentHeading>
+            <Lead id={`${id}-sent`}>
               If {sentTo} belongs to a client account, a sign-in link is on its way. It works once and expires in{' '}
               {linkMinutes} minutes.
             </Lead>
@@ -90,6 +116,7 @@ export default function SignInForm({ initialError, initialEmail, next, linkMinut
             <div>
               <TextButton
                 onClick={() => {
+                  backToFormRef.current = true;
                   setSentTo(null);
                   setEmail('');
                 }}
@@ -120,6 +147,7 @@ export default function SignInForm({ initialError, initialEmail, next, linkMinut
             <Stack $gap={2}>
               <Label htmlFor={`${id}-email`}>Email address</Label>
               <Input
+                ref={emailRef}
                 id={`${id}-email`}
                 name="email"
                 type="email"

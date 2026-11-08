@@ -123,10 +123,6 @@ const EmptyWrap = styled.div`
   border: 1px dashed ${({ theme }) => tint(theme.colors.primary, 22)};
   border-radius: ${radius.panel};
 
-  h3 {
-    ${type.h3}
-  }
-
   p {
     ${type.body}
     max-width: 52ch;
@@ -134,11 +130,23 @@ const EmptyWrap = styled.div`
   }
 `;
 
+const EmptyTitle = styled.h3`
+  ${type.h3}
+`;
+
+interface EmptyStateProps {
+  title: string;
+  children?: ReactNode;
+  action?: ReactNode;
+  // 3 under a section's h2; 2 when it stands straight under the page's h1, so no level is skipped
+  level?: 2 | 3;
+}
+
 // What an empty section is for, and what to do about it
-export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+export function EmptyState({ title, children, action, level = 3 }: EmptyStateProps) {
   return (
     <EmptyWrap>
-      <h3>{title}</h3>
+      <EmptyTitle as={level === 2 ? 'h2' : 'h3'}>{title}</EmptyTitle>
       {children && <p>{children}</p>}
       {action}
     </EmptyWrap>

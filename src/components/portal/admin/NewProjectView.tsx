@@ -148,6 +148,7 @@ export default function NewProjectView({ formId, clients, preselect }: NewProjec
 
       {clients.length === 0 ? (
         <EmptyState
+          level={2}
           title="Add a client first"
           action={
             <ButtonLink href="/portal/admin/clients?add=1">

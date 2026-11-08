@@ -460,19 +460,28 @@ interface CheckboxProps extends Omit<ComponentPropsWithoutRef<'input'>, 'type' |
   savedChecked?: boolean;
 }
 
-// The whole sentence is the click target
-export function Checkbox({ name, children, hint, savedChecked = false, ...inputProps }: CheckboxProps) {
+// The whole sentence is the click target; the error is linked to the box, which takes focus
+export function Checkbox({ name, children, hint, savedChecked = false, 'aria-describedby': describedBy, ...inputProps }: CheckboxProps) {
+  const id = useId();
   const { error, defaultChecked } = useField(name);
+  const errorId = error ? `${id}-error` : undefined;
   return (
     <div>
       <CheckLabel>
-        <input type="checkbox" name={name} defaultChecked={defaultChecked(savedChecked)} aria-invalid={error ? true : undefined} {...inputProps} />
+        <input
+          type="checkbox"
+          name={name}
+          defaultChecked={defaultChecked(savedChecked)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={[errorId, describedBy].filter(Boolean).join(' ') || undefined}
+          {...inputProps}
+        />
         <span>
           {children}
           {hint && <small>{hint}</small>}
         </span>
       </CheckLabel>
-      {error && <ErrorText>{error}</ErrorText>}
+      {error && <ErrorText id={errorId}>{error}</ErrorText>}
     </div>
   );
 }

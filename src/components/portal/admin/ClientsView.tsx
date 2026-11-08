@@ -427,6 +427,7 @@ export default function ClientsView({ clients, studio, openAdd }: ClientsViewPro
 
       {clients.length === 0 ? (
         <EmptyState
+          level={2}
           title="Add your first client"
           action={
             <Button onClick={add.openDialog}>

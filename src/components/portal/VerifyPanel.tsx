@@ -15,6 +15,13 @@ const Column = styled.div`
   }
 `;
 
+// The sign-in page, keeping where the person was heading (a path the server already checked
+// with safePortalPath): Better Auth adds ?error= to it for an expired or used link, so the
+// next link still opens that page
+export function signInHref(next: string | null) {
+  return next ? `/portal/sign-in?next=${encodeURIComponent(next)}` : '/portal/sign-in';
+}
+
 interface VerifyPanelProps {
   token: string | null;
   next: string | null;
@@ -23,6 +30,8 @@ interface VerifyPanelProps {
 // The email links here, not to the verify endpoint, so a link scanner that opens URLs
 // in advance only loads this page and leaves the one-time token unused
 export default function VerifyPanel({ token, next }: VerifyPanelProps) {
+  // Both ways back to sign-in keep the deep link, so the next link still opens it
+  const signIn = signInHref(next);
   if (!token) {
     return (
       <Column>
@@ -33,7 +42,7 @@ export default function VerifyPanel({ token, next }: VerifyPanelProps) {
             <Lead>Request a new sign-in link, then use the button in that email.</Lead>
           </Stack>
           <div>
-            <TextLink href="/portal/sign-in">Request a new link</TextLink>
+            <TextLink href={signIn}>Request a new link</TextLink>
           </div>
         </Stack>
       </Column>
@@ -43,7 +52,7 @@ export default function VerifyPanel({ token, next }: VerifyPanelProps) {
   const verify = new URLSearchParams({
     token,
     callbackURL: next ?? '/portal',
-    errorCallbackURL: '/portal/sign-in',
+    errorCallbackURL: signIn,
   });
 
   return (

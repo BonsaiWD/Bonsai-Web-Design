@@ -200,6 +200,23 @@ const Main = styled.main`
   }
 `;
 
+// Where "Skip to content" lands on a page with its own header and tabs: a project's tab content
+const CONTENT_ID = 'portal-content';
+
+const SkipTargetBox = styled.div`
+  &:focus {
+    outline: none;
+  }
+`;
+
+export function SkipTarget({ children }: { children: React.ReactNode }) {
+  return (
+    <SkipTargetBox id={CONTENT_ID} tabIndex={-1}>
+      {children}
+    </SkipTargetBox>
+  );
+}
+
 // The first stop for the keyboard: past the header, the shell nav and a project's tabs
 const SkipLink = styled.a`
   position: absolute;
@@ -296,9 +313,10 @@ function Shell({ email, isAdmin, previewingAsClient, children }: PortalShellProp
       <SkipLink
         href="#portal-main"
         onClick={(event) => {
-          // Focus the content itself, so the next Tab starts there, without a history entry
+          // Focus the content itself, so the next Tab starts there, without a history entry. On a
+          // project page that is the tab's content, past the project header and its tabs.
           event.preventDefault();
-          document.getElementById('portal-main')?.focus();
+          (document.getElementById(CONTENT_ID) ?? document.getElementById('portal-main'))?.focus();
         }}
       >
         Skip to content

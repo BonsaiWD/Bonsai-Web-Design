@@ -1,3 +1,4 @@
+import { SkipTarget } from '@/components/portal/PortalShell';
 import ProjectHeader from '@/components/portal/ProjectHeader';
 import type { ProjectTab } from '@/components/portal/tabs';
 import { Page } from '@/components/portal/ui';
@@ -38,7 +39,8 @@ export default async function ProjectLayout({
         showStudio={viewer.showStudio}
         badges={badges}
       />
-      {children}
+      {/* "Skip to content" lands here, past the project header and tabs */}
+      <SkipTarget>{children}</SkipTarget>
     </Page>
   );
 }

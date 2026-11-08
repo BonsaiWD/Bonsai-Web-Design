@@ -393,6 +393,7 @@ export default function StudioDashboard({
 
         {projects.length === 0 ? (
           <EmptyState
+            level={2}
             title={hasClients ? 'Start your first project' : 'Add your first client'}
             action={
               <ButtonLink href={hasClients ? '/portal/admin/projects/new' : '/portal/admin/clients?add=1'}>
