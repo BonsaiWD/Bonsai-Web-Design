@@ -145,9 +145,11 @@ export const fields = {
         .pipe(z.union([z.literal(''), z.iso.date({ error: 'Enter a valid date.' })]))
         .transform((value) => value || null),
     requiredDate: trimmed.pipe(z.iso.date({ error: 'Choose a date.' })),
-    // Checkboxes send "on" when ticked and nothing otherwise
+    // Checkboxes send "on" when ticked and nothing otherwise. Zod 4 only lets a key be missing
+    // when the schema is .optional(), so a union with z.undefined() rejected unticked boxes.
     checkbox: z
-        .union([z.literal('on'), z.literal('true'), z.undefined()])
+        .union([z.literal('on'), z.literal('true')])
+        .optional()
         .transform((value) => value !== undefined),
     file: z.instanceof(File, { error: 'Choose a file.' }),
 };
