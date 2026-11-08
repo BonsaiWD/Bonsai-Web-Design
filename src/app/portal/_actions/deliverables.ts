@@ -518,7 +518,8 @@ export async function recordApproval(_prev: ActionState, formData: FormData): Pr
     const input = parseForm(versionSchema.extend({ ...shown, note: fields.requiredText('how they approved', 2000) }), formData);
     const projectId = actor.project.id;
     const clientName = clientNameOf(actor);
-    const recordedBy = admin.name || admin.email;
+    // The statement is shown to the client, who never sees a studio member's address
+    const recordedBy = admin.name?.trim() || 'Bonsai Web Design';
     const meta = await requestMeta();
 
     const result = await getDb().transaction(async (tx) => {

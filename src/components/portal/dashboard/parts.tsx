@@ -517,7 +517,7 @@ export function ActivityPanel({ id, title, items, perspective, showProject, empt
               <div>
                 <Summary>{item.href ? <Link href={item.href}>{item.summary}</Link> : item.summary}</Summary>
                 <MetaLine>
-                  {item.actorIsViewer ? 'You' : (item.actorName ?? (perspective === 'client' ? 'Bonsai' : 'The portal'))}
+                  {item.actorIsViewer ? 'You' : (item.actorName ?? (perspective === 'client' ? 'Bonsai Web Design' : 'The portal'))}
                   <LocalTime value={item.at} />
                   {showProject && item.projectName}
                 </MetaLine>

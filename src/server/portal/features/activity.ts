@@ -14,6 +14,9 @@ import { projectScope, type FeatureContext } from '../attention';
 
 const TABS = new Set<string>(PROJECT_TABS.map((tab) => tab.key));
 
+// Who the studio is to a client: they deal with the studio, not with one of its members
+const STUDIO_NAME = 'Bonsai Web Design';
+
 // Features write a tab name ("deliverables"), optionally with an anchor ("deliverables#deliverable-<id>")
 function targetHref(projectId: string, target: string | null): string | null {
     if (!target) return null;
@@ -21,6 +24,16 @@ function targetHref(projectId: string, target: string | null): string | null {
     if (!TABS.has(tab)) return null;
     return projectHref(projectId, tab as ProjectTab, anchor && /^[\w-]+$/.test(anchor) ? anchor : undefined);
 }
+
+// What follows the actor's name at the start of a summary, or null when it does not start with it
+function afterSubject(summary: string, names: (string | null)[]): string | null {
+    for (const candidate of names) {
+        if (candidate && summary.startsWith(`${candidate} `)) return summary.slice(candidate.length + 1);
+    }
+    return null;
+}
+
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export async function loadActivity(context: FeatureContext, options: { limit: number }): Promise<ActivityView[]> {
     const studio = context.perspective === 'studio';
@@ -34,6 +47,7 @@ export async function loadActivity(context: FeatureContext, options: { limit: nu
         actorId: activity.actorId,
         actorName: user.name,
         actorEmail: user.email,
+        actorRole: user.role,
     };
 
     const rows = await getDb()
@@ -47,14 +61,21 @@ export async function loadActivity(context: FeatureContext, options: { limit: nu
         .limit(options.limit);
 
     return rows.map((row) => {
+        const name = row.actorName?.trim() || null;
+        // Through the client's eyes (a preview included) a studio member is the studio, and an
+        // admin previewing is not the "you" the client reads
+        const asStudio = !studio && row.actorRole === 'admin';
+        const actorIsViewer = !asStudio && row.actorId != null && row.actorId === context.viewer.user.id;
+        // Summaries are stored with the actor's name as their subject ("Jane Doe approved ...")
+        const rest = afterSubject(row.summary, [row.actorName, name, row.actorEmail]);
         const view: ActivityView = {
             id: row.id,
             projectId: row.projectId,
             projectName: row.projectName,
-            summary: row.summary,
+            summary: rest === null ? row.summary : actorIsViewer ? `You ${rest}` : asStudio ? capitalise(rest) : row.summary,
             href: targetHref(row.projectId, row.target),
-            actorName: row.actorName || row.actorEmail || null,
-            actorIsViewer: row.actorId === context.viewer.user.id,
+            actorName: asStudio ? STUDIO_NAME : name || row.actorEmail || null,
+            actorIsViewer,
             at: row.createdAt.toISOString(),
         };
         if (studio && 'visibility' in row) {
