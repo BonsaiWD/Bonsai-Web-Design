@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiPlus, FiX } from 'react-icons/fi';
 import { createInvoice, updateInvoice } from '@/app/portal/_actions/invoices';
-import { firstName, formatMoney } from '@/lib/portal-format';
+import { formatMoney } from '@/lib/portal-format';
 import {
   ActionForm,
   Button,
@@ -349,7 +349,6 @@ export function InvoiceEditor({ mode, projectId, clientName, today, saved, onCan
   const amounts = rows.map(rowAmount);
   const total = amounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
   const atLimit = rows.length >= MAX_LINES;
-  const client = firstName(clientName) ?? clientName;
 
   return (
     <ActionForm
@@ -501,7 +500,7 @@ export function InvoiceEditor({ mode, projectId, clientName, today, saved, onCan
         </Lines>
 
         <Field
-          label={`Notes for ${client}`}
+          label={`Notes for ${clientName}`}
           name="notes"
           optional
           saved={saved?.notes ?? ''}
@@ -526,7 +525,7 @@ export function InvoiceEditor({ mode, projectId, clientName, today, saved, onCan
           </Button>
           <FormMessage />
         </FormActions>
-        {mode === 'create' && <Meta>Nothing is sent yet. You can check the draft, then send it to {client}.</Meta>}
+        {mode === 'create' && <Meta>Nothing is sent yet. You can check the draft, then send it to {clientName}.</Meta>}
       </FormStack>
 
       <input type="hidden" name="projectId" value={projectId} />

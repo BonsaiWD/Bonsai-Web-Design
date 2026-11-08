@@ -19,14 +19,17 @@ import {
   invoicePath,
   invoiceUrl,
   invoiceVersion,
+  loadEnabledPaymentMethods,
+  loadNotReceived,
   notReceivedEmail,
+  notReceivedSummary,
   paymentReportedEmail,
   receiptEmail,
   reminderEmail,
   sentEmail,
 } from '@/server/portal/features/invoices';
-import { emailNote, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
-import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
+import { emailedSummary, emailNote, receiptSummary, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { claimRateSlot, forceRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * Every export here is an endpoint anyone can call with any arguments, so each one starts by
@@ -295,7 +298,8 @@ export async function deleteInvoice(_prev: ActionState, formData: FormData): Pro
       visibility: 'studio',
     });
     refresh(projectId);
-    redirect(projectHref(projectId, 'invoices'));
+    // The list says what happened: the draft's own page, where the button was, is gone
+    redirect(`${projectHref(projectId, 'invoices')}?deleted=${encodeURIComponent(row.number)}`);
   });
 }
 
@@ -393,13 +397,17 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
     const { totalCents } = await totalOf(db, row.id);
     const base = await facts(actor, row, totalCents);
     const receipt = row.status === 'paid' && row.paidOn && row.paidMethod ? { paidOn: row.paidOn, method: row.paidMethod } : null;
-    const { subject, content } = receipt ? receiptEmail({ ...base, ...receipt, reference: row.paidReference }) : reminderEmail(base, todayIso());
+    // A reminder after "Not received yet" repeats the studio's note, in case that email never arrived
+    const { subject, content } = receipt
+      ? receiptEmail({ ...base, ...receipt, reference: row.paidReference })
+      : reminderEmail(base, todayIso(), await loadNotReceived(projectId, row));
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
       kind: invoiceKind('reminded', row.id),
-      // Worded as every other receipt row: "Receipt emailed to <name>: <what>"
-      summary: receipt ? `Receipt emailed to ${clientName}: payment of ${row.number} (again)` : `Reminder about ${row.number} emailed to ${clientName}`,
+      summary: receipt
+        ? receiptSummary(clientName, `payment of ${row.number} (again)`)
+        : emailedSummary(`${clientName} a reminder about ${row.number}`),
       target: 'invoices',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -448,8 +456,8 @@ export async function markInvoicePaid(_prev: ActionState, formData: FormData): P
     refresh(projectId);
 
     const { row, totalCents } = result;
-    // A receipt always goes out, but it also starts the gap before another email
-    const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
+    // A receipt always goes out, and it starts the gap before another email
+    const slot = await forceRateSlot(invoiceEmailKey(row.id));
     const { subject, content } = receiptEmail({ ...(await facts(actor, row, totalCents)), paidOn: input.paidOn, method: input.method, reference: input.reference });
     const { emailStatus } = await recordActivity({
       projectId,
@@ -490,14 +498,15 @@ export async function markPaymentNotReceived(_prev: ActionState, formData: FormD
 
     refresh(projectId);
     const { row, totalCents } = result;
-    const reported = row.reportedMethod ? ` (${METHOD_LABELS[row.reportedMethod]}${row.reportedReference ? `, ${row.reportedReference}` : ''})` : '';
-    const slot = await claimRateSlot(invoiceEmailKey(row.id), EMAIL_INTERVAL_MS);
+    // The note always goes out, and it starts the gap before another email
+    const slot = await forceRateSlot(invoiceEmailKey(row.id));
     const { subject, content } = notReceivedEmail({ ...(await facts(actor, row, totalCents)), note: input.note });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
       kind: invoiceKind('notReceived', row.id),
-      summary: `The payment reported for ${row.number}${reported} has not arrived yet, so it is open again`,
+      // The note is kept here, so the client's invoice page shows it whether or not the email arrives
+      summary: notReceivedSummary(row.number, { method: row.reportedMethod, reference: row.reportedReference }, input.note),
       target: 'invoices',
       email: { to: actor.project.clientEmail, subject, content },
     });
@@ -545,6 +554,12 @@ export async function reportPayment(_prev: ActionState, formData: FormData): Pro
     // Only the project's own client says they have paid; the studio confirms with Mark paid
     const actor = await projectActor(formData.get('projectId'), { clientOnly: true });
     const input = parseForm(reportSchema, formData);
+    // Only a way the invoice offers. With none set up, the details went out separately, so the
+    // form offers all six and so does this check.
+    const offered = await loadEnabledPaymentMethods();
+    if (offered.length > 0 && !offered.some((entry) => entry.method === input.method)) {
+      throw new ActionError('Choose how you paid.', { method: 'Choose how you paid.' });
+    }
     const projectId = actor.project.id;
     const thanks = "Thanks. We'll confirm when your payment arrives and email you a receipt.";
 

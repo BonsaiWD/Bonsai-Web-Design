@@ -11,6 +11,7 @@ import {
   focusRing,
   H3,
   Meta,
+  paymentDetail,
   sansHeading,
   space,
   Stack,
@@ -69,13 +70,12 @@ const DetailLabel = styled.span`
   ${type.meta}
 `;
 
-// Addresses and account numbers: tabular, slashed zeros, and selectable in one go
+// Addresses and account numbers: monospace, every character as itself, selectable in one go
 const DetailValue = styled.span`
   ${type.body}
-  font-variant-numeric: tabular-nums slashed-zero;
+  ${paymentDetail}
+  font-size: 0.9375rem;
   color: ${({ theme }) => theme.colors.text};
-  overflow-wrap: anywhere;
-  word-break: break-word;
   user-select: all;
 `;
 

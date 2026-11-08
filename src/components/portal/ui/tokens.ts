@@ -43,6 +43,19 @@ export const focusRing = css`
   }
 `;
 
+// Payment details (wallet addresses, account and routing numbers) in a monospace face, with
+// contextual alternates and ligatures off: Inter draws the x in "8x0" as a times sign, and its
+// l, I and 1 look alike. Copied by hand into a wallet, every character has to read as itself.
+// A long address breaks anywhere rather than run out of its box.
+export const paymentDetail = css`
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-variant-ligatures: none;
+  font-feature-settings: 'calt' 0, 'liga' 0;
+  font-variant-numeric: tabular-nums slashed-zero;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+`;
+
 // The portal type scale: Inter, 16px base, nothing below 13px, one uppercase style left.
 // Each style resets margin, because GlobalStyle gives every heading and paragraph one;
 // spacing inside the portal comes from Stack, Cluster and the other layout components.

@@ -11,7 +11,7 @@ import {
   sendInvoice,
   voidInvoice,
 } from '@/app/portal/_actions/invoices';
-import { firstName, formatMoney } from '@/lib/portal-format';
+import { formatMoney } from '@/lib/portal-format';
 import {
   ActionForm,
   Button,
@@ -44,6 +44,7 @@ import {
   useDialog,
   type Announce,
 } from '@/components/portal/ui';
+import { NoteBlock } from '@/components/portal/deliverables/parts';
 import { invoiceStatus, isOverdue, METHOD_LABELS, METHOD_ORDER } from './labels';
 import { Amount, Inset } from './parts';
 import type { InvoiceDetail } from './types';
@@ -219,7 +220,6 @@ export function StudioInvoicePanel({
   const send = useDialog();
   const paid = useDialog();
   const notReceived = useDialog();
-  const client = firstName(clientName) ?? clientName;
   const overdue = isOverdue(invoice.status, invoice.dueOn, today);
   const badge = invoiceStatus(invoice.status, 'studio', overdue);
   const money = formatMoney(invoice.totalCents);
@@ -246,7 +246,7 @@ export function StudioInvoicePanel({
                 <Notice>Before you can send it, edit the draft to add {sentence(missing)}.</Notice>
               ) : (
                 <Meta>
-                  Only the studio can see this draft. Sending it emails {client} a link to this invoice.
+                  Only the studio can see this draft. Sending it emails {clientName} a link to this invoice.
                 </Meta>
               )}
               <Stack $gap={3}>
@@ -258,7 +258,7 @@ export function StudioInvoicePanel({
                   }}
                 >
                   <FiSend aria-hidden="true" />
-                  Send to {client}
+                  Send to {clientName}
                 </Button>
                 <Button ref={editButtonRef} $block $variant="secondary" onClick={onEdit}>
                   <FiEdit3 aria-hidden="true" />
@@ -281,12 +281,27 @@ export function StudioInvoicePanel({
 
           {invoice.status === 'sent' && (
             <>
-              <LastEmailed invoice={invoice} clientName={client} />
+              {invoice.notReceived && (
+                <Inset>
+                  <RecordTitle>
+                    Reopened <LocalTime value={invoice.notReceived.at} />: the payment {clientName} reported
+                    {invoice.notReceived.method ? ` (${invoice.notReceived.method}${invoice.notReceived.reference ? `, ${invoice.notReceived.reference}` : ''})` : ''}{' '}
+                    hadn&apos;t arrived
+                  </RecordTitle>
+                  {invoice.notReceived.note && (
+                    <NoteBlock>
+                      <h5>Your note to {clientName}</h5>
+                      <p>{invoice.notReceived.note}</p>
+                    </NoteBlock>
+                  )}
+                </Inset>
+              )}
+              <LastEmailed invoice={invoice} clientName={clientName} />
               <Stack $gap={3}>
                 <Button $block onClick={paid.openDialog}>
                   Mark paid
                 </Button>
-                <EmailAgain projectId={projectId} invoice={invoice} label={overdue ? `Remind ${client} it's overdue` : `Email ${client} again`} />
+                <EmailAgain projectId={projectId} invoice={invoice} label={overdue ? `Remind ${clientName} it's overdue` : `Email ${clientName} again`} />
               </Stack>
             </>
           )}
@@ -297,7 +312,7 @@ export function StudioInvoicePanel({
               <ConfirmAction
                 block
                 label="Void invoice"
-                question={`Void ${invoice.number}? ${client} will see it as cancelled, and it can't be reopened.`}
+                question={`Void ${invoice.number}? ${clientName} will see it as cancelled, and it can't be reopened.`}
                 confirmLabel="Void invoice"
                 pendingLabel="Voiding…"
                 action={voidInvoice}
@@ -319,7 +334,7 @@ export function StudioInvoicePanel({
                   <LocalTime value={invoice.reported.at} />
                 </Meta>
               </Inset>
-              <Meta>Check it has arrived, then mark it paid to send {client} a receipt.</Meta>
+              <Meta>Check it has arrived, then mark it paid to send {clientName} a receipt.</Meta>
               <Stack $gap={3}>
                 <Button $block onClick={paid.openDialog}>
                   Mark paid
@@ -339,12 +354,12 @@ export function StudioInvoicePanel({
                 </RecordTitle>
                 {invoice.paid.reference && <Meta>Reference {invoice.paid.reference}</Meta>}
               </Inset>
-              <LastEmailed invoice={invoice} clientName={client} />
+              <LastEmailed invoice={invoice} clientName={clientName} />
               <EmailAgain projectId={projectId} invoice={invoice} label="Email the receipt again" />
             </>
           )}
 
-          {invoice.status === 'void' && <Text $muted>Void. {client} sees this invoice as cancelled, with nothing to pay.</Text>}
+          {invoice.status === 'void' && <Text $muted>Void. {clientName} sees this invoice as cancelled, with nothing to pay.</Text>}
         </Stack>
       </Panel>
 
@@ -399,7 +414,7 @@ export function StudioInvoicePanel({
             <dd>{clientEmail}</dd>
           </div>
         </DataList>
-        {dueLater && <Notice tone="alert">The due date has already passed, so {client} will see it as overdue.</Notice>}
+        {dueLater && <Notice tone="alert">The due date has already passed, so {clientName} will see it as overdue.</Notice>}
         {methodsShown === 0 && (
           <Notice>No payment methods are turned on, so the invoice says you&apos;ll send payment details separately.</Notice>
         )}
@@ -408,7 +423,7 @@ export function StudioInvoicePanel({
       <FormDialog
         dialog={paid}
         title={`Mark ${invoice.number} paid`}
-        description={`Records the payment and emails ${client} a receipt.`}
+        description={`Records the payment and emails ${clientName} a receipt.`}
         action={markInvoicePaid}
         submitLabel="Mark paid"
         pendingLabel="Saving…"
@@ -468,15 +483,15 @@ export function StudioInvoicePanel({
       <FormDialog
         dialog={notReceived}
         title="Payment not arrived yet?"
-        description={`${invoice.number} goes back to unpaid, and we email ${client} your note so they can check.`}
+        description={`${invoice.number} goes back to unpaid, and we email ${clientName} your note so they can check.`}
         action={markPaymentNotReceived}
-        submitLabel={`Reopen and email ${client}`}
+        submitLabel={`Reopen and email ${clientName}`}
         pendingLabel="Sending…"
         onSuccess={done}
         returnFocusTo={statusRef}
         hidden={<Ids projectId={projectId} invoice={invoice} />}
       >
-        <Field label={`Note to ${client}`} name="note" hint="Say what you checked, such as the account it should have reached or the reference.">
+        <Field label={`Note to ${clientName}`} name="note" hint="Say what you checked, such as the account it should have reached or the reference.">
           {(control) => (
             <Textarea
               id={control.id}
