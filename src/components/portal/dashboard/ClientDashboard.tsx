@@ -1,8 +1,7 @@
 'use client';
 
 import styled from 'styled-components';
-import MetaDot from '@/components/common/MetaDot';
-import { formatShortDate } from '@/lib/portal-format';
+import { dueInfo, formatShortDate } from '@/lib/portal-format';
 import { EmptyState, Eyebrow, H1, H2, LAPTOP, Lead, MetaText, space, Stack } from '../ui';
 import { AttentionPanel, DeadlinePanel } from './parts';
 import { ProjectCard } from './ProjectCard';
@@ -15,12 +14,47 @@ const Intro = styled.header`
   margin-bottom: ${space[10]};
 `;
 
+// The words carry the meaning; the colour only marks it as late
+const Overdue = styled.span`
+  color: ${({ theme }) => theme.colors.error};
+`;
+
+/*
+ * Parts separated by the bronze dot, as in MetaLine: each part carries its dot in front, and
+ * the row is pulled left by one slot inside a clipping box, so a wrapped line never starts or
+ * ends on a dot.
+ */
+const DOT_SLOT = '1.75rem';
+
+const SummaryClip = styled.div`
+  overflow: hidden;
+`;
+
 const SummaryLine = styled(Lead)`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: ${space[1]} ${space[3]};
+  row-gap: ${space[1]};
   max-width: none;
+  margin-left: -${DOT_SLOT};
+
+  > span {
+    position: relative;
+    padding-left: ${DOT_SLOT};
+  }
+
+  > span::before {
+    content: '';
+    position: absolute;
+    left: calc(${DOT_SLOT} / 2 - 2px);
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    margin-top: -2px;
+    border-radius: 50%;
+    background: ${({ theme }) => theme.colors.primary};
+    opacity: 0.6;
+  }
 `;
 
 /*
@@ -72,7 +106,11 @@ interface ClientDashboardProps {
 
 export default function ClientDashboard({ firstName, eyebrow, today, attention, deadlines, projects }: ClientDashboardProps) {
   const open = attention.filter((item) => item.tone !== 'info');
-  const upcoming = deadlines.find((item) => item.date >= today);
+  // The client's own late dates come first in the headline; the next date prefers theirs too
+  const overdue = deadlines.filter((item) => item.owner === 'client' && item.date < today);
+  const upcoming = deadlines.find((item) => item.date >= today && item.owner === 'client') ?? deadlines.find((item) => item.date >= today);
+  const overdueText =
+    overdue.length === 1 ? `${overdue[0].title} is ${dueInfo(overdue[0].date, today).label}` : `${overdue.length} deadlines have passed`;
   const many = projects.length > 1;
   const greeting = firstName ? `Welcome back, ${firstName}` : 'Welcome back';
 
@@ -96,19 +134,19 @@ export default function ClientDashboard({ firstName, eyebrow, today, attention, 
       <Intro>
         {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <H1>{greeting}</H1>
-        <SummaryLine>
-          <span>
-            {open.length === 0 ? 'Nothing needs you right now' : open.length === 1 ? '1 thing needs you' : `${open.length} things need you`}
-          </span>
-          {upcoming && (
-            <>
-              <MetaDot aria-hidden="true" />
+        <SummaryClip>
+          <SummaryLine>
+            <span>
+              {open.length === 0 ? 'Nothing needs you right now' : open.length === 1 ? '1 thing needs you' : `${open.length} things need you`}
+            </span>
+            {overdue.length > 0 && <Overdue>{overdueText}</Overdue>}
+            {upcoming && (
               <span>
                 next deadline <time dateTime={upcoming.date}>{formatShortDate(upcoming.date)}</time>
               </span>
-            </>
-          )}
-        </SummaryLine>
+            )}
+          </SummaryLine>
+        </SummaryClip>
       </Intro>
 
       <Grid>

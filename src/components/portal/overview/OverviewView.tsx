@@ -199,6 +199,7 @@ export default function OverviewView({
             items={attention}
             today={today}
             showProject={false}
+            followUpTitle={`To follow up with ${clientFirst}`}
             calm={
               studio
                 ? { title: 'Nothing needs the studio on this project right now.' }

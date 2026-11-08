@@ -16,9 +16,11 @@ export default async function ProjectLayout({
   const project = await requireProject(projectId);
   const [viewer, attention] = await Promise.all([getViewer(), collectAttention(project.id)]);
 
+  // A tab's count is what waits on the reader. A studio follow-up that waits on the client (an
+  // overdue invoice or sign-off) is on the client's list, as the dashboard counts it, not here.
   const badges: Partial<Record<ProjectTab, number>> = {};
   for (const item of attention) {
-    if (item.tone !== 'info') badges[item.tab] = (badges[item.tab] ?? 0) + 1;
+    if (item.tone !== 'info' && item.blockedOn !== 'client') badges[item.tab] = (badges[item.tab] ?? 0) + 1;
   }
 
   return (

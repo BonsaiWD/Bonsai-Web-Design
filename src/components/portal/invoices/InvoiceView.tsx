@@ -34,11 +34,18 @@ const ViewStatus = styled(StatusLine)`
   margin-bottom: ${space[6]};
 `;
 
-const Aside = styled.aside`
+const Aside = styled.aside<{ $payFirst: boolean }>`
   display: flex;
   flex-direction: column;
   gap: ${space[5]};
   min-width: 0;
+
+  /* A client with something to pay sees the amount, how to pay and "I've sent payment"
+     before the line items when the columns stack. Print lays the page out as blocks, where
+     order does not apply, so the statement still prints first. */
+  @media (max-width: calc(${LAPTOP} - 0.02px)) {
+    order: ${({ $payFirst }) => ($payFirst ? -1 : 0)};
+  }
 
   /* Below the statement on tablets: panels side by side, a lone panel at full width */
   @media (min-width: ${PHONE}) and (max-width: calc(${LAPTOP} - 0.02px)) {
@@ -126,7 +133,7 @@ export default function InvoiceView({ projectId, perspective, canPay, today, inv
           <Statement invoice={invoice} parties={parties} perspective={perspective} today={today} />
         )}
 
-        <Aside aria-label={studio ? 'Invoice status and studio actions' : 'Paying this invoice'}>
+        <Aside aria-label={studio ? 'Invoice status and studio actions' : 'Paying this invoice'} $payFirst={!studio && invoice.status === 'sent'}>
           {studio ? (
             <>
               <StudioInvoicePanel
@@ -147,7 +154,7 @@ export default function InvoiceView({ projectId, perspective, canPay, today, inv
                     <H3 id={payHeadingId}>How to pay</H3>
                     <Meta>
                       {methods.length
-                        ? `${parties.clientName} sees ${methods.length === 1 ? 'one way' : `${methods.length} ways`} to pay: ${listMethods(methods.map((method) => method.method))}, each with a Copy button.`
+                        ? `${parties.clientName} sees ${methods.length === 1 ? 'one way' : `${methods.length} ways`} to pay: ${listMethods(methods.map((method) => method.method))}.`
                         : `No methods are turned on, so ${parties.clientName} is told you'll send payment details separately.`}{' '}
                       <TextLink href="/portal/admin/settings">Edit payment settings</TextLink>
                     </Meta>

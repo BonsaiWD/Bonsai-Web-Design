@@ -10,7 +10,7 @@ import { METHOD_LABELS } from '@/components/portal/invoices/labels';
 import { invoiceTotalCents, MAX_LINES, parseDollars, parseQuantity } from '@/components/portal/invoices/money';
 import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate, formatMoney, todayIso } from '@/lib/portal-format';
-import { projectActor, type ProjectActor } from '@/server/portal/access';
+import { assertStillClient, projectActor, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
   activityKind,
@@ -25,7 +25,6 @@ import {
   reminderEmail,
   sentEmail,
   studioProjectActor,
-  type Tx,
 } from '@/server/portal/features/invoices';
 import { emailNote, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 
@@ -401,7 +400,8 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
       projectId,
       actorId: actor.user.id,
       kind: activityKind('reminded', row.id),
-      summary: receipt ? `Receipt for ${row.number} emailed again` : `Reminder about ${row.number} emailed to ${clientName}`,
+      // Worded as every other receipt row: "Receipt emailed to <name>: <what>"
+      summary: receipt ? `Receipt emailed to ${clientName} again: payment of ${row.number}` : `Reminder about ${row.number} emailed to ${clientName}`,
       target: 'invoices',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -551,6 +551,8 @@ export async function reportPayment(_prev: ActionState, formData: FormData): Pro
     const thanks = "Thanks. We'll confirm when your payment arrives and email you a receipt.";
 
     const result = await getDb().transaction(async (tx) => {
+      // First, before the invoice lock: the project may have moved to another client since
+      await assertStillClient(tx, actor);
       const row = await lockInvoice(tx, projectId, input.invoiceId);
       // Drafts are invisible to clients, so one looks like a missing invoice
       if (row.status === 'draft') throw new ActionError(NOT_FOUND);
@@ -583,7 +585,8 @@ export async function reportPayment(_prev: ActionState, formData: FormData): Pro
       projectId,
       actorId: actor.user.id,
       kind: activityKind('reported', result.row.id),
-      summary: `${name} reported paying ${result.row.number} by ${METHOD_LABELS[input.method]}`,
+      // The words of the studio's attention item and email: "<client> reported a payment on BWD-0003"
+      summary: `${name} reported a payment on ${result.row.number} by ${METHOD_LABELS[input.method]}`,
       target: 'invoices',
       email: { to: STUDIO_EMAIL, subject, content },
     });

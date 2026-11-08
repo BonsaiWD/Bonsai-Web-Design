@@ -23,7 +23,7 @@ import {
   tint,
   type,
 } from '../ui';
-import { ActivityPanel, AttentionPanel, DeadlinePanel, MetaLine, PanelTitle, sinceLabel, ToneMarker } from './parts';
+import { ActivityPanel, AttentionPanel, DeadlinePanel, itemHref, MetaLine, PanelTitle, sinceLabel, ToneMarker } from './parts';
 import { ProjectsTable } from './ProjectsTable';
 import type { ActivityView, AttentionItem, DeadlineItem, ProjectCardView, StudioStats } from './types';
 
@@ -310,10 +310,11 @@ function WaitingOnClients({ items, projects, today }: { items: AttentionItem[]; 
                   <li key={item.key}>
                     <ToneMarker tone={item.tone} />
                     <div>
-                      <Link href={projectHref(item.projectId, item.tab, item.anchor)}>{item.title}</Link>
+                      <Link href={itemHref(item)}>{item.title}</Link>
+                      {/* Due first, as in every attention list */}
                       <MetaLine>
-                        {item.since && sinceLabel(item.since, today, true)}
                         {item.due && <DueText value={item.due} today={today} />}
+                        {item.since && sinceLabel(item.since, today, true)}
                       </MetaLine>
                     </div>
                   </li>

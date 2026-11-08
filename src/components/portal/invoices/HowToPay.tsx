@@ -79,6 +79,13 @@ const DetailValue = styled.span`
   user-select: all;
 `;
 
+// A sentence such as "We send bank details with your invoice": read, not copied
+const Prose = styled.span`
+  ${type.body}
+  color: ${({ theme }) => theme.colors.text};
+  overflow-wrap: anywhere;
+`;
+
 const CopyButton = styled(Button)`
   flex-shrink: 0;
 
@@ -161,11 +168,33 @@ async function copyText(value: string): Promise<boolean> {
   return copied;
 }
 
+/*
+ * Every detail gets a Copy button except a sentence, such as "We send bank details with your
+ * invoice." A sentence has words in lower case ("with", "your") and either ends like one or runs
+ * past a few words. An account name ("Bonsai Web Design LLC"), a bank, an IBAN in groups or a
+ * street address has none of that, so it stays copyable.
+ */
+function isCopyable(detail: PaymentDetail): boolean {
+  if (detail.label) return true;
+  const value = detail.value.trim();
+  const words = value.split(/\s+/);
+  const inWords = words.some((word) => /^[a-z]{2,}/.test(word));
+  return !(inWords && (/[.!?]$/.test(value) || words.length > 6));
+}
+
 function Detail({ detail, noun, onResult }: { detail: PaymentDetail; noun: string; onResult: (text: string) => void }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const what = detail.label ? detail.label.toLocaleLowerCase('en-US') : noun;
+
+  if (!isCopyable(detail)) {
+    return (
+      <li>
+        <Prose>{detail.value}</Prose>
+      </li>
+    );
+  }
 
   return (
     <li>

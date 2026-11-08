@@ -17,12 +17,11 @@ import type {
 import { projectHref } from '@/components/portal/tabs';
 import type { EmailContent } from '@/lib/email';
 import { firstName, formatDate, formatMoney } from '@/lib/portal-format';
-import { adminActor, isUuid, projectActor } from '../access';
+import { adminActor, isUuid, projectActor, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { portalOrigin } from '../notify';
 
 type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export const STUDIO_NAME = 'Bonsai Web Design';
 
@@ -423,11 +422,13 @@ const scopedOpenInvoices = cache(async (context: FeatureContext) => {
 async function attention(context: FeatureContext): Promise<AttentionItem[]> {
   const rows = await scopedOpenInvoices(context);
   const items: AttentionItem[] = [];
+  // Every item opens the invoice's own page, where paying, Mark paid and Email again live
   const base = (row: (typeof rows)[number]) => ({
     projectId: row.projectId,
     projectName: row.projectName,
     tab: 'invoices' as const,
     anchor: invoiceAnchor(row.id),
+    href: invoicePath(row.projectId, row.id),
   });
 
   if (context.perspective === 'client') {
@@ -458,13 +459,15 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
         tone: 'action',
       });
     } else if (isOverdue(row.status, row.dueOn, context.today)) {
+      // Paying is the client's step: a follow-up for the studio, counted as waiting on them
       items.push({
         ...base(row),
         key: `invoice-overdue:${row.id}`,
-        title: `${row.number} is overdue`,
-        detail: `${client} · ${formatMoney(row.totalCents)}`,
+        title: `Waiting on ${firstName(client) ?? client} to pay ${row.number}`,
+        detail: `${formatMoney(row.totalCents)} · ${row.title}`,
         due: row.dueOn,
         tone: 'alert',
+        blockedOn: 'client',
       });
     }
   }
@@ -503,6 +506,7 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
       projectName: row.projectName,
       tab: 'invoices',
       anchor: invoiceAnchor(row.invoiceId),
+      href: invoicePath(row.projectId, row.invoiceId),
       title: `The email about ${row.number} to ${row.emailTo} could not be sent`,
       detail: row.summary,
       since: row.createdAt.toISOString(),
@@ -522,6 +526,7 @@ async function deadlines(context: FeatureContext): Promise<DeadlineItem[]> {
       projectName: row.projectName,
       tab: 'invoices' as const,
       anchor: invoiceAnchor(row.id),
+      href: invoicePath(row.projectId, row.id),
       title: `Invoice ${row.number} (${formatMoney(row.totalCents)})`,
       date: row.dueOn as string,
       kind: 'invoice' as const,

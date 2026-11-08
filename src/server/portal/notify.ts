@@ -7,6 +7,10 @@ import { sendEmail, STUDIO_EMAIL, type EmailContent } from '@/lib/email';
 
 export { STUDIO_EMAIL };
 
+// Who the studio is to a client: they deal with the studio, so a studio member with no name is
+// shown as the studio, never by their address
+export const STUDIO_NAME = 'Bonsai Web Design';
+
 const PRODUCTION_ORIGIN = 'https://bonsaiwebdesign.com';
 
 /**

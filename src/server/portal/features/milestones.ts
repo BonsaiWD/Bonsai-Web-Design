@@ -8,6 +8,7 @@ import type { LinkedDeliverable, MilestoneView, SignoffRecord } from '@/componen
 import { daysBetween, firstName } from '@/lib/portal-format';
 import { adminActor, isUuid, projectActor, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
+import { STUDIO_NAME } from '../notify';
 import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
@@ -154,7 +155,9 @@ export async function loadMilestones(projectId: string, perspective: Perspective
                 id: row.signoffId,
                 source: row.source,
                 initials: row.initials,
-                signerName: row.signerName || row.signerEmail || 'Unknown',
+                // The client deals with the studio, so a sign-off the studio recorded names the studio
+                signerName:
+                    !studio && row.source === 'studio' ? STUDIO_NAME : row.signerName?.trim() || row.signerEmail || 'Unknown',
                 statement: row.statement,
                 note: row.note,
                 signedAt: row.signedAt.toISOString(),

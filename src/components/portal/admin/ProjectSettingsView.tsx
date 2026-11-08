@@ -30,6 +30,7 @@ import {
   type,
   useDialog,
   useFormStatusState,
+  useUnsavedChanges,
 } from '../ui';
 import { FreshFields, FormDialog } from './parts';
 import ProjectFields from './ProjectFields';
@@ -102,6 +103,9 @@ const clientLabel = (client: ClientOption) => [client.name, client.company].filt
 
 function DetailsForm({ settings }: { settings: ProjectSettingsData }) {
   const clientFirst = firstName(settings.client.name) ?? settings.client.name;
+  // Unsaved edits ask before the tabs, the shell's links or a reload discard them
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
   return (
     <Panel aria-labelledby="settings-details">
       <Stack $gap={6}>
@@ -109,7 +113,7 @@ function DetailsForm({ settings }: { settings: ProjectSettingsData }) {
           <H2 id="settings-details">Project details</H2>
           <Meta>A change of stage or launch date shows on {clientFirst}&apos;s timeline.</Meta>
         </SectionHead>
-        <ActionForm action={updateProject}>
+        <ActionForm action={updateProject} onChange={() => setDirty(true)} onSuccess={() => setDirty(false)}>
           <FormStack>
             <FreshFields saved={settings.version}>
               <ProjectFields
