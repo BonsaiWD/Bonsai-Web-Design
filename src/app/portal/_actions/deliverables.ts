@@ -17,6 +17,7 @@ import {
   claimEmailSlot,
   currentVersion,
   deliverableAnchor,
+  emailedAboutVersion,
   eventForLinked,
   lockMilestones,
   recheckMilestone,
@@ -526,6 +527,13 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
       );
     }
     const { version } = locked;
+    // Shared without an email, or every earlier one failed: this is the first they hear of it
+    const again = await emailedAboutVersion({
+      projectId,
+      deliverableId: locked.deliverableId,
+      versionId: version.id,
+      to: actor.project.clientEmail,
+    });
     const { subject, content } = shareEmail({
       projectName: actor.project.name,
       clientName: actor.project.clientName,
@@ -535,19 +543,19 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
       needsApproval: version.status === 'in_review',
       reviewBy: version.reviewBy,
       url: await cardUrl(projectId, locked.deliverableId),
-      reminder: true,
+      reminder: again,
     });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
       kind: activityKind('reminded', locked.deliverableId),
-      summary: `Emailed ${clientName} again about version ${version.version} of ${locked.title}`,
+      summary: `Emailed ${clientName}${again ? ' again' : ''} about version ${version.version} of ${locked.title}`,
       target: 'deliverables',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
     });
     refresh(projectId);
-    if (emailStatus === 'sent') return done(`Emailed ${clientName} again.`);
+    if (emailStatus === 'sent') return done(`Emailed ${clientName}${again ? ' again' : ''}.`);
     await releaseEmailSlot(input.versionId);
     if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName).trim());
     throw new ActionError(`The email to ${clientName} could not be sent. It is flagged on your dashboard; try again in a minute.`);

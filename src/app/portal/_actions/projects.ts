@@ -280,7 +280,7 @@ export async function deleteProject(_prev: ActionState, formData: FormData): Pro
             const records = await countProjectRecords(tx, projectId);
             if (hasSignedRecords(records)) {
                 throw new ActionError(
-                    `This project can't be deleted: it has ${listParts(signedRecords(records))}, which are kept on record. Set its stage to On hold instead.`,
+                    `This project can't be deleted: it has ${listParts(signedRecords(records))}, and signed records are kept. Set its stage to On hold instead.`,
                 );
             }
             const keys = await tx.select({ key: file.storageKey }).from(file).where(eq(file.projectId, projectId));

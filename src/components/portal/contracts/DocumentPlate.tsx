@@ -95,7 +95,8 @@ function detail(entry: ContractFileView, perspective: Perspective) {
       <>
         {size} <Dot aria-hidden="true" data-dot />{' '}
         <Nowrap data-break>
-          SHA-256 <Sha title={entry.sha256}>{shortSha(entry.sha256)}…</Sha>
+          {/* The studio reads the algorithm's name; the client, what it is for */}
+          {perspective === 'studio' ? 'SHA-256' : 'Fingerprint'} <Sha title={entry.sha256}>{shortSha(entry.sha256)}…</Sha>
         </Nowrap>
       </>
     );
@@ -124,7 +125,7 @@ export function DocumentPlate({ contract, perspective }: { contract: ContractVie
           <div>
             <FileGlyph filename={entry.filename} />
             <Body>
-              <Kind>{fileLabel(entry.label, perspective, contract.requiresSignature)}</Kind>
+              <Kind>{fileLabel(entry.label, perspective, contract.requiresSignature, entry.side)}</Kind>
               <strong>{entry.filename}</strong>
               <small>{detail(entry, perspective)}</small>
             </Body>

@@ -13,7 +13,7 @@ export default async function FilesPage({ params }: { params: Promise<{ projectI
   const project = await requireProject(projectId);
   const [viewer, context] = await Promise.all([getViewer(), featureContext(project.id)]);
   // The client's copy never includes removed files
-  const files = await loadProjectFiles(project.id, context.perspective, viewer.user.id);
+  const files = await loadProjectFiles(project.id, context.perspective, viewer.user.id, project.clientId);
   const studio = context.perspective === 'studio';
 
   return (

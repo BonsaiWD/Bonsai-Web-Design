@@ -6,7 +6,7 @@ import { H3, LocalTime, StatusBadge, Text } from '@/components/portal/ui';
 import { ClientActions } from './ClientActions';
 import { DocumentPlate } from './DocumentPlate';
 import { contractLabel } from './labels';
-import { FileHistory, SignatureRecord } from './Records';
+import { FileHistory, ReturnedNotice, SignatureRecord } from './Records';
 import { StudioActions } from './StudioActions';
 import type { ContractView, Perspective, UploadLimits } from './types';
 
@@ -51,6 +51,8 @@ export function ContractCard({ projectId, contract, perspective, clientName, can
       <DocumentPlate contract={contract} perspective={perspective} />
 
       <SignatureRecord contract={contract} perspective={perspective} clientName={clientName} />
+
+      <ReturnedNotice contract={contract} perspective={perspective} clientName={clientName} />
 
       {studio ? (
         <StudioActions

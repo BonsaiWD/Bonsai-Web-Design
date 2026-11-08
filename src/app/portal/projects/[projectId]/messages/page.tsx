@@ -24,7 +24,7 @@ export default async function MessagesPage({
 
   // The client's thread is filtered in the query: internal notes never leave the database
   const [thread, studioInfo] = await Promise.all([
-    loadThread({ projectId: project.id, perspective: context.perspective, readerId, all: query.all === '1' }),
+    loadThread({ projectId: project.id, clientId: project.clientId, perspective: context.perspective, readerId, all: query.all === '1' }),
     studio ? loadStudioThreadInfo(project) : Promise.resolve(null),
   ]);
 

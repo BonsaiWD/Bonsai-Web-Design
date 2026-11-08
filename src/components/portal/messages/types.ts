@@ -16,6 +16,8 @@ export interface MessageView {
   authorId: string;
   authorName: string;
   side: Side;
+  // Written by a client the project belonged to before it moved: never the reader's own side
+  formerClient?: boolean;
   // From the other side and newer than the reader's last visit
   unread: boolean;
   // Shown in the browser while it is being sent; never comes from the server

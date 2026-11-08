@@ -9,6 +9,7 @@ import {
   emailContractAgain,
   recordContractSignature,
   replaceContractDocument,
+  returnSignedCopy,
   uploadCountersigned,
 } from '@/app/portal/_actions/contracts';
 import { CardActions, ConfirmAction, FormDialog, sansHeading, type Announce } from '@/components/portal/deliverables/parts';
@@ -135,6 +136,7 @@ export function StudioActions({
   const record = useDialog();
   const countersign = useDialog();
   const edit = useDialog();
+  const sendBack = useDialog();
   const [manageOpen, setManageOpen] = useState(false);
   const toolsId = useId();
 
@@ -144,6 +146,12 @@ export function StudioActions({
   const signed = status === 'signed' || status === 'countersigned';
   const studio = contract.studio;
   const original = contract.original;
+  // A copy the client uploaded, with no signature behind it, can go back to them if it is wrong
+  const returnable = status === 'signed' && !signature && contract.signedCopy?.side === 'client' ? contract.signedCopy : null;
+  // The dialog outlives its copy: success re-renders the card without it, and the dialog must
+  // still be there to report the result and hand focus back
+  const [heldCopy, setHeldCopy] = useState(returnable);
+  if (returnable?.id !== heldCopy?.id && !sendBack.open) setHeldCopy(returnable);
 
   // Every action lands its message in the card's status line, and focus goes with it
   const landed = (state: NonNullable<ActionState>) => announce(state.message);
@@ -174,7 +182,7 @@ export function StudioActions({
     )
   ) : contract.signedCopy ? (
     <>
-      {clientName} uploaded a signed copy on <LocalTime value={contract.signedCopy.uploadedAt} />
+      {contract.signedCopy.uploadedByName || clientName} uploaded a signed copy on <LocalTime value={contract.signedCopy.uploadedAt} />
     </>
   ) : null;
 
@@ -184,7 +192,8 @@ export function StudioActions({
         {awaiting && (
           <SubmitButton variant="quiet" pendingLabel="Sending…">
             <FiMail aria-hidden="true" />
-            Email {clientName} again
+            {/* "Again" only once an email has gone, or was tried */}
+            {studio?.lastEmailedAt || studio?.lastEmailFailed ? `Email ${clientName} again` : `Email ${clientName}`}
           </SubmitButton>
         )}
         {status === 'signed' && (
@@ -227,6 +236,22 @@ export function StudioActions({
       )}
 
       <Tools id={toolsId} hidden={!manageOpen}>
+        {returnable && (
+          <Tool>
+            <div>
+              <h5>Send back the signed copy</h5>
+              <p>
+                If {returnable.filename} isn&apos;t a signed copy of {original?.filename ?? 'the document'}, send it back with a note.{' '}
+                {clientName} gets an email and can sign again; the file stays in the history.
+              </p>
+            </div>
+            <div>
+              <Button $variant="secondary" onClick={sendBack.openDialog}>
+                Send it back
+              </Button>
+            </div>
+          </Tool>
+        )}
         {unsigned && original && (
           <Tool>
             <div>
@@ -287,7 +312,10 @@ export function StudioActions({
           <div>
             <h5>Delete {contract.title}</h5>
             {blockedBy ? (
-              <p>Can&apos;t delete: {blockedBy}. Signed records are kept.</p>
+              <p>
+                Can&apos;t delete: {blockedBy}. Signed records are kept.
+                {returnable ? ' If the copy is wrong, send it back first.' : ''}
+              </p>
             ) : (
               <p>Removes it and its files from the portal. Only possible while it is unsigned.</p>
             )}
@@ -393,6 +421,40 @@ export function StudioActions({
             acceptedExtensions={limits.acceptedExtensions}
             maxUploadBytes={limits.maxUploadBytes}
           />
+        </FormDialog>
+      )}
+
+      {heldCopy && (
+        <FormDialog
+          dialog={sendBack}
+          title={`Send back the signed copy of ${contract.title}`}
+          description={`${clientName} gets your note by email, and ${contract.title} waits for their signature again. ${heldCopy.filename} stays in the file history.`}
+          action={returnSignedCopy}
+          submitLabel="Send it back"
+          pendingLabel="Sending…"
+          onSuccess={landed}
+          returnFocusTo={statusRef}
+          hidden={
+            <>
+              {contractFields}
+              <input type="hidden" name="contractFileId" value={heldCopy.id} />
+            </>
+          }
+        >
+          <Field label="What's wrong with it" name="reason" hint={`For example: the signature page is missing. ${clientName} sees this note.`}>
+            {(control) => (
+              <Textarea
+                id={control.id}
+                name={control.name}
+                defaultValue={control.defaultValue}
+                aria-describedby={control.describedBy}
+                aria-invalid={control.invalid || undefined}
+                rows={3}
+                maxLength={1000}
+                required
+              />
+            )}
+          </Field>
         </FormDialog>
       )}
 

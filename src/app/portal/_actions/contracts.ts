@@ -1,16 +1,17 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
-import { contract, contractFile, contractSignature, file, rateLimit } from '@/db/schema';
+import { contract, contractFile, contractSignature, file, rateLimit, user } from '@/db/schema';
 import { signStatement, studioSignStatement } from '@/components/portal/contracts/copy';
 import { projectHref } from '@/components/portal/tabs';
 import { plural } from '@/lib/portal-format';
-import { adminActor, projectActor, type PortalUser, type ProjectActor } from '@/server/portal/access';
+import { adminActor, assertStillClient, projectActor, type PortalUser, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
+  askedByEmail,
   askEmail,
   claimEmailSlot,
   contractAnchor,
@@ -19,11 +20,14 @@ import {
   lockContract,
   recordedSignatureEmail,
   releaseEmailSlot,
+  returnedCopyEmail,
+  returnedKind,
+  returnedNoteSummary,
   signedCopyEmail,
   signedEmails,
   type LockedContract,
-  type Tx,
 } from '@/server/portal/features/contracts';
+import { claimUploadQuota, refundUploadQuota } from '@/server/portal/features/files';
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
@@ -452,25 +456,27 @@ export async function emailContractAgain(_prev: ActionState, formData: FormData)
         `${clientName} was emailed about this a few minutes ago. You can send another in ${plural(slot.waitMinutes, 'minute')}.`,
       );
     }
+    // Added without an email, or every earlier one failed: this is the first they hear of it
+    const again = await askedByEmail(projectId, input.contractId, actor.project.clientEmail);
     const { subject, content } = askEmail({
       projectName: actor.project.name,
       clientName: actor.project.clientName,
       title: locked.title,
       requiresSignature: true,
       url: await contractUrl(projectId, input.contractId),
-      kind: 'reminder',
+      kind: again ? 'reminder' : 'added',
     });
     const { emailStatus } = await recordActivity({
       projectId,
       actorId: actor.user.id,
       kind: contractKind('reminded', input.contractId),
-      summary: `Emailed ${clientName} again about signing ${locked.title}`,
+      summary: `Emailed ${clientName}${again ? ' again' : ''} about signing ${locked.title}`,
       target: 'contracts',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
     });
     refresh(projectId);
-    if (emailStatus === 'sent') return done(`Emailed ${clientName} again.`);
+    if (emailStatus === 'sent') return done(`Emailed ${clientName}${again ? ' again' : ''}.`);
     await releaseEmailSlot(input.contractId);
     if (emailStatus === 'skipped') return done(emailNote(emailStatus, clientName).trim());
     throw new ActionError(`The email to ${clientName} could not be sent. It is flagged on your dashboard; try again in a minute.`);
@@ -652,6 +658,8 @@ export async function signContract(_prev: ActionState, formData: FormData): Prom
     const meta = await requestMeta();
 
     const result = await getDb().transaction(async (tx) => {
+      // Before any other lock: the project may have moved to another client since projectActor
+      await assertStillClient(tx, actor);
       const locked = await lockOrFail(tx, projectId, input.contractId);
       // A double click: the first click already signed it
       const mine = (signature: { source: string; signerId: string } | null) =>
@@ -760,6 +768,9 @@ const signedCopySchema = z.object({
   projectId: fields.uuid,
   contractId: fields.uuid,
   contractFileId: fields.uuid,
+  // The document the client had on screen: a copy of a version the studio has since replaced
+  // is refused, as a portal signature would be
+  shownFileId: fields.uuid,
   note: fields.optionalText('the note', 1000),
 });
 
@@ -770,34 +781,83 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
     const input = parseWithChecks(signedCopySchema, formData, upload ? {} : { file: 'Choose your signed copy.' });
     const projectId = actor.project.id;
     const thanks = (title: string) => `Thanks, we have your signed copy of ${title}.`;
+    // One signed copy at a time: another can follow once the studio sends this one back, so
+    // each copy (and its email to the studio) waits on a person in between
     const refuse = (locked: LockedContract) => {
       if (!locked.requiresSignature) throw new ActionError(`${locked.title} doesn't need your signature.`);
       if (locked.status === 'countersigned') throw new ActionError(`${locked.title} is already signed by both of us.`);
+      if (locked.signature) throw new ActionError(`${locked.title} is already signed.`);
+      if (locked.hasSignedCopy) {
+        throw new ActionError(
+          `You've already uploaded a signed copy of ${locked.title}. If it's the wrong file, tell us in Messages and we'll send it back so you can upload another.`,
+        );
+      }
+      if (!locked.original || locked.original.fileId !== input.shownFileId) {
+        // The client's card still shows the old version: refresh it, so the new one is there to download
+        refresh(projectId);
+        throw new ActionError(
+          'We replaced this document since you opened it. The new version is on this page now: download it, sign that one, then upload it.',
+        );
+      }
     };
 
     const repeat = await existingContractFile(projectId, input.contractFileId);
     if (repeat) return done(thanks(repeat.title));
     refuse(await peek(projectId, input.contractId));
 
-    const result = await withUpload(actor, upload, async (tx, stored) => {
-      const locked = await lockOrFail(tx, projectId, input.contractId);
-      refuse(locked);
-      const inserted = stored
-        ? await tx
-            .insert(contractFile)
-            .values({
-              id: input.contractFileId,
-              contractId: locked.id,
-              fileId: stored.id,
-              label: 'client_signed',
-              uploadedBy: actor.user.id,
-            })
-            .onConflictDoNothing({ target: contractFile.id })
-            .returning({ id: contractFile.id })
-        : [];
-      return { duplicate: inserted.length === 0, title: locked.title, filename: stored?.filename ?? '', sha256: stored?.sha256 ?? '' };
-    });
-    if (result.duplicate) return done(thanks(result.title));
+    // Counted before the bytes are stored, and given back if nothing comes of the upload
+    const quota = upload ? await claimUploadQuota(actor.user.id, upload.size) : null;
+    type Original = { filename: string; sha256: string; uploadedAt: Date; replaced: boolean };
+    let result: { duplicate: boolean; title: string; filename: string; sha256: string; original: Original | null };
+    try {
+      result = await withUpload(actor, upload, async (tx, stored) => {
+        // Before any other lock: the project may have moved to another client since projectActor
+        await assertStillClient(tx, actor);
+        const locked = await lockOrFail(tx, projectId, input.contractId);
+        // A double submit that waited for the first one's lock
+        const [already] = await tx
+          .select({ id: contractFile.id })
+          .from(contractFile)
+          .where(and(eq(contractFile.id, input.contractFileId), eq(contractFile.contractId, locked.id)));
+        if (already) return { duplicate: true, title: locked.title, filename: '', sha256: '', original: null };
+        refuse(locked);
+        const inserted = stored
+          ? await tx
+              .insert(contractFile)
+              .values({
+                id: input.contractFileId,
+                contractId: locked.id,
+                fileId: stored.id,
+                label: 'client_signed',
+                uploadedBy: actor.user.id,
+              })
+              .onConflictDoNothing({ target: contractFile.id })
+              .returning({ id: contractFile.id })
+          : [];
+        return {
+          duplicate: inserted.length === 0,
+          title: locked.title,
+          filename: stored?.filename ?? '',
+          sha256: stored?.sha256 ?? '',
+          // Which version the copy is of, and whether an earlier one came before it
+          original: locked.original
+            ? {
+                filename: locked.original.filename,
+                sha256: locked.original.sha256,
+                uploadedAt: locked.original.uploadedAt,
+                replaced: locked.original.replaced,
+              }
+            : null,
+        };
+      });
+    } catch (error) {
+      if (quota) await refundUploadQuota(quota);
+      throw error;
+    }
+    if (result.duplicate || !result.original) {
+      if (quota) await refundUploadQuota(quota);
+      return done(thanks(result.title));
+    }
 
     refresh(projectId);
     const clientName = clientNameOf(actor);
@@ -806,6 +866,7 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
       title: result.title,
       filename: result.filename,
       sha256: result.sha256,
+      original: result.original,
       note: input.note,
       url: await contractUrl(projectId, input.contractId),
     });
@@ -817,6 +878,91 @@ export async function uploadSignedCopy(_prev: ActionState, formData: FormData): 
       target: 'contracts',
       email: { to: STUDIO_EMAIL, replyTo: actor.user.email, subject, content },
     });
-    return done(`${thanks(result.title)} We'll add our countersigned copy here.`);
+    return done(`${thanks(result.title)} We'll check it and add our countersigned copy here.`);
+  });
+}
+
+/* ---------- Studio: send back a signed copy that isn't right ---------- */
+
+const returnSchema = z.object({
+  projectId: fields.uuid,
+  contractId: fields.uuid,
+  // The client_signed contract_file row on screen
+  contractFileId: fields.uuid,
+  reason: fields.requiredText("what's wrong with it", 1000),
+});
+
+export async function returnSignedCopy(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runAction(formData, async () => {
+    const actor = await studioActor(formData.get('projectId'));
+    const input = parseForm(returnSchema, formData);
+    const projectId = actor.project.id;
+    const clientName = clientNameOf(actor);
+    const sentBack = (title: string) => `Sent back the signed copy. ${title} is waiting for ${clientName}'s signature again.`;
+
+    const result = await getDb().transaction(async (tx) => {
+      const locked = await lockOrFail(tx, projectId, input.contractId);
+      const [copy] = await tx
+        .select({
+          fileId: file.id,
+          filename: file.filename,
+          removedAt: file.removedAt,
+          label: contractFile.label,
+          uploaderRole: user.role,
+        })
+        .from(contractFile)
+        .innerJoin(file, eq(file.id, contractFile.fileId))
+        .innerJoin(user, eq(user.id, contractFile.uploadedBy))
+        .where(and(eq(contractFile.id, input.contractFileId), eq(contractFile.contractId, locked.id)))
+        .for('update', { of: file });
+      if (!copy || copy.label !== 'client_signed') throw new ActionError('That signed copy could not be found. Reload the page.');
+      // A second click: it is already back with them
+      if (copy.removedAt) return { repeat: true as const, title: locked.title };
+      // A copy the studio attached to a recorded signature belongs to that record
+      if (locked.signature || copy.uploaderRole === 'admin') {
+        throw new ActionError(`${locked.title} has a signature on record, so its signed copy is kept.`);
+      }
+      if (locked.status === 'countersigned') {
+        throw new ActionError(`You've added the countersigned copy of ${locked.title}, so the signed copies are kept.`);
+      }
+      // Kept for the record, hidden from the client, and no longer a signature
+      await tx
+        .update(file)
+        .set({ removedAt: sql`now()` })
+        .where(eq(file.id, copy.fileId));
+      return { repeat: false as const, title: locked.title, filename: copy.filename };
+    });
+    if (result.repeat) return done(sentBack(result.title));
+
+    refresh(projectId);
+    const { subject, content } = returnedCopyEmail({
+      projectName: actor.project.name,
+      clientName: actor.project.clientName,
+      title: result.title,
+      filename: result.filename,
+      reason: input.reason,
+      url: await contractUrl(projectId, input.contractId),
+    });
+    // The change, for every timeline; the note, by email to the client and on the studio's
+    // record only, so it never shows in the timeline a later client of the project reads
+    await recordActivity({
+      projectId,
+      actorId: actor.user.id,
+      kind: returnedKind('returned', input.contractId, input.contractFileId),
+      summary: `Sent back the signed copy of ${result.title}`,
+      target: 'contracts',
+    });
+    const { emailStatus } = await recordActivity({
+      projectId,
+      actorId: actor.user.id,
+      kind: returnedKind('returnedNote', input.contractId, input.contractFileId),
+      summary: returnedNoteSummary(clientName, result.title, input.reason),
+      target: 'contracts',
+      visibility: 'studio',
+      email: { to: actor.project.clientEmail, subject, content },
+    });
+    return done(
+      `${sentBack(result.title)}${emailStatus === 'sent' ? ` We emailed ${clientName} your note.` : emailNote(emailStatus, clientName)}`,
+    );
   });
 }

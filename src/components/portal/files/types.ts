@@ -8,7 +8,8 @@ export interface ProjectFileView {
   // PDFs and images can open in the browser
   previewable: boolean;
   uploadedAt: string;
-  side: 'studio' | 'client';
+  // former: a client this project belonged to before it moved to the current one
+  side: 'studio' | 'client' | 'former';
   uploadedByName: string;
   // The viewer uploaded it, so they may remove it
   mine: boolean;

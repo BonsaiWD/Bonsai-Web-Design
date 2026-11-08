@@ -16,8 +16,11 @@ import {
   FormMessage,
   FormStack,
   Input,
+  LocalTime,
+  Notice,
   space,
   SubmitButton,
+  Text,
   Textarea,
   TextAnchor,
   tint,
@@ -28,7 +31,7 @@ import {
 } from '@/components/portal/ui';
 import { fileHref, FreshId } from '../files/parts';
 import { UploadField } from '../files/UploadField';
-import { shortSha, signStatement } from './copy';
+import { shortSha, signStatement, wasReplaced } from './copy';
 import type { ContractView, UploadLimits } from './types';
 
 // What exactly is being signed, restated inside the dialog with a way to read it first
@@ -56,6 +59,17 @@ const Signing = styled.div`
     align-self: flex-start;
     margin-top: ${space[1]};
   }
+`;
+
+// The filename the copy should be of
+const Version = styled.strong`
+  ${type.label}
+  ${type.figures}
+  overflow-wrap: anywhere;
+`;
+
+const PanelNotice = styled.div`
+  margin-bottom: ${space[5]};
 `;
 
 const Dot = styled(MetaDot)`
@@ -95,6 +109,10 @@ interface ClientActionsProps {
 export function ClientActions({ projectId, contract, clientName, canSign, limits, announce, statusRef }: ClientActionsProps) {
   const sign = useDialog();
   const [uploadOpen, setUploadOpen] = useState(false);
+  // The document on screen when the upload opened: a copy of a version replaced since is refused
+  const [uploadFor, setUploadFor] = useState<string | null>(null);
+  // The studio replaced the document while the panel was open (the refusal refreshes the card)
+  const [replacedWhileOpen, setReplacedWhileOpen] = useState(false);
   const panelId = useId();
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -103,10 +121,16 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
   const [held, setHeld] = useState(contract.original);
   if (contract.original && contract.original !== held && !sign.open) setHeld(contract.original);
   const original = held;
+  // The open panel follows the document now on the card, with a fresh form and a word on why
+  const current = contract.original;
+  if (uploadOpen && uploadFor && current && current.fileId !== uploadFor) {
+    setUploadFor(current.fileId);
+    setReplacedWhileOpen(true);
+  }
 
   useEffect(() => {
     if (uploadOpen) panelRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.focus();
-  }, [uploadOpen]);
+  }, [uploadOpen, uploadFor]);
 
   if (!canSign) {
     if (!awaiting) return null;
@@ -134,23 +158,42 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
               <VisuallyHidden>: {contract.title}</VisuallyHidden>
             </Button>
           )}
-          <Button
-            ref={uploadButtonRef}
-            $variant="secondary"
-            aria-expanded={uploadOpen}
-            aria-controls={panelId}
-            onClick={() => setUploadOpen((open) => !open)}
-          >
-            <FiUpload aria-hidden="true" />
-            Upload a signed copy
-          </Button>
+          {original && (
+            <Button
+              ref={uploadButtonRef}
+              $variant="secondary"
+              aria-expanded={uploadOpen}
+              aria-controls={panelId}
+              onClick={() => {
+                setUploadFor(original.fileId);
+                setReplacedWhileOpen(false);
+                setUploadOpen((open) => !open);
+              }}
+            >
+              <FiUpload aria-hidden="true" />
+              Upload a signed copy
+            </Button>
+          )}
         </div>
       </CardActions>
 
-      {/* The form mounts on opening, in the browser, so each opening gets its own id */}
+      {/* The form mounts on opening, in the browser, so each opening (and each new version of
+          the document) gets its own id and a clear file control */}
       <InsetPanel id={panelId} ref={panelRef} hidden={!uploadOpen || !awaiting}>
-        {uploadOpen && (
+        {/* Mounted with the panel, so the notice is announced when the document changes */}
+        <div role="status">
+          {uploadOpen && replacedWhileOpen && current && (
+            <PanelNotice>
+              <Notice>
+                We replaced this document with a new version, {current.filename}, since you opened this. Download it from the card, sign
+                it, then upload your signed copy of the new version here.
+              </Notice>
+            </PanelNotice>
+          )}
+        </div>
+        {uploadOpen && uploadFor && current && (
           <ActionForm
+            key={uploadFor}
             action={uploadSignedCopy}
             onSuccess={(state) => {
               setUploadOpen(false);
@@ -158,9 +201,22 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             }}
           >
             <FormStack>
+              {!replacedWhileOpen && (
+                <Text>
+                  Upload your signed copy of <Version>{current.filename}</Version>
+                  {wasReplaced(contract) ? (
+                    <>
+                      , the version we added on <LocalTime value={current.uploadedAt} />. If you printed the document before then, print
+                      this version and sign it instead.
+                    </>
+                  ) : (
+                    '.'
+                  )}
+                </Text>
+              )}
               <UploadField
                 label="Your signed copy"
-                hint={`Signed on paper? Upload a scan or photo of the signed pages, or the signed PDF, up to ${Math.round(limits.maxUploadBytes / (1024 * 1024))} MB.`}
+                hint={`A scan or photo of the signed pages, or the signed PDF, up to ${Math.round(limits.maxUploadBytes / (1024 * 1024))} MB.`}
                 acceptedExtensions={limits.acceptedExtensions}
                 maxUploadBytes={limits.maxUploadBytes}
               />
@@ -193,6 +249,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             </FormStack>
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="contractId" value={contract.id} />
+            <input type="hidden" name="shownFileId" value={uploadFor} />
             <FreshId name="contractFileId" />
           </ActionForm>
         )}
@@ -222,7 +279,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             <span>You are signing</span>
             <strong>{original.filename}</strong>
             <span>
-              {formatBytes(original.sizeBytes)} <Dot aria-hidden="true" /> SHA-256 {shortSha(original.sha256)}…
+              {formatBytes(original.sizeBytes)} <Dot aria-hidden="true" /> Fingerprint {shortSha(original.sha256)}…
             </span>
             {original.previewable ? (
               <TextAnchor href={fileHref(original.fileId, true)} target="_blank" rel="noopener noreferrer">

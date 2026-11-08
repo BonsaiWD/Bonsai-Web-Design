@@ -291,7 +291,7 @@ function DeleteSection({ settings }: { settings: ProjectSettingsData }) {
         <H2 id="settings-delete">Delete project</H2>
         {hasSignedRecords(settings.records) ? (
           <Text $muted>
-            This project can&apos;t be deleted: it has {listParts(signed)}, which are kept on record. If the work has stopped, set its stage
+            This project can&apos;t be deleted: it has {listParts(signed)}, and signed records are kept. If the work has stopped, set its stage
             to On hold instead; it stays in the portal, out of the way.
           </Text>
         ) : (
@@ -358,7 +358,7 @@ function Counts({ settings }: { settings: ProjectSettingsData }) {
     ['Contracts', records.contracts],
     ['Invoices', records.draftInvoices + records.issuedInvoices],
     ['Messages', records.messages],
-    ['Files', records.files],
+    ['Files', records.sharedFiles],
     ['Activity entries', records.activity],
   ];
   const signed = signedRecords(records);

@@ -21,11 +21,22 @@ export interface ContractFileView {
   // PDFs and images can open in the browser
   previewable: boolean;
   uploadedAt: string;
-  // Which side uploaded it; the person's name is for the studio only
-  side: 'studio' | 'client';
+  // Which side uploaded it; the person's name is for the studio only. former: a client the
+  // project belonged to before it moved to the current one
+  side: 'studio' | 'client' | 'former';
   uploadedByName: string | null;
   // The newest original: the document the client reads and signs
   current: boolean;
+  // Studio perspective only: a signed copy the studio sent back, which no longer counts
+  returned?: ReturnedInfo | null;
+}
+
+export interface ReturnedInfo {
+  at: string;
+  // The note sent to the client with it
+  reason: string | null;
+  // The studio member who sent it back, for the studio only
+  byName: string | null;
 }
 
 export interface ContractSignatureView {
@@ -59,7 +70,10 @@ export interface ContractView {
   signedCopy: ContractFileView | null;
   countersigned: ContractFileView | null;
   signature: ContractSignatureView | null;
-  // Every file, newest first
+  // The latest signed copy the studio sent back, while the contract waits for a signature again.
+  // The client's copy only ever has their own; the studio's names who uploaded it.
+  returnedCopy: (ReturnedInfo & { filename: string; uploadedAt: string; uploadedByName: string | null; former: boolean }) | null;
+  // Every file, newest first (the client's copy leaves out copies that were sent back)
   files: ContractFileView[];
   // Studio perspective only
   studio?: {

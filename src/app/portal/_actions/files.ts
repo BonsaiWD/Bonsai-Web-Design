@@ -8,7 +8,18 @@ import { file } from '@/db/schema';
 import { projectHref } from '@/components/portal/tabs';
 import { projectActor, type ProjectActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
-import { claimUpload, fileAnchor, fileKind, releaseUpload, sharedSummary } from '@/server/portal/features/files';
+import {
+  claimUpload,
+  claimUploadEmail,
+  claimUploadQuota,
+  fileAnchor,
+  fileKind,
+  refundUploadQuota,
+  releaseUpload,
+  releaseUploadEmail,
+  sharedSummary,
+  type QuotaClaim,
+} from '@/server/portal/features/files';
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 import { storeUpload } from '@/server/portal/storage';
 
@@ -67,9 +78,13 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
     // A second submit of the same form: the first one is uploading it, or already has
     if (!(await claimUpload(input.uploadId))) return done(thanks);
     let stored;
+    let quota: QuotaClaim | null = null;
     try {
+      // A client's uploads count toward their daily limit; the studio's do not
+      if (!studio) quota = await claimUploadQuota(actor.user.id, chosen.size);
       stored = await storeUpload({ projectId, purpose: 'project_file', uploadedBy: actor.user.id, upload: chosen });
     } catch (error) {
+      if (quota) await refundUploadQuota(quota);
       await releaseUpload(input.uploadId);
       throw error;
     }
@@ -86,7 +101,16 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
     };
 
     if (!studio) {
-      await recordActivity({
+      // One email per project every 10 minutes; later uploads wait in the feed and on the dashboard
+      const emailing = await claimUploadEmail(projectId).catch((error) => {
+        console.error('[portal files] upload email throttle', error);
+        return true;
+      });
+      if (!emailing) {
+        await recordActivity(activity);
+        return done(thanks);
+      }
+      const { emailStatus } = await recordActivity({
         ...activity,
         email: {
           to: STUDIO_EMAIL,
@@ -97,9 +121,11 @@ export async function uploadProjectFile(_prev: ActionState, formData: FormData):
             paragraphs: [`${clientName} added ${stored.filename} to the files on ${actor.project.name}.`],
             quote: input.note ?? undefined,
             action: { label: 'Open the files', url },
+            footnotes: ['Anything else they upload in the next 10 minutes is in the portal, without another email.'],
           },
         },
       });
+      if (emailStatus !== 'sent') await releaseUploadEmail(projectId);
       return done(thanks);
     }
 
