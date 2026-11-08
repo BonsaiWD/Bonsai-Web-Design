@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { updateMilestone } from '@/app/portal/_actions/milestones';
-import { ActionForm, Button, FormActions, FormMessage, FormStack, SubmitButton } from '../ui';
-import { FreshFields } from './formParts';
+import { ActionForm, Button, FormActions, FormMessage, FormStack, FreshFields, SubmitButton } from '../ui';
 import MilestoneFields, { type MilestoneFieldValues } from './MilestoneFields';
 import { EditPanel } from './styles';
 import type { MilestoneView } from './types';
@@ -87,8 +86,10 @@ export default function EditMilestoneForm({ id, hidden, milestone, projectId, cl
 
   return (
     <EditPanel id={id} ref={panelRef} hidden={hidden}>
+      {/* The row tracks edits against the saved values itself (and keeps them while collapsed) */}
       <ActionForm
         key={generation}
+        guardUnsaved={false}
         action={updateMilestone}
         aria-label={`Edit ${milestone.title}`}
         onChange={(event) => check(event.currentTarget)}

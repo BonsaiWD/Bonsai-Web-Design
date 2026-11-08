@@ -1,16 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import styled from 'styled-components';
 import { FiArchive, FiDownload, FiEye, FiFileText, FiImage } from 'react-icons/fi';
 import { ButtonAnchor, PHONE, space, tint, VisuallyHidden } from '@/components/portal/ui';
-
-// A new id each time a form mounts (each dialog opening), so a second submit of the same
-// opening is recognised by the server and adds nothing twice
-export function FreshId({ name }: { name: string }) {
-  const [id] = useState(() => crypto.randomUUID());
-  return <input type="hidden" name={name} value={id} />;
-}
 
 // Downloads go through the authorising route; ?inline=1 opens PDFs and images in the browser
 export const fileHref = (fileId: string, inline = false) => `/api/portal/files/${fileId}${inline ? '?inline=1' : ''}`;

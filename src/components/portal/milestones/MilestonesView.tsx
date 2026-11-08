@@ -126,7 +126,12 @@ export default function MilestonesView({
               </MetaText>
             </HeaderText>
             {showStudio && (
-              <Button onClick={addDialog.openDialog}>
+              <Button
+                onClick={(event) => {
+                  addingFirst.current = false;
+                  addDialog.openDialog(event);
+                }}
+              >
                 <FiPlus aria-hidden="true" />
                 Add milestone
               </Button>
@@ -163,19 +168,13 @@ export default function MilestonesView({
 
       {showStudio && (
         <AddMilestoneDialog
-          open={addDialog.open}
-          onClose={() => {
-            addingFirst.current = false;
-            addDialog.closeDialog();
-          }}
+          dialog={addDialog}
           onAdded={(text) => {
             announce(text);
-            addDialog.closeDialog();
             // The empty state's button has gone; the new list's heading takes focus instead
             if (addingFirst.current) setFocusHeading((value) => value + 1);
             addingFirst.current = false;
           }}
-          triggerRef={addDialog.triggerRef}
           projectId={projectId}
           clientFirst={clientFirst}
           nextNumber={milestones.length + 1}

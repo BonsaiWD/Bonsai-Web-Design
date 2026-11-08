@@ -1,9 +1,7 @@
 'use client';
 
 import { addClient, changeClientEmail, updateClient } from '@/app/portal/_actions/clients';
-import { Checkbox, Field, FieldRow, Input, Notice, useDialog } from '@/components/portal/ui';
-import FormId from './FormId';
-import { FormDialog } from './parts';
+import { Checkbox, Field, FieldRow, FormDialog, FormId, Input, Notice, useDialog } from '@/components/portal/ui';
 import type { ClientView } from './types';
 
 type DialogState = ReturnType<typeof useDialog>;

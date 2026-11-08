@@ -17,6 +17,7 @@ import {
   Input,
   Meta,
   PHONE,
+  sansHeading,
   space,
   SubmitButton,
   Textarea,
@@ -28,7 +29,6 @@ import {
   type ActionState,
 } from '@/components/portal/ui';
 import { centsToInput, lineAmountCents, MAX_LINES, parseDollars, parseQuantity } from './money';
-import { sansHeading } from './parts';
 import type { InvoiceDetail } from './types';
 
 /* ---------- Layout ---------- */
@@ -353,6 +353,8 @@ export function InvoiceEditor({ mode, projectId, clientName, today, saved, onCan
 
   return (
     <ActionForm
+      // The editor compares its lines with the saved invoice itself
+      guardUnsaved={false}
       action={mode === 'create' ? createInvoice : updateInvoice}
       aria-labelledby={labelledBy}
       onChange={() => setDirty(true)}

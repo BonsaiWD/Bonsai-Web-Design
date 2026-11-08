@@ -13,17 +13,19 @@ import {
   H3,
   Meta,
   Panel,
+  sansHeading,
   SectionHeader,
   space,
   Split,
   Stack,
+  StatusLine,
   tint,
   type,
+  useAnnouncer,
   useDialog,
 } from '@/components/portal/ui';
 import { DeliverableCard } from './DeliverableCard';
 import { GROUP_ORDER, GROUP_TITLES, groupOf, type GroupKey } from './labels';
-import { sansHeading, StatusLine, useAnnouncer } from './parts';
 import { ShareDialog, type ShareContext } from './ShareDialog';
 import type { DeliverableView, MilestoneOption, Perspective } from './types';
 

@@ -6,8 +6,8 @@ import { FiArrowRight } from 'react-icons/fi';
 import { plural } from '@/lib/portal-format';
 import { MILESTONE_LABELS, STAGE_LABELS, STAGE_TONES } from '../labels';
 import { projectHref } from '../tabs';
-import { DateText, DueText, DURATION, ease, Eyebrow, focusRing, MetaText, panelStyles, space, StatusBadge, tint, type } from '../ui';
-import { MetaLine, StageProgress } from './parts';
+import { DateText, DueText, DURATION, ease, Eyebrow, focusRing, MetaLine, MetaText, panelStyles, space, StatusBadge, tint, type } from '../ui';
+import { StageProgress } from './parts';
 import type { ProjectCardView } from './types';
 
 // Sized by its own width: a lone project gets the whole column, so its card goes two-up

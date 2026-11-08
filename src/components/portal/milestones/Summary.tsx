@@ -2,10 +2,9 @@
 
 import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';
-import MetaDot from '@/components/common/MetaDot';
 import { dueInfo, firstName } from '@/lib/portal-format';
 import { projectHref } from '../tabs';
-import { DateText, DueText, Eyebrow, focusRing, GuardedLink, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
+import { DateText, DueText, Eyebrow, focusRing, GuardedLink, MetaLine, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
 import { asksForInitials } from './signoff';
 import type { MilestoneView } from './types';
 
@@ -98,14 +97,6 @@ const JumpLink = styled.a`
       text-decoration-color: ${({ theme }) => theme.colors.primary};
     }
   }
-`;
-
-const DueLine = styled.p`
-  ${type.meta}
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: ${space[2]};
 `;
 
 const WaitList = styled.ul`
@@ -223,16 +214,11 @@ export default function Summary({ projectId, milestones, today, forClient, clien
               <CellTitle>
                 <JumpLink href={`#milestone-${next.id}`}>{next.title}</JumpLink>
               </CellTitle>
-              <DueLine>
+              <MetaLine>
                 <DueText value={next.dueDate} today={today} />
                 {/* "Due Mar 4, 2027" already names the day; the relative labels need it added */}
-                {nextDue.tone !== 'later' && (
-                  <>
-                    <MetaDot aria-hidden="true" />
-                    <DateText value={next.dueDate} />
-                  </>
-                )}
-              </DueLine>
+                {nextDue.tone !== 'later' && <DateText value={next.dueDate} />}
+              </MetaLine>
             </>
           ) : (
             <MetaText>{doneCount === total ? 'Every milestone is done.' : 'No open milestone has a date yet.'}</MetaText>
@@ -258,9 +244,9 @@ export default function Summary({ projectId, milestones, today, forClient, clien
                     </GuardedLink>
                   )}
                   {item.due && (
-                    <DueLine>
+                    <MetaLine>
                       <DueText value={item.due} today={today} />
-                    </DueLine>
+                    </MetaLine>
                   )}
                 </li>
               ))}

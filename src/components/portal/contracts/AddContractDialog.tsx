@@ -1,9 +1,7 @@
 'use client';
 
 import { createContract } from '@/app/portal/_actions/contracts';
-import { FormDialog } from '@/components/portal/deliverables/parts';
-import { Checkbox, Field, Input, Textarea, useDialog, type ActionState } from '@/components/portal/ui';
-import { FreshId } from '../files/parts';
+import { Checkbox, Field, FormDialog, FormId, Input, Textarea, useDialog, type ActionState } from '@/components/portal/ui';
 import { UploadField } from '../files/UploadField';
 import type { UploadLimits } from './types';
 
@@ -29,8 +27,8 @@ export function AddContractDialog({ dialog, projectId, clientName, limits, onAdd
       hidden={
         <>
           <input type="hidden" name="projectId" value={projectId} />
-          <FreshId name="contractId" />
-          <FreshId name="contractFileId" />
+          <FormId name="contractId" />
+          <FormId name="contractFileId" />
         </>
       }
     >

@@ -3,12 +3,11 @@
 import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';
 import { dueInfo } from '@/lib/portal-format';
-import { MetaLine } from '../dashboard/parts';
 import type { NextMilestoneView, Perspective } from '../dashboard/types';
 import { MILESTONE_LABELS } from '../labels';
 import { asksForInitials } from '../milestones/signoff';
 import { projectHref } from '../tabs';
-import { ButtonLink, DateText, DueText, H2, H3, MetaText, Panel, space, StatusBadge, Text, TextLink, tint, type } from '../ui';
+import { ButtonLink, DateText, DueText, H2, H3, MetaLine, MetaText, Panel, space, StatusBadge, Text, TextLink, tint, type } from '../ui';
 
 const Head = styled.header`
   display: flex;

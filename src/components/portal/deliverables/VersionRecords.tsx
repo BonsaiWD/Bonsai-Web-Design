@@ -2,8 +2,8 @@
 
 import styled from 'styled-components';
 import { FiCheck, FiMessageSquare } from 'react-icons/fi';
-import { DateText, LocalTime, PHONE, space, StatusBadge, TextAnchor, tint, type, VisuallyHidden } from '@/components/portal/ui';
-import { Disclosure, DisclosureSummary, MetaLine, NoteBlock } from './parts';
+import { DateText, LocalTime, MetaLine, PHONE, space, StatusBadge, TextAnchor, tint, type, VisuallyHidden } from '@/components/portal/ui';
+import { Disclosure, DisclosureSummary, NoteBlock } from './parts';
 import { versionLabel } from './labels';
 import { formatBytes } from './copy';
 import { fileHref } from './VersionContent';

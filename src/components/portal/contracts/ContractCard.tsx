@@ -1,8 +1,8 @@
 'use client';
 
 import { useId } from 'react';
-import { Card, CardHead, MetaLine, StatusLine, useAnnouncer } from '@/components/portal/deliverables/parts';
-import { H3, LocalTime, StatusBadge, Text } from '@/components/portal/ui';
+import { Card, CardHead } from '@/components/portal/deliverables/parts';
+import { H3, LocalTime, MetaLine, StatusBadge, StatusLine, Text, useAnnouncer } from '@/components/portal/ui';
 import { ClientActions } from './ClientActions';
 import { DocumentPlate } from './DocumentPlate';
 import { contractLabel } from './labels';

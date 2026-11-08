@@ -8,6 +8,7 @@ import {
   Checkbox,
   Field,
   FieldRow,
+  FormDialog,
   Input,
   Select,
   space,
@@ -20,7 +21,6 @@ import {
 } from '@/components/portal/ui';
 import { UploadField } from '../files/UploadField';
 import { linkWarning } from './copy';
-import { FormDialog } from './parts';
 import type { DeliverableView, MilestoneOption } from './types';
 
 const LINK_HINT =
@@ -179,8 +179,6 @@ function ShareFields({ context, deliverable }: { context: ShareContext; delivera
         >
           {(control) => (
             <Select
-              // React does not re-apply a changed defaultValue to a select, so a failed submit remounts it
-              key={control.defaultValue}
               id={control.id}
               name={control.name}
               defaultValue={control.defaultValue}

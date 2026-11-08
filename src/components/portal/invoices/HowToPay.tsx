@@ -11,6 +11,7 @@ import {
   focusRing,
   H3,
   Meta,
+  sansHeading,
   space,
   Stack,
   Text,
@@ -19,7 +20,6 @@ import {
   VisuallyHidden,
 } from '@/components/portal/ui';
 import { METHOD_DETAILS, METHOD_LABELS, paymentDetails, type PaymentDetail } from './labels';
-import { sansHeading } from './parts';
 import type { PaymentMethodView } from './types';
 
 const Methods = styled.ul`

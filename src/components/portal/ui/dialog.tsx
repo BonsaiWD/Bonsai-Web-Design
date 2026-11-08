@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import styled from 'styled-components';
 import { FiX } from 'react-icons/fi';
+import { Button, type ButtonVariant } from './buttons';
+import { ActionForm, FormActions, FormMessage, FormStack, FreshFields, PendingReporter, SubmitButton, type ActionState, type FormAction } from './forms';
 import { PHONE, focusRing, radius, space, tint, type } from './tokens';
 
 /*
@@ -147,5 +149,76 @@ export function Dialog({ open, onClose, title, description, children, busy = fal
         </>
       )}
     </Shell>
+  );
+}
+
+/* ---------- A dialog holding one form ---------- */
+
+interface FormDialogProps {
+  dialog: ReturnType<typeof useDialog>;
+  title: ReactNode;
+  description?: ReactNode;
+  action: FormAction;
+  submitLabel: ReactNode;
+  pendingLabel: string;
+  submitVariant?: Exclude<ButtonVariant, 'quiet'>;
+  onSuccess?: (state: NonNullable<ActionState>) => void;
+  // The fields: remounted after every result (FreshFields), and mounted afresh each opening
+  children: ReactNode;
+  // Hidden inputs go after the fields, so the dialog's first focus lands on a real control.
+  // They are not remounted after a result, so a per-opening FormId survives a failed submit.
+  hidden?: ReactNode;
+  // Where focus goes after success, when the button that opened the dialog may be gone
+  returnFocusTo?: RefObject<HTMLElement | null>;
+}
+
+// Closes on success and hands focus back; what is typed is guarded until then (ActionForm)
+export function FormDialog({
+  dialog,
+  title,
+  description,
+  action,
+  submitLabel,
+  pendingLabel,
+  submitVariant,
+  onSuccess,
+  children,
+  hidden,
+  returnFocusTo,
+}: FormDialogProps) {
+  const [busy, setBusy] = useState(false);
+  // Focus returns to the opening button on cancel, and to returnFocusTo after success
+  const focusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (dialog.open) focusRef.current = dialog.triggerRef.current;
+  }, [dialog.open, dialog.triggerRef]);
+
+  return (
+    <Dialog open={dialog.open} onClose={dialog.closeDialog} title={title} description={description} busy={busy} triggerRef={focusRef}>
+      <ActionForm
+        action={action}
+        onSuccess={(state) => {
+          if (returnFocusTo?.current) focusRef.current = returnFocusTo.current;
+          onSuccess?.(state);
+          setBusy(false);
+          dialog.closeDialog();
+        }}
+      >
+        <PendingReporter onChange={setBusy} />
+        <FormStack>
+          <FreshFields>{children}</FreshFields>
+          <FormActions>
+            <SubmitButton pendingLabel={pendingLabel} variant={submitVariant}>
+              {submitLabel}
+            </SubmitButton>
+            <Button $variant="quiet" onClick={() => !busy && dialog.closeDialog()}>
+              Cancel
+            </Button>
+            <FormMessage />
+          </FormActions>
+        </FormStack>
+        {hidden}
+      </ActionForm>
+    </Dialog>
   );
 }

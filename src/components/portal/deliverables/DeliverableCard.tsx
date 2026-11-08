@@ -2,10 +2,10 @@
 
 import { useId } from 'react';
 import { dueInfo } from '@/lib/portal-format';
-import { DateText, DueText, H3, LocalTime, Stack, StatusBadge, Text } from '@/components/portal/ui';
+import { DateText, DueText, H3, LocalTime, MetaLine, Stack, StatusBadge, StatusLine, Text, useAnnouncer } from '@/components/portal/ui';
 import { ClientDecision } from './ClientDecision';
 import { cardStatus } from './labels';
-import { Card, CardHead, MetaLine, NoteBlock, StatusLine, useAnnouncer } from './parts';
+import { Card, CardHead, NoteBlock } from './parts';
 import type { ShareContext } from './ShareDialog';
 import { StudioControls } from './StudioControls';
 import type { DeliverableView, Perspective } from './types';

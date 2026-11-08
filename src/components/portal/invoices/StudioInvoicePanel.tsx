@@ -15,19 +15,23 @@ import { firstName, formatMoney } from '@/lib/portal-format';
 import {
   ActionForm,
   Button,
+  ConfirmAction,
   DataList,
   DateText,
   DueText,
   Eyebrow,
   Field,
   FieldRow,
+  FormDialog,
   FormMessage,
   H3,
   Input,
   LocalTime,
   Meta,
+  MetaLine,
   Notice,
   Panel,
+  sansHeading,
   Select,
   space,
   Stack,
@@ -38,9 +42,10 @@ import {
   tint,
   type,
   useDialog,
+  type Announce,
 } from '@/components/portal/ui';
 import { invoiceStatus, isOverdue, METHOD_LABELS, METHOD_ORDER } from './labels';
-import { Amount, ConfirmAction, FormDialog, Inset, MetaLine, sansHeading, type Announce } from './parts';
+import { Amount, Inset } from './parts';
 import type { InvoiceDetail } from './types';
 
 const RecordTitle = styled.p`

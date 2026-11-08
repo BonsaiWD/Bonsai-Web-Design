@@ -2,11 +2,13 @@
 
 import {
   createContext,
+  Fragment,
   useActionState,
   useContext,
   useEffect,
   useId,
   useRef,
+  useState,
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from 'react';
@@ -16,9 +18,14 @@ import { FiCheck, FiChevronDown } from 'react-icons/fi';
 import type { ActionState } from '@/server/portal/actions';
 import { Button, type ButtonSize, type ButtonVariant } from './buttons';
 import { DURATION, ease, focusRing, space, tint, type } from './tokens';
+import { useFormEdits, useUnsavedChanges } from './unsaved';
 
 export type { ActionState };
 export type FormAction = (state: ActionState, formData: FormData) => Promise<ActionState>;
+
+// A result as the form sees it: on failure, also the names of the files that were sent, since
+// browsers clear file inputs when the form resets and the person has to choose them again
+export type FormState = (NonNullable<ActionState> & { files?: Record<string, string> }) | null;
 
 /*
  * The form contract. A server action returns { ok, message, fieldErrors, values }. React
@@ -28,7 +35,7 @@ export type FormAction = (state: ActionState, formData: FormData) => Promise<Act
  */
 
 interface FormContextValue {
-  state: ActionState;
+  state: FormState;
   pending: boolean;
 }
 
@@ -55,6 +62,10 @@ interface ActionFormProps extends Omit<ComponentPropsWithoutRef<'form'>, 'action
   children: ReactNode;
   // Called once per successful run, e.g. to close a dialog
   onSuccess?: (state: NonNullable<ActionState>) => void;
+  // Once something is typed, leaving the page asks first (until a success or unmount). Off for
+  // a form that is only hidden, not discarded, and for views that track edits against the
+  // saved values themselves.
+  guardUnsaved?: boolean;
 }
 
 // What was typed, so the form can put it back after a request that never reached the action
@@ -66,13 +77,23 @@ function typedValues(formData: FormData): Record<string, string> {
   return values;
 }
 
-export function ActionForm({ action, children, onSuccess, ...formProps }: ActionFormProps) {
+function sentFiles(formData: FormData): Record<string, string> | undefined {
+  const files: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (value instanceof File && value.size > 0) files[key] = value.name;
+  }
+  return Object.keys(files).length ? files : undefined;
+}
+
+export function ActionForm({ action, children, onSuccess, guardUnsaved = true, ...formProps }: ActionFormProps) {
   // A request can fail before the action runs: a dropped connection, a body over the upload
   // limit, or a new deploy that no longer knows this action. Without this the whole page
   // would be replaced by an error and everything typed would be lost.
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(async (previous, formData) => {
+  const [state, formAction, pending] = useActionState<FormState, FormData>(async (previous, formData) => {
+    const files = sentFiles(formData);
     try {
-      return await action(previous, formData);
+      const result = await action(previous, formData);
+      return result && !result.ok && files ? { ...result, files } : result;
     } catch (error) {
       // redirect() and notFound() from an action arrive as errors; let Next handle them
       unstable_rethrow(error);
@@ -82,6 +103,7 @@ export function ActionForm({ action, children, onSuccess, ...formProps }: Action
           ? 'The portal was just updated. Copy anything you typed, reload the page and try again.'
           : "We couldn't reach the server. Check your connection and try again. If you attached a file, it may be over 4 MB.",
         values: typedValues(formData),
+        files,
         at: Date.now(),
       };
     }
@@ -89,6 +111,15 @@ export function ActionForm({ action, children, onSuccess, ...formProps }: Action
   const formRef = useRef<HTMLFormElement>(null);
   const lastHandled = useRef<number | null>(null);
   const onSuccessRef = useRef(onSuccess);
+
+  // A success saved what was typed; a failure keeps it unsaved
+  const [edited, setEdited] = useFormEdits(formRef);
+  const [resultAt, setResultAt] = useState(state?.at);
+  if (state?.at !== resultAt) {
+    setResultAt(state?.at);
+    if (state?.ok) setEdited(false);
+  }
+  useUnsavedChanges(edited && guardUnsaved);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
@@ -113,6 +144,31 @@ export function ActionForm({ action, children, onSuccess, ...formProps }: Action
       </form>
     </FormContext.Provider>
   );
+}
+
+/*
+ * React resets a form after each action, and a <select> resets to the option it was first
+ * rendered with, not to its current defaultValue. Remounting the fields after every result
+ * makes every control start from useField's values: what was submitted after an error, what
+ * was saved after a success. `saved` remounts them too when the saved values change.
+ */
+export function FreshFields({ children, saved = '' }: { children: ReactNode; saved?: string }) {
+  const { state } = useContext(FormContext);
+  return <Fragment key={`${saved}:${state?.at ?? 0}`}>{children}</Fragment>;
+}
+
+// Tells a dialog while its form is submitting, so Escape cannot close it halfway
+export function PendingReporter({ onChange }: { onChange: (pending: boolean) => void }) {
+  const { pending } = useContext(FormContext);
+  useEffect(() => onChange(pending), [pending, onChange]);
+  return null;
+}
+
+// One id per form instance, made in the browser when the form mounts (each dialog opening): a
+// second submit of the same form is recognised by the server and adds nothing twice
+export function FormId({ name = 'id' }: { name?: string }) {
+  const [id] = useState(() => crypto.randomUUID());
+  return <input type="hidden" name={name} value={id} />;
 }
 
 /* ---------- Status message ---------- */

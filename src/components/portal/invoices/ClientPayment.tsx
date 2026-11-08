@@ -2,45 +2,34 @@
 
 import { useId, type RefObject } from 'react';
 import styled from 'styled-components';
-import { FiLock } from 'react-icons/fi';
 import { reportPayment } from '@/app/portal/_actions/invoices';
 import { dueInfo, formatMoney } from '@/lib/portal-format';
 import {
   Button,
+  ClientOnlyNote,
   DateText,
   Divider,
   DueText,
   Eyebrow,
   Field,
+  FormDialog,
   Input,
   LocalTime,
   Meta,
+  MetaLine,
   Panel,
   Select,
-  space,
   Stack,
   StatusBadge,
   Text,
   type,
   useDialog,
+  type Announce,
 } from '@/components/portal/ui';
 import { HowToPay } from './HowToPay';
 import { invoiceStatus, isOverdue, METHOD_LABELS, METHOD_ORDER } from './labels';
-import { Amount, FormDialog, Inset, MetaLine, type Announce } from './parts';
+import { Amount, Inset } from './parts';
 import type { InvoiceDetail, PaymentMethodView } from './types';
-
-const OnlyClient = styled.p`
-  ${type.meta}
-  display: flex;
-  align-items: flex-start;
-  gap: ${space[2]};
-
-  svg {
-    flex-shrink: 0;
-    margin-top: 0.2em;
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
 
 const RecordText = styled.p`
   ${type.body}
@@ -132,10 +121,9 @@ export function ClientPayment({ projectId, invoice, today, methods, canPay, clie
                     <Meta>Tell us once you&apos;ve paid. We&apos;ll confirm when it arrives and email you a receipt.</Meta>
                   </>
                 ) : (
-                  <OnlyClient>
-                    <FiLock aria-hidden="true" />
+                  <ClientOnlyNote>
                     Only {clientName} can tell us about a payment.
-                  </OnlyClient>
+                  </ClientOnlyNote>
                 )}
               </Stack>
             </>

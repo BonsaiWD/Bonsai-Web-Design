@@ -14,11 +14,14 @@ import {
 import {
   ActionForm,
   Button,
+  ConfirmAction,
   Field,
+  FormDialog,
   FormMessage,
   Input,
   LocalTime,
   PHONE,
+  sansHeading,
   Select,
   space,
   SubmitButton,
@@ -28,9 +31,10 @@ import {
   useDialog,
   useField,
   type ActionState,
+  type Announce,
 } from '@/components/portal/ui';
 import { linkWarning } from './copy';
-import { CardActions, ConfirmAction, FormDialog, sansHeading, type Announce } from './parts';
+import { CardActions } from './parts';
 import { ShareDialog, type ShareContext } from './ShareDialog';
 import type { DeliverableView } from './types';
 

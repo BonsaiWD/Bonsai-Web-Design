@@ -12,16 +12,20 @@ import {
   returnSignedCopy,
   uploadCountersigned,
 } from '@/app/portal/_actions/contracts';
-import { CardActions, ConfirmAction, FormDialog, sansHeading, type Announce } from '@/components/portal/deliverables/parts';
+import { CardActions } from '@/components/portal/deliverables/parts';
 import {
   ActionForm,
   Button,
   Checkbox,
+  ConfirmAction,
   Field,
+  FormDialog,
+  FormId,
   FormMessage,
   Input,
   LocalTime,
   PHONE,
+  sansHeading,
   space,
   SubmitButton,
   Textarea,
@@ -29,8 +33,8 @@ import {
   type,
   useDialog,
   type ActionState,
+  type Announce,
 } from '@/components/portal/ui';
-import { FreshId } from '../files/parts';
 import { UploadField } from '../files/UploadField';
 import type { ContractView, UploadLimits } from './types';
 
@@ -349,7 +353,7 @@ export function StudioActions({
             <>
               {contractFields}
               <input type="hidden" name="expectedFileId" value={original.id} />
-              <FreshId name="contractFileId" />
+              <FormId name="contractFileId" />
             </>
           }
         >
@@ -392,7 +396,7 @@ export function StudioActions({
             <>
               {contractFields}
               <input type="hidden" name="shownFileId" value={original.fileId} />
-              <FreshId name="contractFileId" />
+              <FormId name="contractFileId" />
             </>
           }
         >
@@ -470,7 +474,7 @@ export function StudioActions({
         hidden={
           <>
             {contractFields}
-            <FreshId name="contractFileId" />
+            <FormId name="contractFileId" />
           </>
         }
       >

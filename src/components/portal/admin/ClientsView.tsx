@@ -12,6 +12,7 @@ import { projectHref } from '../tabs';
 import {
   ActionForm,
   Button,
+  ConfirmAction,
   DURATION,
   ease,
   EmptyState,
@@ -26,15 +27,17 @@ import {
   PHONE,
   space,
   Stack,
+  StatusLine,
   SubmitButton,
   TextLink,
   tint,
   type,
+  useAnnouncer,
   useDialog,
   VisuallyHidden,
 } from '../ui';
 import { AddClientDialog, ChangeEmailDialog, EditClientDialog } from './ClientDialogs';
-import { ConfirmAction, StatusLine, Tool, Tools, useAnnouncer } from './parts';
+import { Tool, Tools } from './parts';
 import type { ClientView, StudioMemberView } from './types';
 
 const Intro = styled.header`
@@ -316,7 +319,7 @@ function ClientRows({ client, onRemoving }: { client: ClientView; onRemoving: (c
                     question={`Sign ${who} out on every device? They can sign back in with a new link.`}
                     confirmLabel="Sign out"
                     pendingLabel="Signing out…"
-                    variant="secondary"
+                    tone="primary"
                     action={signOutClient}
                     hidden={hidden}
                     onSuccess={(state) => announce(state.message)}

@@ -14,6 +14,7 @@ import {
   focusRing,
   H1,
   ListPanel,
+  MetaLine,
   Notice,
   PHONE,
   Panel,
@@ -23,7 +24,7 @@ import {
   tint,
   type,
 } from '../ui';
-import { ActivityPanel, AttentionPanel, DeadlinePanel, itemHref, MetaLine, PanelTitle, sinceLabel, ToneMarker } from './parts';
+import { ActivityPanel, AttentionPanel, DeadlinePanel, itemHref, PanelTitle, sinceLabel, ToneMarker } from './parts';
 import { ProjectsTable } from './ProjectsTable';
 import type { ActivityView, AttentionItem, DeadlineItem, ProjectCardView, StudioStats } from './types';
 

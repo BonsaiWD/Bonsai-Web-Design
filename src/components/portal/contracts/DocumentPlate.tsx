@@ -1,9 +1,8 @@
 'use client';
 
 import styled from 'styled-components';
-import MetaDot from '@/components/common/MetaDot';
 import { formatBytes } from '@/components/portal/deliverables/copy';
-import { LocalTime, PHONE, space, tint, type } from '@/components/portal/ui';
+import { LocalTime, MetaLine, PHONE, space, tint, type } from '@/components/portal/ui';
 import { FileButtons, FileGlyph } from '../files/parts';
 import { fileLabel, shortSha } from './copy';
 import type { ContractFileView, ContractView, Perspective } from './types';
@@ -44,7 +43,7 @@ const Kind = styled.span`
   ${type.overline}
 `;
 
-const Body = styled.span`
+const Body = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${space[1]};
@@ -54,28 +53,6 @@ const Body = styled.span`
     ${type.label}
     overflow-wrap: anywhere;
   }
-
-  small {
-    ${type.meta}
-    ${type.figures}
-    overflow-wrap: anywhere;
-  }
-
-  /* On phones the second fact takes its own line instead of leaving a dot at a line end */
-  @media (max-width: ${PHONE}) {
-    small [data-break] {
-      display: block;
-    }
-
-    small [data-dot] {
-      display: none;
-    }
-  }
-`;
-
-// Inline in running meta text, so it sits on the text's midline
-const Dot = styled(MetaDot)`
-  margin: 0 ${space[1]};
 `;
 
 const Nowrap = styled.span`
@@ -88,28 +65,29 @@ const Sha = styled.abbr`
   letter-spacing: 0.02em;
 `;
 
-function detail(entry: ContractFileView, perspective: Perspective) {
+// Size and one more fact; on phones the second takes its own line
+function Detail({ entry, perspective }: { entry: ContractFileView; perspective: Perspective }) {
   const size = formatBytes(entry.sizeBytes);
   if (entry.label === 'original') {
     return (
-      <>
-        {size} <Dot aria-hidden="true" data-dot />{' '}
-        <Nowrap data-break>
+      <MetaLine stackOnPhone>
+        {size}
+        <Nowrap>
           {/* The studio reads the algorithm's name; the client, what it is for */}
           {perspective === 'studio' ? 'SHA-256' : 'Fingerprint'} <Sha title={entry.sha256}>{shortSha(entry.sha256)}…</Sha>
         </Nowrap>
-      </>
+      </MetaLine>
     );
   }
   const who = perspective === 'studio' && entry.uploadedByName ? ` by ${entry.uploadedByName}` : '';
   return (
-    <>
-      {size} <Dot aria-hidden="true" data-dot />{' '}
-      <span data-break>
+    <MetaLine stackOnPhone>
+      {size}
+      <span>
         Added <LocalTime value={entry.uploadedAt} />
         {who}
       </span>
-    </>
+    </MetaLine>
   );
 }
 
@@ -127,7 +105,7 @@ export function DocumentPlate({ contract, perspective }: { contract: ContractVie
             <Body>
               <Kind>{fileLabel(entry.label, perspective, contract.requiresSignature, entry.side)}</Kind>
               <strong>{entry.filename}</strong>
-              <small>{detail(entry, perspective)}</small>
+              <Detail entry={entry} perspective={perspective} />
             </Body>
           </div>
           <FileButtons fileId={entry.fileId} filename={entry.filename} previewable={entry.previewable} />

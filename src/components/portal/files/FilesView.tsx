@@ -1,23 +1,27 @@
 'use client';
 
 import styled from 'styled-components';
-import { FiLock, FiUpload } from 'react-icons/fi';
+import { FiUpload } from 'react-icons/fi';
 import { firstName, plural } from '@/lib/portal-format';
 import { uploadProjectFile } from '@/app/portal/_actions/files';
 import { formatBytes } from '@/components/portal/deliverables/copy';
-import { Disclosure, DisclosureSummary, FormDialog, MetaLine, StatusLine, useAnnouncer } from '@/components/portal/deliverables/parts';
+import { Disclosure, DisclosureSummary } from '@/components/portal/deliverables/parts';
 import { projectHref } from '@/components/portal/tabs';
 import {
   Button,
   Checkbox,
+  ClientOnlyNote,
   DataList,
   EmptyState,
   Field,
+  FormDialog,
+  FormId,
   H2,
   H3,
   ListPanel,
   LocalTime,
   Meta,
+  MetaLine,
   MetaText,
   Panel,
   PanelHeader,
@@ -27,15 +31,17 @@ import {
   space,
   Split,
   Stack,
-  Textarea,
+  StatusLine,
   TextAnchor,
+  Textarea,
   TextLink,
   tint,
   type,
+  useAnnouncer,
   useDialog,
 } from '@/components/portal/ui';
 import { FileItem } from './FileItem';
-import { fileHref, FreshId } from './parts';
+import { fileHref } from './parts';
 import type { ProjectFileView } from './types';
 import { UploadField } from './UploadField';
 
@@ -92,17 +98,9 @@ const Kinds = styled.ul`
   }
 `;
 
-const OnlyClient = styled.p`
-  ${type.meta}
-  display: flex;
-  align-items: center;
-  gap: ${space[2]};
+// Beside the panel's heading, so it stays short
+const OnlyClient = styled(ClientOnlyNote)`
   max-width: 34ch;
-
-  svg {
-    flex-shrink: 0;
-    color: ${({ theme }) => theme.colors.primary};
-  }
 `;
 
 const RemovedList = styled.ul`
@@ -175,7 +173,7 @@ function UploadDialog({
       hidden={
         <>
           <input type="hidden" name="projectId" value={projectId} />
-          <FreshId name="uploadId" />
+          <FormId name="uploadId" />
         </>
       }
     >
@@ -286,7 +284,6 @@ export default function FilesView({
           uploadButton
         ) : (
           <OnlyClient>
-            <FiLock aria-hidden="true" />
             Only {clientName} can upload in this view. Switch back to the studio view to share a file.
           </OnlyClient>
         )}

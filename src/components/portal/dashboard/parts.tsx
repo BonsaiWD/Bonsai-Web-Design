@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Children, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import styled, { css } from 'styled-components';
 import { FiAlertCircle, FiArrowRight, FiCheck } from 'react-icons/fi';
 import BranchNode from '@/components/common/BranchNode';
@@ -19,6 +19,7 @@ import {
   H2,
   ListPanel,
   LocalTime,
+  MetaLine,
   MetaText,
   PanelHeader,
   PHONE,
@@ -32,64 +33,6 @@ import {
 import type { ActivityView, AttentionItem, DeadlineItem, Perspective } from './types';
 
 /* ---------- Small pieces ---------- */
-
-/*
- * Meta items separated by the bronze dot, as everywhere on the site. Each item carries its
- * dot in front of it, and the row is pulled left by one dot's width inside a clipping box,
- * so the item that starts a line hides its dot: a wrapped line never begins or ends on one.
- */
-const META_SLOT = '1rem';
-
-const MetaClip = styled.div`
-  overflow: hidden;
-  min-width: 0;
-`;
-
-const MetaRow = styled.div`
-  ${type.meta}
-  ${type.figures}
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: ${space[1]};
-  margin-left: -${META_SLOT};
-
-  > span {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    padding-left: ${META_SLOT};
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  > span::before {
-    content: '';
-    position: absolute;
-    left: calc(${META_SLOT} / 2 - 2px);
-    top: 50%;
-    width: 4px;
-    height: 4px;
-    margin-top: -2px;
-    border-radius: 50%;
-    background: ${({ theme }) => theme.colors.primary};
-    opacity: 0.6;
-  }
-`;
-
-export function MetaLine({ children }: { children: ReactNode }) {
-  const items = Children.toArray(children).filter(Boolean);
-  if (items.length === 0) return null;
-  return (
-    <MetaClip>
-      <MetaRow>
-        {items.map((item, index) => (
-          <span key={index}>{item}</span>
-        ))}
-      </MetaRow>
-    </MetaClip>
-  );
-}
 
 // A heading row inside a list panel: title and a quiet count or note
 export function PanelTitle({ id, title, note, action }: { id: string; title: string; note?: ReactNode; action?: ReactNode }) {
