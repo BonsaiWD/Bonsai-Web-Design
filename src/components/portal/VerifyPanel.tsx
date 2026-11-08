@@ -1,45 +1,66 @@
 'use client';
 
-import { Eyebrow, Lead, NarrowColumn, PageTitle, PortalPage, PrimaryLink, TextLink } from './ui';
+import styled from 'styled-components';
+import { FiArrowRight } from 'react-icons/fi';
+import { ButtonAnchor, Eyebrow, H1, Lead, Stack, TextLink, space } from './ui';
+
+const Column = styled.div`
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: ${space[16]} ${space[4]};
+
+  @media (max-width: 768px) {
+    padding-top: ${space[10]};
+  }
+`;
 
 interface VerifyPanelProps {
   token: string | null;
+  next: string | null;
 }
 
 // The email links here, not to the verify endpoint, so a link scanner that opens URLs
 // in advance only loads this page and leaves the one-time token unused
-export default function VerifyPanel({ token }: VerifyPanelProps) {
+export default function VerifyPanel({ token, next }: VerifyPanelProps) {
   if (!token) {
     return (
-      <PortalPage>
-        <NarrowColumn>
-          <Eyebrow>Client portal</Eyebrow>
-          <PageTitle>
-            This link is <em>incomplete</em>
-          </PageTitle>
-          <Lead>Request a new sign-in link, then use the button in that email.</Lead>
-          <TextLink href="/portal/sign-in">Request a new link</TextLink>
-        </NarrowColumn>
-      </PortalPage>
+      <Column>
+        <Stack $gap={5}>
+          <Stack $gap={3}>
+            <Eyebrow>Client portal</Eyebrow>
+            <H1>This link is incomplete</H1>
+            <Lead>Request a new sign-in link, then use the button in that email.</Lead>
+          </Stack>
+          <div>
+            <TextLink href="/portal/sign-in">Request a new link</TextLink>
+          </div>
+        </Stack>
+      </Column>
     );
   }
 
   const verify = new URLSearchParams({
     token,
-    callbackURL: '/portal',
+    callbackURL: next ?? '/portal',
     errorCallbackURL: '/portal/sign-in',
   });
 
   return (
-    <PortalPage>
-      <NarrowColumn>
-        <Eyebrow>Client portal</Eyebrow>
-        <PageTitle>
-          Continue to your <em>portal</em>
-        </PageTitle>
-        <Lead>Use the button below to finish signing in on this device.</Lead>
-        <PrimaryLink href={`/api/auth/magic-link/verify?${verify}`}>Open my portal</PrimaryLink>
-      </NarrowColumn>
-    </PortalPage>
+    <Column>
+      <Stack $gap={6}>
+        <Stack $gap={3}>
+          <Eyebrow>Client portal</Eyebrow>
+          <H1>Continue to your portal</H1>
+          <Lead>Use the button below to finish signing in on this device.</Lead>
+        </Stack>
+        <div>
+          <ButtonAnchor href={`/api/auth/magic-link/verify?${verify}`}>
+            Open my portal
+            <FiArrowRight aria-hidden="true" />
+          </ButtonAnchor>
+        </div>
+      </Stack>
+    </Column>
   );
 }

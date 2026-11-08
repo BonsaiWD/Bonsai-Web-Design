@@ -20,7 +20,8 @@ export function allowedHosts(): string[] {
     ]) {
         if (host) hosts.push(host);
     }
-    if (!process.env.VERCEL) hosts.push('localhost:3000');
+    // Local development, on the usual port or a few beside it
+    if (!process.env.VERCEL) for (let port = 3000; port <= 3010; port++) hosts.push(`localhost:${port}`);
     return hosts;
 }
 
