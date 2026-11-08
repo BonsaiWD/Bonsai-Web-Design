@@ -188,6 +188,9 @@ interface ConfirmActionProps {
   action: FormAction;
   hidden: ReactNode;
   onSuccess?: (state: NonNullable<ActionState>) => void;
+  // For a confirm that removes its own row: the row unmounts with the result, so the list
+  // notices the row has gone instead
+  onSubmit?: () => void;
   variant?: 'danger' | 'secondary';
 }
 
@@ -200,6 +203,7 @@ export function ConfirmAction({
   action,
   hidden,
   onSuccess,
+  onSubmit,
   variant = 'danger',
 }: ConfirmActionProps) {
   const [asking, setAsking] = useState(false);
@@ -225,6 +229,7 @@ export function ConfirmAction({
   return (
     <ActionForm
       action={action}
+      onSubmit={onSubmit}
       onSuccess={(state) => {
         returnFocus.current = false;
         setAsking(false);

@@ -200,7 +200,7 @@ function InviteTool({ client }: { client: ClientView }) {
   );
 }
 
-function ClientRows({ client, onRemoved }: { client: ClientView; onRemoved: (message: string) => void }) {
+function ClientRows({ client, onRemoving }: { client: ClientView; onRemoving: (client: { id: string; name: string }) => void }) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const edit = useDialog();
@@ -235,6 +235,7 @@ function ClientRows({ client, onRemoved }: { client: ClientView; onRemoved: (mes
         <td role="cell" data-label="Projects">
           {client.projects.length ? (
             <Cell>
+              <MetaText>{plural(client.projects.length, 'project')}</MetaText>
               {client.projects.map((item) => (
                 <span key={item.id}>
                   <TextLink href={projectHref(item.id)}>{item.name}</TextLink> <MetaText>· {STAGE_LABELS[item.stage]}</MetaText>
@@ -260,7 +261,7 @@ function ClientRows({ client, onRemoved }: { client: ClientView; onRemoved: (mes
         </td>
         <td role="cell" data-actions="">
           <ManageButton
-            $variant="quiet"
+            $variant="secondary"
             $size="sm"
             aria-expanded={open}
             aria-controls={panelId}
@@ -345,7 +346,7 @@ function ClientRows({ client, onRemoved }: { client: ClientView; onRemoved: (mes
                       pendingLabel="Removing…"
                       action={removeClient}
                       hidden={hidden}
-                      onSuccess={(state) => onRemoved(state.message)}
+                      onSubmit={() => onRemoving({ id: client.id, name: who })}
                     />
                   </ToolControls>
                 )}
@@ -377,6 +378,17 @@ export default function ClientsView({ clients, studio, openAdd }: ClientsViewPro
   const addButton = useRef<HTMLButtonElement>(null);
   const { statusRef, message, announce } = useAnnouncer();
   const { openDialog } = add;
+
+  // A removed client's row unmounts with its form, so the list says what happened
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+  const [seen, setSeen] = useState(clients);
+  if (seen !== clients) {
+    setSeen(clients);
+    if (removing && !clients.some((client) => client.id === removing.id)) {
+      setRemoving(null);
+      announce(`Removed ${removing.name}.`);
+    }
+  }
 
   // "Add client" on the dashboard links here with ?add=1
   useEffect(() => {
@@ -441,7 +453,7 @@ export default function ClientsView({ clients, studio, openAdd }: ClientsViewPro
             </thead>
             <tbody role="rowgroup">
               {clients.map((client) => (
-                <ClientRows key={client.id} client={client} onRemoved={announce} />
+                <ClientRows key={client.id} client={client} onRemoving={setRemoving} />
               ))}
             </tbody>
           </ClientTable>

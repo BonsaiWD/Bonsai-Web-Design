@@ -54,6 +54,12 @@ export const Table = styled.table`
   }
 
   @media (max-width: ${PHONE}) {
+    display: block;
+
+    colgroup {
+      display: none;
+    }
+
     thead {
       position: absolute;
       width: 1px;

@@ -6,32 +6,47 @@ import { formatDate } from '@/lib/portal-format';
 import { ActivityPanel, AttentionPanel, DeadlinePanel } from '../dashboard/parts';
 import type { ActivityView, AttentionItem, DeadlineItem, NextMilestoneView, Perspective } from '../dashboard/types';
 import { projectHref } from '../tabs';
-import {
-  ButtonLink,
-  DataList,
-  Eyebrow,
-  H2,
-  H3,
-  LocalTime,
-  MetaText,
-  Panel,
-  space,
-  Split,
-  Stack,
-  Text,
-  TextAnchor,
-  TextLink,
-  type,
-} from '../ui';
+import { ButtonLink, DataList, Eyebrow, H2, H3, LocalTime, MetaText, Panel, LAPTOP, space, Text, TextAnchor, TextLink, type } from '../ui';
 import NextMilestone from './NextMilestone';
 
 const STUDIO_EMAIL = 'admin@bonsaiwebdesign.com';
 
-const Aside = styled.aside`
+/*
+ * Two columns on laptops: the work on the left, dates and people on the right. Below that,
+ * the columns dissolve (display: contents) and each block takes its place in one reading
+ * order, so the key dates come right after the next milestone instead of after the feed.
+ */
+const Layout = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${space[6]};
+  gap: ${space[8]};
+
+  @media (min-width: ${LAPTOP}) {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: ${space[10]};
+    align-items: start;
+  }
+`;
+
+const Column = styled.div<{ $gap: 6 | 8 }>`
+  display: contents;
+
+  @media (min-width: ${LAPTOP}) {
+    display: flex;
+    flex-direction: column;
+    gap: ${({ $gap }) => space[$gap]};
+    min-width: 0;
+  }
+`;
+
+const Slot = styled.div<{ $order: number }>`
+  order: ${({ $order }) => $order};
   min-width: 0;
+
+  @media (min-width: ${LAPTOP}) {
+    order: 0;
+  }
 `;
 
 const CardStack = styled.div`
@@ -175,71 +190,85 @@ export default function OverviewView({
 }: OverviewViewProps) {
   const studio = perspective === 'studio';
   return (
-    <Split>
-      <Stack $gap={8}>
-        <AttentionPanel
-          id="overview-attention"
-          title="Needs your attention"
-          items={attention}
-          today={today}
-          showProject={false}
-          calm={
-            studio
-              ? { title: 'Nothing needs the studio on this project right now.' }
-              : { title: "You're all caught up.", text: "We'll email you when something needs you." }
-          }
-        />
-        {studio && (
+    <Layout>
+      <Column $gap={8}>
+        <Slot $order={1}>
           <AttentionPanel
-            id="overview-waiting"
-            title={`Waiting on ${clientFirst}`}
-            items={waiting}
+            id="overview-attention"
+            title="Needs your attention"
+            items={attention}
             today={today}
             showProject={false}
-            calm={{ title: `Nothing is waiting on ${clientFirst}.` }}
-            note={waiting.length ? 'What they see on their to-do list' : undefined}
+            calm={
+              studio
+                ? { title: 'Nothing needs the studio on this project right now.' }
+                : { title: "You're all caught up.", text: "We'll email you when something needs you." }
+            }
           />
+        </Slot>
+        {studio && (
+          <Slot $order={2}>
+            <AttentionPanel
+              id="overview-waiting"
+              title={`Waiting on ${clientFirst}`}
+              items={waiting}
+              today={today}
+              showProject={false}
+              calm={{ title: `Nothing is waiting on ${clientFirst}.` }}
+              note={waiting.length ? 'What they see on their to-do list' : undefined}
+            />
+          </Slot>
         )}
-        <NextMilestone projectId={projectId} perspective={perspective} today={today} clientFirst={clientFirst} {...milestones} />
-        <ActivityPanel
-          id="overview-activity"
-          title="Recent activity"
-          items={activity}
-          perspective={perspective}
-          showProject={false}
-          empty={studio ? 'Nothing has happened on this project yet.' : 'Updates on your project will appear here.'}
-          note={studio ? 'Studio-only entries included' : undefined}
-        />
-      </Stack>
+        <Slot $order={3}>
+          <NextMilestone projectId={projectId} perspective={perspective} today={today} clientFirst={clientFirst} {...milestones} />
+        </Slot>
+        <Slot $order={5}>
+          <ActivityPanel
+            id="overview-activity"
+            title="Recent activity"
+            items={activity}
+            perspective={perspective}
+            showProject={false}
+            empty={studio ? 'Nothing has happened on this project yet.' : 'Updates on your project will appear here.'}
+            note={studio ? 'Studio-only entries included' : undefined}
+          />
+        </Slot>
+      </Column>
 
-      <Aside>
-        <DeadlinePanel
-          id="overview-dates"
-          title="Key dates"
-          items={deadlines}
-          today={today}
-          perspective={perspective}
-          showProject={false}
-          limit={8}
-          clientFirst={clientFirst}
-          empty={studio ? 'No open dates. Give milestones a due date to see them here.' : 'Dates appear here as we plan each step.'}
-        />
-        <Panel aria-labelledby="overview-about">
-          <CardStack>
-            <H2 id="overview-about">About this project</H2>
-            {summary ? (
-              <Text $muted>{summary}</Text>
-            ) : studio ? (
-              <Text $muted>
-                No summary yet. <TextLink href={`${projectHref(projectId)}/settings`}>Add one in project settings</TextLink> so{' '}
-                {clientFirst} has the project in a sentence.
-              </Text>
-            ) : null}
-            <MetaText>Started {formatDate(startedOn)}</MetaText>
-          </CardStack>
-        </Panel>
-        <ContactCard projectId={projectId} client={client} />
-      </Aside>
-    </Split>
+      <Column $gap={6}>
+        <Slot $order={4}>
+          <DeadlinePanel
+            id="overview-dates"
+            title="Key dates"
+            items={deadlines}
+            today={today}
+            perspective={perspective}
+            showProject={false}
+            limit={8}
+            clientFirst={clientFirst}
+            empty={studio ? 'No open dates. Give milestones a due date to see them here.' : 'Dates appear here as we plan each step.'}
+          />
+        </Slot>
+        <Slot $order={6}>
+          <Panel aria-labelledby="overview-about">
+            <CardStack>
+              <H2 id="overview-about">About this project</H2>
+              {summary ? (
+                <Text $muted>{summary}</Text>
+              ) : studio ? (
+                <Text $muted>
+                  No summary yet. <TextLink href={`${projectHref(projectId)}/settings`}>Add one in project settings</TextLink> so{' '}
+                  {clientFirst} has the project in a sentence.
+                </Text>
+              ) : null}
+              <MetaText>Started {formatDate(startedOn)}</MetaText>
+            </CardStack>
+          </Panel>
+        </Slot>
+        <Slot $order={7}>
+          <ContactCard projectId={projectId} client={client} />
+        </Slot>
+      </Column>
+    </Layout>
   );
 }

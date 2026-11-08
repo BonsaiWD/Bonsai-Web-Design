@@ -62,14 +62,15 @@ const Cards = styled.div`
 
 interface ClientDashboardProps {
   firstName: string | null;
-  company: string | null;
+  // The client's company, or what a preview shows
+  eyebrow: string | null;
   today: string;
   attention: AttentionItem[];
   deadlines: DeadlineItem[];
   projects: ProjectCardView[];
 }
 
-export default function ClientDashboard({ firstName, company, today, attention, deadlines, projects }: ClientDashboardProps) {
+export default function ClientDashboard({ firstName, eyebrow, today, attention, deadlines, projects }: ClientDashboardProps) {
   const open = attention.filter((item) => item.tone !== 'info');
   const upcoming = deadlines.find((item) => item.date >= today);
   const many = projects.length > 1;
@@ -79,7 +80,7 @@ export default function ClientDashboard({ firstName, company, today, attention, 
     return (
       <Stack $gap={8}>
         <Intro>
-          {company && <Eyebrow>{company}</Eyebrow>}
+          {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
           <H1>{greeting}</H1>
         </Intro>
         <EmptyState title="Your project will appear here">
@@ -93,7 +94,7 @@ export default function ClientDashboard({ firstName, company, today, attention, 
   return (
     <>
       <Intro>
-        {company && <Eyebrow>{company}</Eyebrow>}
+        {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <H1>{greeting}</H1>
         <SummaryLine>
           <span>

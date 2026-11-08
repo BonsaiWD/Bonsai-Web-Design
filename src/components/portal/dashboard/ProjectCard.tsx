@@ -19,14 +19,20 @@ const Frame = styled.div`
 const Card = styled.article`
   ${panelStyles}
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: ${space[5]};
   min-width: 0;
   height: 100%;
   transition: border-color ${DURATION.hover}s ${ease};
 
+  /* Footers line up when cards sit side by side */
+  > footer {
+    margin-top: auto;
+  }
+
   @container (min-width: 38rem) {
+    display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: ${space[8]};
 

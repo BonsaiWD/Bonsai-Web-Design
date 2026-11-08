@@ -14,7 +14,6 @@ import {
   focusRing,
   H1,
   ListPanel,
-  MetaText,
   Notice,
   PHONE,
   Panel,
@@ -193,22 +192,24 @@ const Group = styled.li`
     overflow-wrap: anywhere;
   }
 
-  h3 a {
-    color: inherit;
-    text-decoration: none;
-    ${focusRing}
-
-    @media (hover: hover) {
-      &:hover {
-        text-decoration: underline;
-        text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 45)};
-        text-underline-offset: 0.2em;
-      }
-    }
-  }
-
   @media (max-width: ${PHONE}) {
     padding: ${space[4]} ${space[5]} ${space[5]};
+  }
+`;
+
+const ProjectLink = styled(Link)`
+  ${type.meta}
+  color: ${({ theme }) => theme.colors.textSecondary};
+  text-decoration: none;
+  ${focusRing}
+
+  @media (hover: hover) {
+    &:hover {
+      color: ${({ theme }) => theme.colors.text};
+      text-decoration: underline;
+      text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 45)};
+      text-underline-offset: 0.2em;
+    }
   }
 `;
 
@@ -301,10 +302,8 @@ function WaitingOnClients({ items, projects, today }: { items: AttentionItem[]; 
           {groups.map((group) => (
             <Group key={group.projectId}>
               <div>
-                <h3>
-                  <Link href={projectHref(group.projectId)}>{group.clientName}</Link>
-                </h3>
-                <MetaText>{group.projectName}</MetaText>
+                <h3>{group.clientName}</h3>
+                <ProjectLink href={projectHref(group.projectId)}>{group.projectName}</ProjectLink>
               </div>
               <Waits aria-label={`Waiting on ${firstName(group.clientName) ?? group.clientName}`}>
                 {group.items.map((item) => (

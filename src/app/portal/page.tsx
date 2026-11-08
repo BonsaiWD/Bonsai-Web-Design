@@ -50,13 +50,15 @@ export default async function PortalHome({ searchParams }: { searchParams: Promi
   }
 
   const projects = await loadProjectCards(context, { attention, deadlines });
-  // An admin previewing sees every client's projects, so no single company names the page
-  const company = viewer.isAdmin ? null : (projects[0]?.client.company ?? null);
+  // An admin previewing sees every client's projects: greet the client when there is only one
+  const single = new Set(projects.map((card) => card.client.id)).size === 1 ? projects[0].client : null;
+  const greetName = viewer.isAdmin ? (single ? firstName(single.name) : null) : firstName(viewer.user.name);
+  const eyebrow = viewer.isAdmin && !single ? (projects.length ? 'Preview of every client' : null) : (projects[0]?.client.company ?? null);
   return (
     <Page>
       <ClientDashboard
-        firstName={firstName(viewer.user.name)}
-        company={company}
+        firstName={greetName}
+        eyebrow={eyebrow}
         today={context.today}
         attention={attention}
         deadlines={deadlines}

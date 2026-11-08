@@ -300,11 +300,11 @@ function DeleteSection({ settings }: { settings: ProjectSettingsData }) {
               Removes the project and everything in it{parts.length ? `: ${listParts(parts)}` : ''}. {settings.client.name} will no longer
               see it. This can&apos;t be undone.
             </Text>
-            <div>
+            <Actions>
               <Button $variant="danger" onClick={dialog.openDialog}>
                 Delete project…
               </Button>
-            </div>
+            </Actions>
             <FormDialog
               dialog={dialog}
               title={`Delete ${settings.name}?`}
