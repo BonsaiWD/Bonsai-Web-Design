@@ -55,6 +55,27 @@ export const paymentDetail = css`
   overflow-wrap: anywhere;
 `;
 
+// Phones and touch screens, where every target is at least 44px tall (spec section 3)
+export const TOUCH = `(max-width: ${PHONE}), (pointer: coarse)`;
+export const TOUCH_TARGET = '2.75rem';
+
+// A link standing on its own gets a box at least 44px tall there, from vertical padding that a
+// negative margin takes back, so its text and everything around it stay where they were. For a
+// box (block, flex item, inline-flex); an inline link uses inlineTouchTarget.
+export const touchTarget = css`
+  @media ${TOUCH} {
+    padding-block: max(0px, (${TOUCH_TARGET} - 1lh) / 2);
+    margin-block: min(0px, (1lh - ${TOUCH_TARGET}) / 2);
+  }
+`;
+
+export const inlineTouchTarget = css`
+  @media ${TOUCH} {
+    display: inline-block;
+  }
+  ${touchTarget}
+`;
+
 // The portal type scale: Inter, 16px base, nothing below 13px, one uppercase style left.
 // Each style resets margin, because GlobalStyle gives every heading and paragraph one;
 // spacing inside the portal comes from Stack, Cluster and the other layout components.
@@ -133,14 +154,14 @@ export const type = {
     `,
 };
 
-// The portal is an app: people point at small targets, so the native cursor comes back
-// (the marketing site's CursorGlow hides it on wide, fine-pointer screens)
 // Small headings (h4, h5) in the portal's sans; the site's global rule would set them in Playfair
 export const sansHeading = css`
   font-family: ${({ theme }) => theme.fonts.main};
   letter-spacing: 0;
 `;
 
+// The portal is an app: people point at small targets, so the native cursor comes back
+// (the marketing site's CursorGlow hides it on wide, fine-pointer screens)
 export const nativeCursor = css`
   @media ${CUSTOM_CURSOR_QUERY} {
     &,

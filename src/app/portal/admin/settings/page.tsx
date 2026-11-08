@@ -1,11 +1,11 @@
-import type { Metadata } from 'next';
 import StudioOnlyNotice from '@/components/portal/admin/StudioOnlyNotice';
 import PaymentSettingsView from '@/components/portal/invoices/PaymentSettingsView';
 import { Page } from '@/components/portal/ui';
 import { getViewer, requireAdminPage } from '@/server/portal/access';
+import { adminPageMetadata } from '@/server/portal/metadata';
 import { loadPaymentSettings } from '@/server/portal/features/invoices';
 
-export const metadata: Metadata = { title: 'Payment settings' };
+export const generateMetadata = adminPageMetadata('Payment settings');
 
 export default async function SettingsPage() {
   // A client sees the same page as a missing one

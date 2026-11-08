@@ -1,11 +1,11 @@
-import type { Metadata } from 'next';
 import ClientsView from '@/components/portal/admin/ClientsView';
 import StudioOnlyNotice from '@/components/portal/admin/StudioOnlyNotice';
 import { Page } from '@/components/portal/ui';
 import { getViewer, requireAdminPage } from '@/server/portal/access';
+import { adminPageMetadata } from '@/server/portal/metadata';
 import { loadPeople } from '@/server/portal/features/clients';
 
-export const metadata: Metadata = { title: 'Clients' };
+export const generateMetadata = adminPageMetadata('Clients');
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ add?: string | string[] }> }) {
   // A client sees the same page as a missing one

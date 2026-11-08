@@ -3,7 +3,7 @@
 import styled, { css } from 'styled-components';
 import BranchNode from '@/components/common/BranchNode';
 import type { MilestoneStatus } from '@/db/schema';
-import { DURATION, ease, PHONE, space, tint, type } from '../ui';
+import { DURATION, ease, PHONE, space, tint, TOUCH, TOUCH_TARGET, touchTarget, type } from '../ui';
 
 /* ---------- The branch line ----------
    Each row draws the segment from its own node down to the next one. A segment leaving a
@@ -292,6 +292,19 @@ export const LinkedList = styled.ul`
     align-items: center;
     gap: ${space[2]} ${space[3]};
     ${type.meta}
+  }
+
+  /* Phones and touch screens: each row is a full-size target for its link */
+  @media ${TOUCH} {
+    gap: 0;
+
+    li {
+      min-height: ${TOUCH_TARGET};
+    }
+
+    li > a {
+      ${touchTarget}
+    }
   }
 `;
 

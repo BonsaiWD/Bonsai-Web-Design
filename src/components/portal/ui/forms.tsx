@@ -17,7 +17,7 @@ import styled, { css } from 'styled-components';
 import { FiCheck, FiChevronDown } from 'react-icons/fi';
 import type { ActionState } from '@/server/portal/actions';
 import { Button, type ButtonSize, type ButtonVariant } from './buttons';
-import { DURATION, ease, focusRing, space, tint, type } from './tokens';
+import { DURATION, ease, focusRing, space, tint, touchTarget, type } from './tokens';
 import { useFormEdits, useUnsavedChanges } from './unsaved';
 
 export type { ActionState };
@@ -62,9 +62,9 @@ interface ActionFormProps extends Omit<ComponentPropsWithoutRef<'form'>, 'action
   children: ReactNode;
   // Called once per successful run, e.g. to close a dialog
   onSuccess?: (state: NonNullable<ActionState>) => void;
-  // Once something is typed, leaving the page asks first (until a success or unmount). Off for
-  // a form that is only hidden, not discarded, and for views that track edits against the
-  // saved values themselves.
+  // While something typed is still there, leaving the page asks first (until a success or
+  // unmount). Off for a form that is only hidden, not discarded, and for views that track
+  // edits against the saved values themselves.
   guardUnsaved?: boolean;
 }
 
@@ -112,14 +112,21 @@ export function ActionForm({ action, children, onSuccess, guardUnsaved = true, .
   const lastHandled = useRef<number | null>(null);
   const onSuccessRef = useRef(onSuccess);
 
-  // A success saved what was typed; a failure keeps it unsaved
+  // A success saved what was typed. A failure keeps it unsaved: the fields start again from
+  // what was sent, so they no longer differ from their defaults, and the hold carries it.
   const [edited, setEdited] = useFormEdits(formRef);
+  const [heldAfterFailure, setHeldAfterFailure] = useState(false);
   const [resultAt, setResultAt] = useState(state?.at);
   if (state?.at !== resultAt) {
     setResultAt(state?.at);
-    if (state?.ok) setEdited(false);
+    if (state?.ok) {
+      setEdited(false);
+      setHeldAfterFailure(false);
+    } else if (state && edited) {
+      setHeldAfterFailure(true);
+    }
   }
-  useUnsavedChanges(edited && guardUnsaved);
+  useUnsavedChanges((edited || heldAfterFailure) && guardUnsaved);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
@@ -424,12 +431,16 @@ export function Select(props: ComponentPropsWithoutRef<'select'>) {
   );
 }
 
+// On phones and touch screens the label is a 44px target (taller with a hint or a wrapped
+// sentence), from padding a negative margin takes back, so the box stays on the first line and
+// nothing around it moves
 const CheckLabel = styled.label`
   display: flex;
   align-items: flex-start;
   gap: ${space[3]};
   ${type.body}
   color: ${({ theme }) => theme.colors.text};
+  ${touchTarget}
 
   input {
     flex-shrink: 0;
@@ -453,19 +464,28 @@ interface CheckboxProps extends Omit<ComponentPropsWithoutRef<'input'>, 'type' |
   savedChecked?: boolean;
 }
 
-// The whole sentence is the click target
-export function Checkbox({ name, children, hint, savedChecked = false, ...inputProps }: CheckboxProps) {
+// The whole sentence is the click target; the error is linked to the box, which takes focus
+export function Checkbox({ name, children, hint, savedChecked = false, 'aria-describedby': describedBy, ...inputProps }: CheckboxProps) {
+  const id = useId();
   const { error, defaultChecked } = useField(name);
+  const errorId = error ? `${id}-error` : undefined;
   return (
     <div>
       <CheckLabel>
-        <input type="checkbox" name={name} defaultChecked={defaultChecked(savedChecked)} aria-invalid={error ? true : undefined} {...inputProps} />
+        <input
+          type="checkbox"
+          name={name}
+          defaultChecked={defaultChecked(savedChecked)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={[errorId, describedBy].filter(Boolean).join(' ') || undefined}
+          {...inputProps}
+        />
         <span>
           {children}
           {hint && <small>{hint}</small>}
         </span>
       </CheckLabel>
-      {error && <ErrorText>{error}</ErrorText>}
+      {error && <ErrorText id={errorId}>{error}</ErrorText>}
     </div>
   );
 }

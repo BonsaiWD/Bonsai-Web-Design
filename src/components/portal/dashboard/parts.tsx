@@ -17,6 +17,7 @@ import {
   ease,
   focusRing,
   H2,
+  inlineTouchTarget,
   ListPanel,
   LocalTime,
   MetaLine,
@@ -443,6 +444,7 @@ const Summary = styled.p`
     color: inherit;
     text-decoration: none;
     ${focusRing}
+    ${inlineTouchTarget}
 
     @media (hover: hover) {
       &:hover {

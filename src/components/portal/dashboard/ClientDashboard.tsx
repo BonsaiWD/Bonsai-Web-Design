@@ -83,7 +83,7 @@ export default function ClientDashboard({ firstName, eyebrow, today, attention, 
           {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
           <H1>{greeting}</H1>
         </Intro>
-        <EmptyState title="Your project will appear here">
+        <EmptyState title="Your project will appear here" level={2}>
           We&apos;re setting it up now. You&apos;ll see each step, what we share for review and our messages here, and we&apos;ll email you
           when something needs you.
         </EmptyState>

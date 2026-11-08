@@ -7,7 +7,7 @@ import type { NextMilestoneView, Perspective } from '../dashboard/types';
 import { MILESTONE_LABELS } from '../labels';
 import { asksForInitials } from '../milestones/signoff';
 import { projectHref } from '../tabs';
-import { ButtonLink, DateText, DueText, H2, H3, MetaLine, MetaText, Panel, space, StatusBadge, Text, TextLink, tint, type } from '../ui';
+import { ButtonLink, DateText, DueText, H2, H3, MetaLine, MetaText, Panel, space, StatusBadge, Text, TextLink, tint, touchTarget, type } from '../ui';
 
 const Head = styled.header`
   display: flex;
@@ -23,6 +23,7 @@ const Head = styled.header`
     gap: ${space[1]};
     ${type.meta}
     font-weight: 500;
+    ${touchTarget}
   }
 `;
 

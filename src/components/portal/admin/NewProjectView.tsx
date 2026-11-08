@@ -28,6 +28,7 @@ import {
   SubmitButton,
   TextLink,
   tint,
+  touchTarget,
   type,
 } from '../ui';
 import ProjectFields from './ProjectFields';
@@ -55,6 +56,7 @@ const Crumbs = styled.nav`
   a {
     color: ${({ theme }) => theme.colors.textSecondary};
     ${focusRing}
+    ${touchTarget}
 
     @media (hover: hover) {
       &:hover {
@@ -146,6 +148,7 @@ export default function NewProjectView({ formId, clients, preselect }: NewProjec
 
       {clients.length === 0 ? (
         <EmptyState
+          level={2}
           title="Add a client first"
           action={
             <ButtonLink href="/portal/admin/clients?add=1">

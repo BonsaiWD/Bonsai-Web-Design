@@ -31,6 +31,7 @@ import {
   SubmitButton,
   TextLink,
   tint,
+  touchTarget,
   type,
   useAnnouncer,
   useDialog,
@@ -124,6 +125,11 @@ const Cell = styled.div`
   flex-direction: column;
   gap: ${space[1]};
   min-width: 0;
+
+  > a {
+    align-self: flex-start;
+    ${touchTarget}
+  }
 `;
 
 const NameText = styled.span`
@@ -421,6 +427,7 @@ export default function ClientsView({ clients, studio, openAdd }: ClientsViewPro
 
       {clients.length === 0 ? (
         <EmptyState
+          level={2}
           title="Add your first client"
           action={
             <Button onClick={add.openDialog}>

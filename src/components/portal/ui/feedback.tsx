@@ -45,14 +45,24 @@ const Marker = styled.span<{ $tone: StatusTone }>`
   }}
 `;
 
+// Badge text is 14px on a 1.3 line; the marker sits centred on the first line
+const BADGE_LINE = '(0.875rem * 1.3)';
+
+/* A badge never shrinks beside a title, as when it could not wrap. One longer than its whole
+   row ("Email to <address> failed") is held to the row's width and wraps, breaking an address
+   if it must, rather than running out of its panel. break-word, not anywhere: a word breaks
+   only when it cannot fit, so a table column sized to its content never squeezes "Development"
+   onto two lines. */
 const Badge = styled.span<{ $tone: StatusTone }>`
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: ${space[2]};
+  flex-shrink: 0;
+  max-width: 100%;
   font-size: 0.875rem;
   line-height: 1.3;
   font-weight: 500;
-  white-space: nowrap;
+  overflow-wrap: break-word;
   color: ${({ $tone, theme }) =>
     $tone === 'alert'
       ? theme.colors.error
@@ -65,8 +75,18 @@ const Badge = styled.span<{ $tone: StatusTone }>`
   svg {
     flex-shrink: 0;
     font-size: 1rem;
+    margin-top: calc((${BADGE_LINE} - 1rem) / 2);
     color: ${({ $tone, theme }) => ($tone === 'alert' ? theme.colors.error : theme.colors.primary)};
   }
+
+  ${Marker} {
+    margin-top: calc((${BADGE_LINE} - 0.625rem) / 2);
+  }
+`;
+
+// The label may shrink below its longest word, so break-word can break an address that does not fit
+const BadgeText = styled.span`
+  min-width: 0;
 `;
 
 export function StatusBadge({ tone, children }: { tone: StatusTone; children: ReactNode }) {
@@ -79,7 +99,7 @@ export function StatusBadge({ tone, children }: { tone: StatusTone; children: Re
       ) : (
         <Marker $tone={tone} aria-hidden="true" />
       )}
-      {children}
+      <BadgeText>{children}</BadgeText>
     </Badge>
   );
 }
@@ -110,10 +130,6 @@ const EmptyWrap = styled.div`
   border: 1px dashed ${({ theme }) => tint(theme.colors.primary, 22)};
   border-radius: ${radius.panel};
 
-  h3 {
-    ${type.h3}
-  }
-
   p {
     ${type.body}
     max-width: 52ch;
@@ -121,11 +137,23 @@ const EmptyWrap = styled.div`
   }
 `;
 
+const EmptyTitle = styled.h3`
+  ${type.h3}
+`;
+
+interface EmptyStateProps {
+  title: string;
+  children?: ReactNode;
+  action?: ReactNode;
+  // 3 under a section's h2; 2 when it stands straight under the page's h1, so no level is skipped
+  level?: 2 | 3;
+}
+
 // What an empty section is for, and what to do about it
-export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+export function EmptyState({ title, children, action, level = 3 }: EmptyStateProps) {
   return (
     <EmptyWrap>
-      <h3>{title}</h3>
+      <EmptyTitle as={level === 2 ? 'h2' : 'h3'}>{title}</EmptyTitle>
       {children && <p>{children}</p>}
       {action}
     </EmptyWrap>

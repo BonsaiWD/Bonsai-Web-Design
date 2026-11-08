@@ -22,8 +22,11 @@ export const Eyebrow = styled.p`
   ${type.overline}
 `;
 
+// Lead and Text hold what people type (summaries, descriptions, notes): a long URL or email
+// breaks where it must instead of pushing the page sideways (spec section 3)
 export const Lead = styled.p`
   ${type.lead}
+  overflow-wrap: anywhere;
 `;
 
 export const Text = styled.p<{ $muted?: boolean }>`
@@ -31,6 +34,7 @@ export const Text = styled.p<{ $muted?: boolean }>`
   max-width: 65ch;
   color: ${({ $muted, theme }) => ($muted ? theme.colors.textSecondary : theme.colors.text)};
   white-space: pre-line;
+  overflow-wrap: anywhere;
 `;
 
 export const Meta = styled.p`

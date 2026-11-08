@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { Metadata } from 'next';
 import NewProjectView from '@/components/portal/admin/NewProjectView';
 import StudioOnlyNotice from '@/components/portal/admin/StudioOnlyNotice';
 import { Page } from '@/components/portal/ui';
 import { getViewer, requireAdminPage } from '@/server/portal/access';
+import { adminPageMetadata } from '@/server/portal/metadata';
 import { loadClientOptions } from '@/server/portal/features/clients';
 
-export const metadata: Metadata = { title: 'New project' };
+export const generateMetadata = adminPageMetadata('New project');
 
 export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ client?: string | string[] }> }) {
   await requireAdminPage();

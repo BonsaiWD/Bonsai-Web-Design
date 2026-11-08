@@ -81,7 +81,7 @@ export default function MilestonesView({
 
   if (milestones.length === 0 && forClient) {
     return (
-      <EmptyState title="Your milestones will appear here">
+      <EmptyState title="Your milestones will appear here" level={2}>
         Once we&apos;ve planned the project with you, each step from kickoff to launch shows here with its due date, so you can see what&apos;s next and
         what we need from you.
       </EmptyState>
@@ -98,6 +98,7 @@ export default function MilestonesView({
 
       {milestones.length === 0 ? (
         <EmptyState
+          level={2}
           title="Plan the project in milestones"
           action={
             <Button
