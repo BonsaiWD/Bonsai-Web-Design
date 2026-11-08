@@ -2,7 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
 import { project, user } from '@/db/schema';
@@ -143,4 +143,20 @@ export async function projectActor(projectId: unknown, options: { clientOnly?: b
     // Decisions are the client's to make; the studio records ones made elsewhere separately
     if (options.clientOnly && !isClient) throw new ActionError('Only the client can do that.');
     return { user: portalUser, project: found, isAdmin: isAdmin(portalUser), isClient };
+}
+
+// A transaction handle, for helpers that take part in an action's transaction
+export type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
+
+/*
+ * Call first inside every client decision transaction (sign-offs, approvals, signatures,
+ * "I've sent payment"), before taking any other lock. FOR KEY SHARE waits for a reassign
+ * that holds the project row, then reads the committed client, so a decision can't land
+ * on a project that moved to someone else after projectActor checked it.
+ */
+export async function assertStillClient(tx: Tx, actor: ProjectActor): Promise<void> {
+    const rows = await tx.execute<{ client_id: string }>(
+        sql`SELECT client_id FROM project WHERE id = ${actor.project.id} FOR KEY SHARE`,
+    );
+    if (rows.rows[0]?.client_id !== actor.user.id) throw new ActionError('That project could not be found.');
 }
