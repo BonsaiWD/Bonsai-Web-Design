@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiArrowLeft, FiPrinter } from 'react-icons/fi';
 import { projectHref } from '@/components/portal/tabs';
-import { Button, H3, Meta, Panel, PHONE, space, Split, Stack, TextLink } from '@/components/portal/ui';
+import { Button, H3, LAPTOP, Meta, Panel, PHONE, space, Split, Stack, TextLink } from '@/components/portal/ui';
 import { ClientPayment } from './ClientPayment';
 import { InvoiceEditor } from './InvoiceEditor';
 import { listMethods } from './labels';
@@ -39,6 +39,13 @@ const Aside = styled.aside`
   flex-direction: column;
   gap: ${space[5]};
   min-width: 0;
+
+  /* Below the statement on tablets: panels side by side, a lone panel at full width */
+  @media (min-width: ${PHONE}) and (max-width: calc(${LAPTOP} - 0.02px)) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    align-items: start;
+  }
 
   @media (max-width: ${PHONE}) {
     gap: ${space[4]};
