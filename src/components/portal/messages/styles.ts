@@ -428,7 +428,8 @@ export const Tips = styled.ul`
   }
 `;
 
-export const ContactLine = styled.p`
+// A div, not a p, so the address alone on its line gets the text link's 44px touch target
+export const ContactLine = styled.div`
   ${type.meta}
   overflow-wrap: anywhere;
 `;

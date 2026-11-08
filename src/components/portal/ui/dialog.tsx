@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { FiX } from 'react-icons/fi';
 import { Button, type ButtonVariant } from './buttons';
 import { ActionForm, FormActions, FormMessage, FormStack, FreshFields, PendingReporter, SubmitButton, type ActionState, type FormAction } from './forms';
-import { PHONE, focusRing, radius, space, tint, type } from './tokens';
+import { PHONE, focusRing, radius, space, tint, TOUCH, TOUCH_TARGET, type } from './tokens';
 
 /*
  * A native <dialog> opened with showModal(): the browser traps focus, makes the page behind
@@ -94,6 +94,12 @@ const Close = styled.button`
   color: ${({ theme }) => theme.colors.textSecondary};
   font-size: 1.25rem;
   ${focusRing}
+
+  /* A full-size target on phones and touch screens */
+  @media ${TOUCH} {
+    width: ${TOUCH_TARGET};
+    height: ${TOUCH_TARGET};
+  }
 
   @media (hover: hover) {
     &:hover {

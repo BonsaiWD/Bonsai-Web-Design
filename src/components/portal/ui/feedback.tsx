@@ -50,7 +50,9 @@ const BADGE_LINE = '(0.875rem * 1.3)';
 
 /* A badge never shrinks beside a title, as when it could not wrap. One longer than its whole
    row ("Email to <address> failed") is held to the row's width and wraps, breaking an address
-   if it must, rather than running out of its panel. */
+   if it must, rather than running out of its panel. break-word, not anywhere: a word breaks
+   only when it cannot fit, so a table column sized to its content never squeezes "Development"
+   onto two lines. */
 const Badge = styled.span<{ $tone: StatusTone }>`
   display: inline-flex;
   align-items: flex-start;
@@ -60,7 +62,7 @@ const Badge = styled.span<{ $tone: StatusTone }>`
   font-size: 0.875rem;
   line-height: 1.3;
   font-weight: 500;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   color: ${({ $tone, theme }) =>
     $tone === 'alert'
       ? theme.colors.error
@@ -82,6 +84,11 @@ const Badge = styled.span<{ $tone: StatusTone }>`
   }
 `;
 
+// The label may shrink below its longest word, so break-word can break an address that does not fit
+const BadgeText = styled.span`
+  min-width: 0;
+`;
+
 export function StatusBadge({ tone, children }: { tone: StatusTone; children: ReactNode }) {
   return (
     <Badge $tone={tone}>
@@ -92,7 +99,7 @@ export function StatusBadge({ tone, children }: { tone: StatusTone; children: Re
       ) : (
         <Marker $tone={tone} aria-hidden="true" />
       )}
-      {children}
+      <BadgeText>{children}</BadgeText>
     </Badge>
   );
 }

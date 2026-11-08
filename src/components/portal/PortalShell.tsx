@@ -232,6 +232,8 @@ const SkipLink = styled.a`
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
+  /* GlobalStyle animates every link; this one appears at full size the moment it takes focus */
+  transition: none;
   ${focusRing}
 
   &:not(:focus) {
@@ -257,11 +259,17 @@ const FooterAlign = styled.div`
   }
 
   /* Its links get a full-size target on phones and touch screens, grown upwards so the
-     underline drawn at their foot stays put */
+     underline drawn at their foot stays put. The second of the two stacked contact links grows
+     no further than the footer's 0.75rem gap above it, so the two boxes meet rather than
+     overlap; it sits a couple of pixels lower there. */
   @media ${TOUCH} {
     footer a {
       padding-top: max(0px, ${TOUCH_TARGET} - 1lh - 0.25rem);
       margin-top: min(0px, 1lh + 0.25rem - ${TOUCH_TARGET});
+    }
+
+    footer a + a {
+      margin-top: max(-0.75rem, min(0px, 1lh + 0.25rem - ${TOUCH_TARGET}));
     }
   }
 `;

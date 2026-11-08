@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
 import { Checkbox, Field, Input, Textarea } from './forms';
-import { space, tint, type } from './tokens';
+import { space, tint, TOUCH, TOUCH_TARGET, touchTarget, type } from './tokens';
 
 /*
  * The fields of every client signing dialog (a milestone sign-off, a deliverable approval, a
@@ -34,10 +34,16 @@ const Plate = styled.div`
     overflow-wrap: anywhere;
   }
 
+  /* The link to read it gets a full-size target on phones and touch screens, without moving */
   a {
     ${type.meta}
     align-self: flex-start;
     margin-top: ${space[1]};
+    ${touchTarget}
+
+    @media ${TOUCH} {
+      margin-top: calc(${space[1]} + min(0px, (1lh - ${TOUCH_TARGET}) / 2));
+    }
   }
 `;
 

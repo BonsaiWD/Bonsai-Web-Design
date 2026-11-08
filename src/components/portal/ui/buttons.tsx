@@ -181,9 +181,11 @@ const textAction = css`
     }
   }
 
-  /* Standing on its own (the only element in its block, paragraph, list item or heading), it
-     gets a full-size touch target */
-  :is(div, p, li, dd, h2, h3, h4) > &:only-child {
+  /* Standing on its own (the only element in its block, list item, definition or heading), it
+     gets a full-size touch target. Not in a paragraph: :only-child ignores text, so a link inside
+     a sentence would match too and its box would cover the controls above and below. A
+     standalone link goes in a div rather than a p. */
+  :is(div, li, dd, h2, h3, h4) > &:only-child {
     ${inlineTouchTarget}
   }
 `;

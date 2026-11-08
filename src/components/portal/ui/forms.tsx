@@ -17,7 +17,7 @@ import styled, { css } from 'styled-components';
 import { FiCheck, FiChevronDown } from 'react-icons/fi';
 import type { ActionState } from '@/server/portal/actions';
 import { Button, type ButtonSize, type ButtonVariant } from './buttons';
-import { DURATION, ease, focusRing, space, tint, type } from './tokens';
+import { DURATION, ease, focusRing, space, tint, touchTarget, type } from './tokens';
 import { useFormEdits, useUnsavedChanges } from './unsaved';
 
 export type { ActionState };
@@ -431,12 +431,16 @@ export function Select(props: ComponentPropsWithoutRef<'select'>) {
   );
 }
 
+// On phones and touch screens the label is a 44px target (taller with a hint or a wrapped
+// sentence), from padding a negative margin takes back, so the box stays on the first line and
+// nothing around it moves
 const CheckLabel = styled.label`
   display: flex;
   align-items: flex-start;
   gap: ${space[3]};
   ${type.body}
   color: ${({ theme }) => theme.colors.text};
+  ${touchTarget}
 
   input {
     flex-shrink: 0;
