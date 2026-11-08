@@ -62,9 +62,9 @@ interface ActionFormProps extends Omit<ComponentPropsWithoutRef<'form'>, 'action
   children: ReactNode;
   // Called once per successful run, e.g. to close a dialog
   onSuccess?: (state: NonNullable<ActionState>) => void;
-  // Once something is typed, leaving the page asks first (until a success or unmount). Off for
-  // a form that is only hidden, not discarded, and for views that track edits against the
-  // saved values themselves.
+  // While something typed is still there, leaving the page asks first (until a success or
+  // unmount). Off for a form that is only hidden, not discarded, and for views that track
+  // edits against the saved values themselves.
   guardUnsaved?: boolean;
 }
 
@@ -112,14 +112,21 @@ export function ActionForm({ action, children, onSuccess, guardUnsaved = true, .
   const lastHandled = useRef<number | null>(null);
   const onSuccessRef = useRef(onSuccess);
 
-  // A success saved what was typed; a failure keeps it unsaved
+  // A success saved what was typed. A failure keeps it unsaved: the fields start again from
+  // what was sent, so they no longer differ from their defaults, and the hold carries it.
   const [edited, setEdited] = useFormEdits(formRef);
+  const [heldAfterFailure, setHeldAfterFailure] = useState(false);
   const [resultAt, setResultAt] = useState(state?.at);
   if (state?.at !== resultAt) {
     setResultAt(state?.at);
-    if (state?.ok) setEdited(false);
+    if (state?.ok) {
+      setEdited(false);
+      setHeldAfterFailure(false);
+    } else if (state && edited) {
+      setHeldAfterFailure(true);
+    }
   }
-  useUnsavedChanges(edited && guardUnsaved);
+  useUnsavedChanges((edited || heldAfterFailure) && guardUnsaved);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;

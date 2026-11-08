@@ -7,7 +7,19 @@ import { FiEye, FiLogOut } from 'react-icons/fi';
 import Footer from '../layout/Footer';
 import { authClient } from '@/lib/auth-client';
 import { setPortalView } from '@/app/portal/_actions/view';
-import { Button, focusRing, GuardedLink, nativeCursor, PHONE, space, tint, type, UnsavedChangesProvider } from './ui';
+import {
+  Button,
+  focusRing,
+  GuardedLink,
+  nativeCursor,
+  PHONE,
+  space,
+  tint,
+  type,
+  UnsavedChangesProvider,
+  useConfirmLeave,
+  useLeaveGuard,
+} from './ui';
 
 const LOGO_SUB = 0.39; // em, as in the site header's lockup
 const LOGO_GAP = 0.25; // em
@@ -191,13 +203,26 @@ const STUDIO_NAV = [
 
 const CLIENT_NAV = [{ href: '/portal', label: 'Projects', match: (p: string) => p === '/portal' || p.startsWith('/portal/projects') }];
 
-export default function PortalShell({ email, isAdmin, previewingAsClient, children }: PortalShellProps) {
+export default function PortalShell(props: PortalShellProps) {
+  // The guard's provider sits above the shell, so the shell's own controls can ask before leaving
+  return (
+    <UnsavedChangesProvider>
+      <Shell {...props} />
+    </UnsavedChangesProvider>
+  );
+}
+
+function Shell({ email, isAdmin, previewingAsClient, children }: PortalShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
+  // Signing out and switching views leave the page like a link does: unsaved edits ask first
+  const confirmLeave = useConfirmLeave();
+  const guardSubmit = useLeaveGuard();
   const nav = isAdmin && !previewingAsClient ? STUDIO_NAV : CLIENT_NAV;
 
   async function handleSignOut() {
+    if (signingOut || !confirmLeave()) return;
     setSigningOut(true);
     await authClient.signOut();
     router.replace('/portal/sign-in');
@@ -206,7 +231,6 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
   }
 
   return (
-    <UnsavedChangesProvider>
     <Frame>
       <Bar>
         <BarInner>
@@ -228,7 +252,7 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
           {email && (
             <Account>
               {isAdmin && !previewingAsClient && (
-                <form action={setPortalView}>
+                <form action={setPortalView} onSubmit={guardSubmit}>
                   <input type="hidden" name="mode" value="client" />
                   {/* Studio-only pages have no client version: preview the client's dashboard */}
                   <input type="hidden" name="back" value={pathname.startsWith('/portal/admin') || pathname.endsWith('/settings') ? '/portal' : pathname} />
@@ -259,7 +283,7 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
               <FiEye aria-hidden="true" />
               You are seeing the portal the way your clients do. Their actions are turned off in this view.
             </p>
-            <form action={setPortalView}>
+            <form action={setPortalView} onSubmit={guardSubmit}>
               <input type="hidden" name="mode" value="studio" />
               <input type="hidden" name="back" value={pathname} />
               <Button type="submit" $variant="secondary" $size="sm">
@@ -274,6 +298,5 @@ export default function PortalShell({ email, isAdmin, previewingAsClient, childr
         <Footer />
       </FooterAlign>
     </Frame>
-    </UnsavedChangesProvider>
   );
 }
