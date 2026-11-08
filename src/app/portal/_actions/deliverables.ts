@@ -1,26 +1,28 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, asc, desc, eq, gt, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
-import { deliverable, deliverableVersion, file, milestone } from '@/db/schema';
+import { deliverable, deliverableVersion, file } from '@/db/schema';
 import { approvalStatement, changesStatement, studioApprovalStatement } from '@/components/portal/deliverables/copy';
 import { projectHref } from '@/components/portal/tabs';
 import { plural, todayIso } from '@/lib/portal-format';
-import { adminActor, projectActor, type ProjectActor } from '@/server/portal/access';
+import { adminActor, assertStillClient, projectActor, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
   activityKind,
   approvalEmails,
   changesEmails,
   claimEmailSlot,
+  currentVersionStatus,
   deliverableAnchor,
+  eventForLinked,
+  lockMilestones,
   recordedApprovalEmail,
   releaseEmailSlot,
   shareEmail,
   syncMilestone,
-  type Tx,
 } from '@/server/portal/features/deliverables';
 import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
@@ -97,6 +99,7 @@ async function lockVersion(tx: Tx, projectId: string, versionId: string) {
       version: deliverableVersion.version,
       titleSnapshot: deliverableVersion.titleSnapshot,
       status: deliverableVersion.status,
+      sharedAt: deliverableVersion.sharedAt,
       linkUrl: deliverableVersion.linkUrl,
       fileId: deliverableVersion.fileId,
       filename: file.filename,
@@ -240,14 +243,17 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     let shared: { version: number; title: string };
     try {
       shared = await db.transaction(async (tx) => {
-        if (input.milestoneId) {
-          const [linked] = await tx
-            .select({ id: milestone.id })
-            .from(milestone)
-            .where(and(eq(milestone.id, input.milestoneId), eq(milestone.projectId, projectId)));
-          if (!linked) throw new ActionError('Choose a milestone from this project.', { milestoneId: 'Choose a milestone from this project.' });
-        }
+        // Milestones are locked before they are synced, and checked to be this project's
+        const lockLinked = async (ids: (string | null)[]) => {
+          const found = await lockMilestones(tx, projectId, ids);
+          if (input.milestoneId && !found.includes(input.milestoneId)) {
+            throw new ActionError('Choose a milestone from this project.', { milestoneId: 'Choose a milestone from this project.' });
+          }
+        };
         if (isNew) {
+          // Nothing can point at a deliverable that does not exist yet, so its milestone can
+          // be locked before it is inserted
+          await lockLinked([input.milestoneId]);
           const inserted = await tx
             .insert(deliverable)
             .values({
@@ -263,7 +269,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
         }
 
         const [row] = await tx
-          .select({ title: deliverable.title, latestVersion: deliverable.latestVersion })
+          .select({ title: deliverable.title, latestVersion: deliverable.latestVersion, milestoneId: deliverable.milestoneId })
           .from(deliverable)
           .where(and(eq(deliverable.id, input.deliverableId), eq(deliverable.projectId, projectId)))
           .for('update');
@@ -271,6 +277,8 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
         if (row.latestVersion !== input.expectedVersion) {
           throw new ActionError(`Version ${row.latestVersion} was just shared. Reload the page to see it.`);
         }
+        // Deliverable first, then its old and new milestones, as every deliverable action does
+        if (!isNew) await lockLinked([row.milestoneId, input.milestoneId]);
 
         const next = row.latestVersion + 1;
         // One version in review at a time: the new one replaces any still waiting
@@ -296,8 +304,11 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
           sharedBy: actor.user.id,
         });
         if (input.milestoneId) {
-          await syncMilestone(tx, projectId, input.milestoneId, input.needsApproval ? 'shared' : 'withdrawn');
+          await syncMilestone(tx, projectId, input.milestoneId, input.needsApproval ? 'shared' : 'recheck');
         }
+        // Moved to another milestone (or none) with this version: the old one may be finished
+        // now, or back with the studio
+        if (row.milestoneId && row.milestoneId !== input.milestoneId) await syncMilestone(tx, projectId, row.milestoneId, 'recheck');
         return { version: next, title: row.title };
       });
     } catch (error) {
@@ -357,21 +368,29 @@ export async function editDeliverable(_prev: ActionState, formData: FormData): P
     const actor = await projectActor(formData.get('projectId'));
     const input = parseForm(editSchema, formData);
     const projectId = actor.project.id;
-    const db = getDb();
-    if (input.milestoneId) {
-      const [linked] = await db
-        .select({ id: milestone.id })
-        .from(milestone)
-        .where(and(eq(milestone.id, input.milestoneId), eq(milestone.projectId, projectId)));
-      if (!linked) throw new ActionError('Choose a milestone from this project.', { milestoneId: 'Choose a milestone from this project.' });
-    }
-    // Shared versions keep the title they were shared with; this renames the card only
-    const updated = await db
-      .update(deliverable)
-      .set({ title: input.title, description: input.description, milestoneId: input.milestoneId })
-      .where(and(eq(deliverable.id, input.deliverableId), eq(deliverable.projectId, projectId)))
-      .returning({ id: deliverable.id });
-    if (!updated.length) throw new ActionError(NOT_FOUND);
+    await getDb().transaction(async (tx) => {
+      const [row] = await tx
+        .select({ milestoneId: deliverable.milestoneId })
+        .from(deliverable)
+        .where(and(eq(deliverable.id, input.deliverableId), eq(deliverable.projectId, projectId)))
+        .for('update');
+      if (!row) throw new ActionError(NOT_FOUND);
+      const found = await lockMilestones(tx, projectId, [row.milestoneId, input.milestoneId]);
+      if (input.milestoneId && !found.includes(input.milestoneId)) {
+        throw new ActionError('Choose a milestone from this project.', { milestoneId: 'Choose a milestone from this project.' });
+      }
+      // Shared versions keep the title they were shared with; this renames the card only
+      await tx
+        .update(deliverable)
+        .set({ title: input.title, description: input.description, milestoneId: input.milestoneId })
+        .where(eq(deliverable.id, input.deliverableId));
+      if (row.milestoneId === input.milestoneId) return;
+      // Moving it changes what both milestones are waiting for
+      if (row.milestoneId) await syncMilestone(tx, projectId, row.milestoneId, 'recheck');
+      if (input.milestoneId) {
+        await syncMilestone(tx, projectId, input.milestoneId, eventForLinked(await currentVersionStatus(tx, input.deliverableId)));
+      }
+    });
     refresh(projectId);
     await recordActivity({
       projectId,
@@ -438,9 +457,23 @@ export async function withdrawVersion(_prev: ActionState, formData: FormData): P
         throw new ActionError('Only a version that is waiting or delivered can be withdrawn. Decided versions stay on record.');
       }
       await tx.update(deliverableVersion).set({ status: 'withdrawn' }).where(eq(deliverableVersion.id, version.id));
-      if (locked.milestoneId && version.status === 'in_review') {
-        await syncMilestone(tx, projectId, locked.milestoneId, 'withdrawn');
+      // The client must not keep the file through an old link or download. Each share stores
+      // its own file row, so nothing else points at this one; the studio can still open it.
+      if (version.fileId) {
+        await tx.update(file).set({ removedAt: sql`now()` }).where(and(eq(file.id, version.fileId), isNull(file.removedAt)));
       }
+      // Nor read about it on their timeline: the share (and any link fix) of this version,
+      // up to the next version shared, becomes studio-only
+      await tx.execute(sql`
+        UPDATE activity SET visibility = 'studio'
+        WHERE project_id = ${projectId}
+          AND kind IN (${activityKind('shared', locked.deliverableId)}, ${activityKind('linkFixed', locked.deliverableId)})
+          AND created_at >= ${version.sharedAt}
+          AND created_at < coalesce(
+            (SELECT min(shared_at) FROM deliverable_version WHERE deliverable_id = ${locked.deliverableId} AND version > ${version.version}),
+            'infinity'
+          )`);
+      if (locked.milestoneId) await syncMilestone(tx, projectId, locked.milestoneId, 'recheck');
       return locked;
     });
 
@@ -591,7 +624,7 @@ export async function deleteDeliverable(_prev: ActionState, formData: FormData):
 
     const title = await getDb().transaction(async (tx) => {
       const [row] = await tx
-        .select({ title: deliverable.title })
+        .select({ title: deliverable.title, milestoneId: deliverable.milestoneId })
         .from(deliverable)
         .where(and(eq(deliverable.id, input.deliverableId), eq(deliverable.projectId, projectId)))
         .for('update');
@@ -620,6 +653,8 @@ export async function deleteDeliverable(_prev: ActionState, formData: FormData):
       const fileIds = files.map((entry) => entry.fileId).filter((id): id is string => Boolean(id));
       // The bytes stay in storage for the studio; the files no longer show anywhere
       if (fileIds.length) await tx.update(file).set({ removedAt: new Date() }).where(inArray(file.id, fileIds));
+      // Its milestone may have been waiting on it alone
+      if (row.milestoneId) await syncMilestone(tx, projectId, row.milestoneId, 'recheck');
       return row.title;
     });
 
@@ -658,6 +693,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
     const meta = await requestMeta();
 
     const result = await getDb().transaction(async (tx) => {
+      await assertStillClient(tx, actor);
       const locked = await lockVersion(tx, projectId, input.versionId);
       const { version } = locked;
       const statement = approvalStatement(version.version, version.titleSnapshot);
@@ -755,6 +791,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
     const meta = await requestMeta();
 
     const result = await getDb().transaction(async (tx) => {
+      await assertStillClient(tx, actor);
       const locked = await lockVersion(tx, projectId, input.versionId);
       const { version } = locked;
       const statement = changesStatement(version.version, version.titleSnapshot);

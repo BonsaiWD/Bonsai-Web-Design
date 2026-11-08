@@ -19,13 +19,10 @@ import {
 import type { DeliverableView, MilestoneOption, Perspective, VersionView } from '@/components/portal/deliverables/types';
 import type { EmailContent } from '@/lib/email';
 import { firstName, formatDate } from '@/lib/portal-format';
-import { isUuid, type PortalProject } from '../access';
+import { isUuid, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { STUDIO_EMAIL } from '../notify';
 import { INLINE_TYPES } from '../storage';
-
-type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /* ---------- Activity kinds ----------
    Activity rows carry the deliverable's id in their kind ("deliverable.shared:<id>"), so the
@@ -262,10 +259,32 @@ export async function loadMilestoneOptions(projectId: string): Promise<Milestone
 }
 
 /* ---------- Milestone sync ----------
-   Runs inside the deliverable's transaction. An initialled milestone is part of the signed
-   record, so deliverables never move it. */
+   Runs inside the deliverable's transaction, after the deliverable is locked. An initialled
+   milestone is part of the signed record, so deliverables never move it.
+   'recheck' is for a deliverable leaving the milestone's work: a version withdrawn, the
+   deliverable deleted, or linked to another milestone. */
 
-type MilestoneEvent = 'shared' | 'changes' | 'approved' | 'withdrawn';
+type MilestoneEvent = 'shared' | 'changes' | 'approved' | 'recheck';
+
+// Locks the milestones a change touches in id order before any of them is synced, as a
+// milestone delete or move does, so two requests never wait on each other in a circle
+// Returns the ids found in the project, so a milestone from elsewhere can be refused.
+export async function lockMilestones(tx: Tx, projectId: string, ids: (string | null | undefined)[]): Promise<string[]> {
+  const wanted = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  if (wanted.length === 0) return [];
+  const rows = await tx
+    .select({ id: milestone.id })
+    .from(milestone)
+    .where(and(eq(milestone.projectId, projectId), inArray(milestone.id, wanted)))
+    .orderBy(asc(milestone.id))
+    .for('update');
+  return rows.map((row) => row.id);
+}
+
+// The event that brings a milestone in line with a deliverable newly linked to it
+export function eventForLinked(status: VersionStatus | null): MilestoneEvent {
+  return status === 'in_review' ? 'shared' : 'recheck';
+}
 
 // The newest non-withdrawn version of every deliverable linked to the milestone
 async function linkedCurrentVersions(tx: Tx, milestoneId: string) {
@@ -282,6 +301,17 @@ async function linkedCurrentVersions(tx: Tx, milestoneId: string) {
   const current = new Map<string, { status: VersionStatus; needsApproval: boolean }>();
   for (const row of rows) if (!current.has(row.deliverableId)) current.set(row.deliverableId, row);
   return [...current.values()];
+}
+
+// The status of the deliverable's newest version that was not withdrawn
+export async function currentVersionStatus(tx: Tx, deliverableId: string): Promise<VersionStatus | null> {
+  const [row] = await tx
+    .select({ status: deliverableVersion.status })
+    .from(deliverableVersion)
+    .where(and(eq(deliverableVersion.deliverableId, deliverableId), ne(deliverableVersion.status, 'withdrawn')))
+    .orderBy(desc(deliverableVersion.version))
+    .limit(1);
+  return row?.status ?? null;
 }
 
 export async function syncMilestone(
@@ -309,13 +339,19 @@ export async function syncMilestone(
   else if (event === 'changes') next = 'in_progress';
   else {
     const linked = await linkedCurrentVersions(tx, milestoneId);
+    const needing = linked.filter((version) => version.needsApproval);
+    const allApproved = needing.length > 0 && needing.every((version) => version.status === 'approved');
+    // Approvals finish the milestone, unless the client still has to initial it off
+    const finished: MilestoneStatus = row.requiresSignoff ? 'waiting_on_client' : 'done';
     if (event === 'approved') {
-      const pending = linked.some((version) => version.needsApproval && version.status !== 'approved');
-      // Approvals finish the milestone, unless the client still has to initial it off
-      if (!pending) next = row.requiresSignoff ? 'waiting_on_client' : 'done';
-    } else if (row.status === 'waiting_on_client' && !row.requiresSignoff && !linked.some((version) => version.status === 'in_review')) {
-      // Nothing is left for the client to review, so the milestone is back with the studio
-      next = 'in_progress';
+      if (!needing.some((version) => version.status !== 'approved')) next = finished;
+    } else if (row.status === 'waiting_on_client' && !linked.some((version) => version.status === 'in_review')) {
+      // Nothing is left for the client to review. If every deliverable that asked for
+      // approval has it, the step is finished; if one was sent back or is being redone, it is
+      // back with the studio. With nothing left to approve, a step that needs initials keeps
+      // waiting for them, and any other goes back to the studio.
+      if (allApproved) next = finished;
+      else if (needing.length > 0 || !row.requiresSignoff) next = 'in_progress';
     }
   }
   if (!next || next === row.status) return null;
