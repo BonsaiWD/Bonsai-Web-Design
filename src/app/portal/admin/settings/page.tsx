@@ -1,9 +1,19 @@
 import type { Metadata } from 'next';
-import { EmptyState } from '@/components/portal/ui';
+import PaymentSettingsView from '@/components/portal/invoices/PaymentSettingsView';
+import { Page } from '@/components/portal/ui';
+import { requireAdminPage } from '@/server/portal/access';
+import { loadPaymentSettings } from '@/server/portal/features/invoices';
 
-export const metadata: Metadata = { title: 'Admin' };
+export const metadata: Metadata = { title: 'Payment settings' };
 
-// Placeholder until the Admin feature is built
-export default function Page() {
-  return <EmptyState title="Admin">This page is on its way.</EmptyState>;
+export default async function SettingsPage() {
+  // A client sees the same page as a missing one
+  await requireAdminPage();
+  const { methods, version } = await loadPaymentSettings();
+
+  return (
+    <Page>
+      <PaymentSettingsView methods={methods} version={version} />
+    </Page>
+  );
 }
