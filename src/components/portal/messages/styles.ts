@@ -201,6 +201,11 @@ export const InternalLabel = styled.span`
   }
 `;
 
+// Beside the name of a client the project belonged to before it moved
+export const FormerLabel = styled.span`
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
 type BubbleTone = 'own' | 'other' | 'internal';
 
 export const Bubble = styled.div<{ $tone: BubbleTone; $own: boolean; $first: boolean; $pending?: boolean }>`

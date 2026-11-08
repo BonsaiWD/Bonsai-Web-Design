@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
-import { FiCheck, FiUpload } from 'react-icons/fi';
+import { FiCheck, FiCornerUpLeft, FiUpload } from 'react-icons/fi';
 import { formatBytes } from '@/components/portal/deliverables/copy';
 import { Disclosure, DisclosureSummary, MetaLine, NoteBlock } from '@/components/portal/deliverables/parts';
 import { LocalTime, PHONE, space, TextAnchor, tint, type, VisuallyHidden } from '@/components/portal/ui';
@@ -165,6 +165,47 @@ export function SignatureRecord({
   );
 }
 
+/* ---------- A signed copy the studio sent back ---------- */
+
+export function ReturnedNotice({
+  contract,
+  perspective,
+  clientName,
+}: {
+  contract: ContractView;
+  perspective: Perspective;
+  clientName: string;
+}) {
+  const returned = contract.returnedCopy;
+  if (!returned) return null;
+  const studio = perspective === 'studio';
+  return (
+    <Record>
+      <FiCornerUpLeft aria-hidden="true" />
+      <div>
+        <RecordLine>
+          {studio ? `Sent back the signed copy ${clientName} uploaded on ` : "We couldn't use the signed copy you uploaded on "}
+          <LocalTime value={returned.uploadedAt} />
+        </RecordLine>
+        <MetaLine stackOnPhone>
+          {returned.filename}
+          <>
+            {studio ? 'Sent back' : 'Returned'}
+            {studio && returned.byName ? ` by ${returned.byName}` : ''} on <LocalTime value={returned.at} />
+          </>
+        </MetaLine>
+        {returned.reason && (
+          <NoteBlock>
+            <h5>{studio ? `Your note to ${clientName}` : 'Our note'}</h5>
+            <p>{returned.reason}</p>
+          </NoteBlock>
+        )}
+        <MetaLine>{studio ? `It waits for ${clientName}'s signature again.` : 'Sign it here, or upload a new signed copy.'}</MetaLine>
+      </div>
+    </Record>
+  );
+}
+
 /* ---------- Every file the contract has had ---------- */
 
 const HistoryList = styled.ol`
@@ -197,6 +238,16 @@ const HistoryTitle = styled.p`
   }
 `;
 
+// Why a copy was sent back, under its row
+const HistoryNote = styled.p`
+  ${type.meta}
+  max-width: 62ch;
+  padding-left: ${space[3]};
+  border-left: 2px solid ${({ theme }) => tint(theme.colors.primary, 30)};
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+`;
+
 // The filename is the download link, tall enough to tap
 const FileLink = styled(TextAnchor)`
   display: inline-flex;
@@ -215,6 +266,7 @@ function uploader(entry: ContractFileView, perspective: Perspective, clientName:
 }
 
 function stateOf(entry: ContractFileView, contract: ContractView): string | null {
+  if (entry.returned) return 'Sent back';
   if (entry.label !== 'original') return null;
   if (entry.current) return contract.signature?.fileId === entry.fileId ? 'Signed version' : 'Current version';
   return 'Replaced';
@@ -251,8 +303,14 @@ export function FileHistory({
                 <>
                   Uploaded by {uploader(entry, perspective, clientName)} on <LocalTime value={entry.uploadedAt} />
                 </>
+                {entry.returned && (
+                  <>
+                    Sent back{entry.returned.byName ? ` by ${entry.returned.byName}` : ''} on <LocalTime value={entry.returned.at} />
+                  </>
+                )}
                 {formatBytes(entry.sizeBytes)}
               </MetaLine>
+              {entry.returned?.reason && <HistoryNote>{entry.returned.reason}</HistoryNote>}
             </li>
           );
         })}

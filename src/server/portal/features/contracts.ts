@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, isNotNull, like, ne, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, ne, notExists, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
 import { activity, contract, contractFile, contractSignature, file, project, rateLimit, user } from '@/db/schema';
@@ -13,13 +13,12 @@ import type {
 } from '@/components/portal/contracts/types';
 import type { EmailContent } from '@/lib/email';
 import { firstName } from '@/lib/portal-format';
-import { isUuid, type PortalProject } from '../access';
+import { isUuid, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
 import { STUDIO_EMAIL } from '../notify';
 import { INLINE_TYPES } from '../storage';
 
 type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /* ---------- Activity kinds ----------
    Rows carry the contract's id in their kind ("contract.added:<id>"), so the page can say when
@@ -37,10 +36,13 @@ const KINDS = {
   recorded: 'contract.recorded',
   edited: 'contract.edited',
   deleted: 'contract.deleted',
+  // "contract.copy_returned:<contractId>:<contractFileId>": the studio sent a signed copy back
+  returned: 'contract.copy_returned',
 } as const;
 
-// The emails that ask the client to sign; a failure here is worth flagging to the studio
-const ASKING = [KINDS.added, KINDS.replaced, KINDS.reminded];
+// The emails that ask the client to sign (a sent-back copy asks again); a failure here is
+// worth flagging to the studio
+const ASKING = [KINDS.added, KINDS.replaced, KINDS.reminded, KINDS.returned];
 
 export function contractKind(event: keyof typeof KINDS, contractId: string): string {
   return `${KINDS[event]}:${contractId}`;
@@ -52,6 +54,21 @@ function contractIdOf(kind: string): string | null {
 }
 
 export const contractAnchor = (contractId: string) => `contract-${contractId}`;
+
+/* A signed copy the studio sends back keeps its rows: its file is marked removed, so it no
+   longer downloads for the client or counts as a signature anywhere, and the studio's history
+   still shows it. The reason travels in the activity summary, as the schema has no column. */
+
+const REASON_MARKER = '. Reason: ';
+
+export function returnedSummary(title: string, reason: string): string {
+  return `Sent back the signed copy of ${title}${REASON_MARKER}${reason}`;
+}
+
+function reasonFromSummary(summary: string): string | null {
+  const at = summary.indexOf(REASON_MARKER);
+  return at >= 0 ? summary.slice(at + REASON_MARKER.length) || null : null;
+}
 
 export function contractStatus(input: {
   requiresSignature: boolean;
@@ -69,6 +86,7 @@ export function contractStatus(input: {
 const creator = alias(user, 'creator');
 const uploader = alias(user, 'uploader');
 const signer = alias(user, 'signer');
+const returner = alias(user, 'returner');
 
 export async function loadContracts(
   forProject: Pick<PortalProject, 'id' | 'clientEmail'>,
@@ -104,6 +122,7 @@ export async function loadContracts(
         contentType: file.contentType,
         uploaderName: uploader.name,
         uploaderRole: uploader.role,
+        removedAt: file.removedAt,
       })
       .from(contractFile)
       .innerJoin(contract, eq(contract.id, contractFile.contractId))
@@ -147,9 +166,31 @@ export async function loadContracts(
           .orderBy(desc(activity.createdAt))
       : Promise.resolve([]),
   ]);
+  // Why the studio sent a signed copy back: the client was emailed it, so both sides see it
+  const returnRows = fileRows.some((row) => row.removedAt)
+    ? await db
+        .select({ kind: activity.kind, summary: activity.summary, createdAt: activity.createdAt, byName: returner.name })
+        .from(activity)
+        .leftJoin(returner, eq(returner.id, activity.actorId))
+        .where(and(eq(activity.projectId, forProject.id), like(activity.kind, `${KINDS.returned}:%`)))
+    : [];
+  const returns = new Map(
+    returnRows.map((row) => [
+      row.kind.split(':')[2],
+      { at: row.createdAt.toISOString(), reason: reasonFromSummary(row.summary), byName: studio ? row.byName || null : null },
+    ]),
+  );
 
   const filesByContract = new Map<string, ContractFileView[]>();
+  const returnedByContract = new Map<string, NonNullable<ContractView['returnedCopy']>>();
   for (const row of fileRows) {
+    const returned = row.removedAt ? (returns.get(row.id) ?? { at: row.removedAt.toISOString(), reason: null, byName: null }) : null;
+    // Rows arrive newest first, so the first one sent back is the latest
+    if (returned && row.label === 'client_signed' && !returnedByContract.has(row.contractId)) {
+      returnedByContract.set(row.contractId, { filename: row.filename, uploadedAt: row.createdAt.toISOString(), ...returned });
+    }
+    // The client can no longer download a copy that was sent back; the notice tells them why
+    if (returned && !studio) continue;
     const list = filesByContract.get(row.contractId) ?? [];
     list.push({
       id: row.id,
@@ -164,6 +205,7 @@ export async function loadContracts(
       // Which of the two of us uploaded it matters to the studio only
       uploadedByName: studio ? row.uploaderName || null : null,
       current: false,
+      ...(studio ? { returned } : {}),
     });
     filesByContract.set(row.contractId, list);
   }
@@ -174,7 +216,8 @@ export async function loadContracts(
     const files = filesByContract.get(item.id) ?? [];
     const original = files.find((entry) => entry.label === 'original') ?? null;
     if (original) original.current = true;
-    const signedCopy = files.find((entry) => entry.label === 'client_signed') ?? null;
+    // A copy the studio sent back is history, not a signature
+    const signedCopy = files.find((entry) => entry.label === 'client_signed' && !entry.returned) ?? null;
     const countersigned = files.find((entry) => entry.label === 'countersigned') ?? null;
     const row = signatureByContract.get(item.id);
 
@@ -205,17 +248,20 @@ export async function loadContracts(
       };
     }
 
+    const status = contractStatus({
+      requiresSignature: item.requiresSignature,
+      signed: Boolean(row),
+      signedCopy: Boolean(signedCopy),
+      countersigned: Boolean(countersigned),
+    });
     return {
       id: item.id,
       title: item.title,
       description: item.description,
       requiresSignature: item.requiresSignature,
-      status: contractStatus({
-        requiresSignature: item.requiresSignature,
-        signed: Boolean(row),
-        signedCopy: Boolean(signedCopy),
-        countersigned: Boolean(countersigned),
-      }),
+      status,
+      // Only while it waits for a signature again: once signed, the history has it
+      returnedCopy: status === 'awaiting' ? (returnedByContract.get(item.id) ?? null) : null,
       createdAt: item.createdAt.toISOString(),
       original,
       signedCopy,
@@ -232,6 +278,9 @@ export async function loadContracts(
 // Locks the contract (inside the actor's project) and reads its state after the lock, so it
 // reflects anything that committed while this request waited
 export async function lockContract(tx: Tx, projectId: string, contractId: string) {
+  // The project row first: a delete or a change of client takes it before its contracts, so
+  // the two wait in turn instead of deadlocking
+  await tx.execute(sql`SELECT id FROM project WHERE id = ${projectId} FOR KEY SHARE`);
   const [row] = await tx
     .select({
       id: contract.id,
@@ -250,7 +299,12 @@ export async function lockContract(tx: Tx, projectId: string, contractId: string
     .select({ source: contractSignature.source, signerId: contractSignature.signerId, signedAt: contractSignature.signedAt })
     .from(contractSignature)
     .where(eq(contractSignature.contractId, row.id));
-  const labels = await tx.selectDistinct({ label: contractFile.label }).from(contractFile).where(eq(contractFile.contractId, row.id));
+  // A signed copy the studio sent back no longer counts
+  const labels = await tx
+    .selectDistinct({ label: contractFile.label })
+    .from(contractFile)
+    .innerJoin(file, eq(file.id, contractFile.fileId))
+    .where(and(eq(contractFile.contractId, row.id), isNull(file.removedAt)));
   const has = (label: string) => labels.some((entry) => entry.label === label);
   const status = contractStatus({
     requiresSignature: row.requiresSignature,
@@ -311,6 +365,24 @@ export async function releaseEmailSlot(contractId: string): Promise<void> {
   await getDb()
     .delete(rateLimit)
     .where(eq(rateLimit.key, throttleKey(contractId)));
+}
+
+// Whether an email asking this client to sign the contract ever reached them, so the next one
+// is worded as a reminder only when it is one
+export async function askedByEmail(projectId: string, contractId: string, to: string): Promise<boolean> {
+  const [row] = await getDb()
+    .select({ id: activity.id })
+    .from(activity)
+    .where(
+      and(
+        eq(activity.projectId, projectId),
+        eq(activity.emailTo, to),
+        eq(activity.emailStatus, 'sent'),
+        or(...ASKING.map((kind) => like(activity.kind, `${kind}:${contractId}%`))),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 /* ---------- Emails ---------- */
@@ -469,6 +541,9 @@ export function signedCopyEmail(input: {
   title: string;
   filename: string;
   sha256: string;
+  // The document in the portal when they uploaded it: the server can't read a scan, so the
+  // studio compares the two before countersigning
+  original: { filename: string; sha256: string };
   note: string | null;
   url: string;
 }): { subject: string; content: EmailContent } {
@@ -476,9 +551,39 @@ export function signedCopyEmail(input: {
     subject: `${input.clientName} uploaded a signed copy of ${input.title}`,
     content: {
       heading: `${input.clientName} uploaded a signed copy of ${input.title}`,
-      paragraphs: [`File: ${input.filename}`, `SHA-256: ${input.sha256}`, 'Check it, then upload the countersigned copy when it is ready.'],
+      paragraphs: [
+        `File: ${input.filename}`,
+        `SHA-256: ${input.sha256}`,
+        `Check it is a signed copy of ${input.original.filename} (SHA-256 ${input.original.sha256.slice(0, 12)}…), the version in the portal when they uploaded it.`,
+        "Then upload the countersigned copy. If it isn't right, send it back from the contract with a note, and they can sign again.",
+      ],
       quote: input.note ?? undefined,
       action: { label: 'Open it in the portal', url: input.url },
+    },
+  };
+}
+
+// To the client, when the studio sends their signed copy back
+export function returnedCopyEmail(input: {
+  projectName: string;
+  clientName: string | null;
+  title: string;
+  filename: string;
+  reason: string;
+  url: string;
+}): { subject: string; content: EmailContent } {
+  return {
+    subject: `We couldn't use your signed copy of ${input.title}`,
+    content: {
+      heading: `We couldn't use your signed copy of ${input.title}`,
+      paragraphs: [
+        greeting(input.clientName),
+        `Thanks for uploading ${input.filename}. We can't use it as the signed copy of ${input.title}; our note is below.`,
+        `${input.title} is waiting for your signature again. You can sign it in the portal, or upload a new signed copy there.`,
+      ],
+      quote: input.reason,
+      action: { label: 'Sign it in the portal', url: input.url },
+      footnotes: [`You're getting this because you're the client on ${input.projectName}.`],
     },
   };
 }
@@ -533,7 +638,8 @@ async function awaitingContracts(context: FeatureContext) {
           db
             .select({ id: contractFile.id })
             .from(contractFile)
-            .where(and(eq(contractFile.contractId, contract.id), eq(contractFile.label, 'client_signed'))),
+            .innerJoin(file, eq(file.id, contractFile.fileId))
+            .where(and(eq(contractFile.contractId, contract.id), eq(contractFile.label, 'client_signed'), isNull(file.removedAt))),
         ),
         projectScope(context),
       ),
@@ -572,11 +678,14 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       })
       .from(contractFile)
       .innerJoin(contract, eq(contract.id, contractFile.contractId))
+      .innerJoin(file, eq(file.id, contractFile.fileId))
       .innerJoin(project, eq(project.id, contract.projectId))
       .innerJoin(uploader, eq(uploader.id, contractFile.uploadedBy))
       .where(
         and(
           eq(contractFile.label, 'client_signed'),
+          // Sent back: no longer news
+          isNull(file.removedAt),
           // A copy the studio attached to a recorded signature is not news to the studio
           ne(uploader.role, 'admin'),
           gte(contractFile.createdAt, sql`now() - interval '7 days'`),

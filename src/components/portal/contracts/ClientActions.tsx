@@ -95,6 +95,8 @@ interface ClientActionsProps {
 export function ClientActions({ projectId, contract, clientName, canSign, limits, announce, statusRef }: ClientActionsProps) {
   const sign = useDialog();
   const [uploadOpen, setUploadOpen] = useState(false);
+  // The document on screen when the upload opened: a copy of a version replaced since is refused
+  const [uploadFor, setUploadFor] = useState<string | null>(null);
   const panelId = useId();
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -134,22 +136,27 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
               <VisuallyHidden>: {contract.title}</VisuallyHidden>
             </Button>
           )}
-          <Button
-            ref={uploadButtonRef}
-            $variant="secondary"
-            aria-expanded={uploadOpen}
-            aria-controls={panelId}
-            onClick={() => setUploadOpen((open) => !open)}
-          >
-            <FiUpload aria-hidden="true" />
-            Upload a signed copy
-          </Button>
+          {original && (
+            <Button
+              ref={uploadButtonRef}
+              $variant="secondary"
+              aria-expanded={uploadOpen}
+              aria-controls={panelId}
+              onClick={() => {
+                setUploadFor(original.fileId);
+                setUploadOpen((open) => !open);
+              }}
+            >
+              <FiUpload aria-hidden="true" />
+              Upload a signed copy
+            </Button>
+          )}
         </div>
       </CardActions>
 
       {/* The form mounts on opening, in the browser, so each opening gets its own id */}
       <InsetPanel id={panelId} ref={panelRef} hidden={!uploadOpen || !awaiting}>
-        {uploadOpen && (
+        {uploadOpen && uploadFor && (
           <ActionForm
             action={uploadSignedCopy}
             onSuccess={(state) => {
@@ -193,6 +200,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             </FormStack>
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="contractId" value={contract.id} />
+            <input type="hidden" name="shownFileId" value={uploadFor} />
             <FreshId name="contractFileId" />
           </ActionForm>
         )}
@@ -222,7 +230,7 @@ export function ClientActions({ projectId, contract, clientName, canSign, limits
             <span>You are signing</span>
             <strong>{original.filename}</strong>
             <span>
-              {formatBytes(original.sizeBytes)} <Dot aria-hidden="true" /> SHA-256 {shortSha(original.sha256)}…
+              {formatBytes(original.sizeBytes)} <Dot aria-hidden="true" /> Fingerprint {shortSha(original.sha256)}…
             </span>
             {original.previewable ? (
               <TextAnchor href={fileHref(original.fileId, true)} target="_blank" rel="noopener noreferrer">

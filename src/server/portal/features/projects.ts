@@ -7,7 +7,7 @@ import { getDb } from '@/db';
 import { activity, milestone, milestoneSignoff, project, user } from '@/db/schema';
 import type { ProjectRecordCounts, ProjectSettingsData } from '@/components/portal/admin/types';
 import type { NextMilestoneView, ProjectCardView } from '@/components/portal/dashboard/types';
-import { adminActor, projectActor } from '../access';
+import { adminActor, projectActor, type Tx } from '../access';
 import { projectScope, sortAttention, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { contractsFeature } from './contracts';
 import { deliverablesFeature } from './deliverables';
@@ -16,7 +16,6 @@ import { invoicesFeature } from './invoices';
 import { milestonesFeature } from './milestones';
 
 type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /* ---------- Shared by the pages and the actions ---------- */
 
@@ -53,7 +52,12 @@ export async function countProjectRecords(db: Db | Tx, projectId: string): Promi
             (SELECT count(*) FROM milestone_signoff WHERE project_id = ${projectId}) AS "signoffs",
             (SELECT count(*) FROM contract WHERE project_id = ${projectId}) AS "contracts",
             (SELECT count(*) FROM contract_signature WHERE project_id = ${projectId}) AS "signatures",
-            (SELECT count(*) FROM file WHERE project_id = ${projectId}) AS "files",
+            -- A copy signed outside the portal is a signature too; one the studio sent back
+            -- (its file removed) is not, as on the Contracts tab
+            (SELECT count(*) FROM contract_file cf JOIN contract c ON c.id = cf.contract_id JOIN file f ON f.id = cf.file_id
+                WHERE c.project_id = ${projectId} AND cf.label IN ('client_signed', 'countersigned') AND f.removed_at IS NULL) AS "signedCopies",
+            -- What the Files tab lists; contract and deliverable files belong to their records
+            (SELECT count(*) FROM file WHERE project_id = ${projectId} AND purpose = 'project_file' AND removed_at IS NULL) AS "sharedFiles",
             (SELECT count(*) FROM message WHERE project_id = ${projectId}) AS "messages",
             (SELECT count(*) FROM invoice WHERE project_id = ${projectId} AND status = 'draft') AS "draftInvoices",
             (SELECT count(*) FROM invoice WHERE project_id = ${projectId} AND status <> 'draft') AS "issuedInvoices",
@@ -69,7 +73,8 @@ export async function countProjectRecords(db: Db | Tx, projectId: string): Promi
         signoffs: read('signoffs'),
         contracts: read('contracts'),
         signatures: read('signatures'),
-        files: read('files'),
+        signedCopies: read('signedCopies'),
+        sharedFiles: read('sharedFiles'),
         messages: read('messages'),
         draftInvoices: read('draftInvoices'),
         issuedInvoices: read('issuedInvoices'),
@@ -79,9 +84,9 @@ export async function countProjectRecords(db: Db | Tx, projectId: string): Promi
 
 /*
  * Locks a project for a change of client or a delete. FOR UPDATE on the project row blocks
- * new rows that reference it (a sign-off, a signature), and FOR SHARE on its deliverables and
- * invoices waits out a decision or a payment already under way, so the record count read
- * afterwards is the one the change acts on.
+ * new rows that reference it (a sign-off, a signature), and FOR SHARE on its deliverables,
+ * invoices and contracts waits out a decision, a payment or a signed copy already under way,
+ * so the record count read afterwards is the one the change acts on.
  */
 export async function lockProjectForRecords(tx: Tx, projectId: string) {
     const [row] = await tx
@@ -92,6 +97,7 @@ export async function lockProjectForRecords(tx: Tx, projectId: string) {
     if (!row) return null;
     await tx.execute(sql`SELECT id FROM deliverable WHERE project_id = ${projectId} FOR SHARE`);
     await tx.execute(sql`SELECT id FROM invoice WHERE project_id = ${projectId} FOR SHARE`);
+    await tx.execute(sql`SELECT id FROM contract WHERE project_id = ${projectId} FOR SHARE`);
     return row;
 }
 

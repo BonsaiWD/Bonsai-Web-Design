@@ -26,6 +26,16 @@ export interface ContractFileView {
   uploadedByName: string | null;
   // The newest original: the document the client reads and signs
   current: boolean;
+  // Studio perspective only: a signed copy the studio sent back, which no longer counts
+  returned?: ReturnedInfo | null;
+}
+
+export interface ReturnedInfo {
+  at: string;
+  // The note sent to the client with it
+  reason: string | null;
+  // The studio member who sent it back, for the studio only
+  byName: string | null;
 }
 
 export interface ContractSignatureView {
@@ -59,7 +69,9 @@ export interface ContractView {
   signedCopy: ContractFileView | null;
   countersigned: ContractFileView | null;
   signature: ContractSignatureView | null;
-  // Every file, newest first
+  // The latest signed copy the studio sent back, while the contract waits for a signature again
+  returnedCopy: (ReturnedInfo & { filename: string; uploadedAt: string }) | null;
+  // Every file, newest first (the client's copy leaves out copies that were sent back)
   files: ContractFileView[];
   // Studio perspective only
   studio?: {

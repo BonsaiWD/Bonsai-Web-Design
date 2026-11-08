@@ -13,6 +13,7 @@ import {
   DayHeading,
   EarlierNote,
   Empty,
+  FormerLabel,
   InternalLabel,
   MessageList,
   NewDivider,
@@ -33,6 +34,7 @@ interface RunData {
   own: boolean;
   you: boolean;
   side: Side;
+  formerClient: boolean;
   internal: boolean;
   authorName: string;
   messages: MessageView[];
@@ -72,13 +74,16 @@ function groupThread(messages: MessageView[], options: { timeZone: string; viewe
     if (run && continues) {
       run.messages.push(m);
     } else {
+      // The viewer's side of the conversation sits on the right. A previous client's messages
+      // (the project has since moved) are no one's own: the current client didn't write them.
+      const own = m.side === options.perspective && !m.formerClient;
       run = {
         key: m.id,
-        // The viewer's side of the conversation sits on the right
-        own: m.side === options.perspective,
+        own,
         // Not while the studio previews the client's view: there, studio messages read as the client sees them
-        you: m.authorId === options.viewerId && m.side === options.perspective,
+        you: own && m.authorId === options.viewerId,
         side: m.side,
+        formerClient: Boolean(m.formerClient),
         internal: m.internal,
         authorName: m.authorName,
         messages: [m],
@@ -119,6 +124,7 @@ function RunItem({ run, timeZone }: { run: RunData; timeZone: string }) {
       <RunColumn $own={run.own}>
         <RunHeader $own={run.own}>
           <strong>{run.you ? 'You' : run.authorName}</strong>
+          {run.formerClient && <FormerLabel>Previous client</FormerLabel>}
           <time dateTime={first.createdAt} title={fullMoment(first.createdAt, timeZone)}>
             {timeOfDay(first.createdAt, timeZone)}
           </time>

@@ -37,7 +37,8 @@ export interface ProjectRecordCounts {
   deliverables: number;
   versions: number;
   contracts: number;
-  files: number;
+  // The Files tab's list: shared files nobody has removed
+  sharedFiles: number;
   messages: number;
   draftInvoices: number;
   activity: number;
@@ -45,6 +46,8 @@ export interface ProjectRecordCounts {
   decidedVersions: number;
   signoffs: number;
   signatures: number;
+  // Signed and countersigned copies uploaded to contracts, not counting ones sent back
+  signedCopies: number;
   issuedInvoices: number;
 }
 

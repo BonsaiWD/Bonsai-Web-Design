@@ -226,6 +226,8 @@ export default function FilesView({
   const removed = files.filter((item) => item.removed);
   const fromClient = listed.filter((item) => item.side === 'client');
   const fromStudio = listed.filter((item) => item.side === 'studio');
+  // Shared by a client the project belonged to before it moved: theirs, not the current client's
+  const fromFormer = listed.filter((item) => item.side === 'former');
 
   const groups = [
     {
@@ -242,11 +244,14 @@ export default function FilesView({
       items: fromStudio,
       empty: studio ? `Nothing shared with ${clientFirst} yet.` : 'Nothing from us yet. Files we share with you appear here.',
     },
+    // Only on a project that moved to another client
+    ...(fromFormer.length ? [{ key: 'former', title: studio ? 'From previous clients' : 'From a previous client', items: fromFormer, empty: '' }] : []),
   ];
 
   // Who uploaded a row, where its group does not already say: which of the two of us, for the
   // studio, or someone other than the viewer on the client's side
   const byline = (item: ProjectFileView): string | null => {
+    if (item.side === 'former') return item.uploadedByName;
     if (item.side === 'studio') return studio ? item.uploadedByName : null;
     if (studio) return item.uploadedByName === clientName ? null : item.uploadedByName;
     return item.mine ? null : item.uploadedByName;
@@ -375,6 +380,12 @@ export default function FilesView({
                     <dt>From the studio</dt>
                     <dd>{fromStudio.length}</dd>
                   </div>
+                  {fromFormer.length > 0 && (
+                    <div>
+                      <dt>From previous clients</dt>
+                      <dd>{fromFormer.length}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Removed</dt>
                     <dd>{removed.length}</dd>

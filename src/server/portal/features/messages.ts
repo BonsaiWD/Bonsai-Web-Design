@@ -54,13 +54,16 @@ function displayName(side: Side, name: string, email: string): string {
 
 interface ThreadOptions {
   projectId: string;
+  // The project's client now: after a move to another client, the previous one's messages
+  // are not the new client's own
+  clientId: string;
   perspective: Perspective;
   // Whose visits decide what is unread: the viewer, or the client while the studio previews
   readerId: string;
   all: boolean;
 }
 
-export async function loadThread({ projectId, perspective, readerId, all }: ThreadOptions): Promise<ThreadView> {
+export async function loadThread({ projectId, clientId, perspective, readerId, all }: ThreadOptions): Promise<ThreadView> {
   const db = getDb();
   const readerSide: Side = perspective;
   const query = db
@@ -105,6 +108,7 @@ export async function loadThread({ projectId, perspective, readerId, all }: Thre
       authorId: row.authorId,
       authorName: displayName(side, row.authorName, row.authorEmail),
       side,
+      formerClient: side === 'client' && row.authorId !== clientId,
       unread: Boolean(row.afterRead) && side !== readerSide && !row.internal,
     };
   });

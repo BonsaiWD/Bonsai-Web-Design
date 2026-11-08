@@ -9,6 +9,7 @@ export function signedRecords(records: ProjectRecordCounts): string[] {
   if (records.decidedVersions) parts.push(plural(records.decidedVersions, 'deliverable decision'));
   if (records.signoffs) parts.push(plural(records.signoffs, 'milestone sign-off'));
   if (records.signatures) parts.push(plural(records.signatures, 'contract signature'));
+  if (records.signedCopies) parts.push(plural(records.signedCopies, 'signed contract copy', 'signed contract copies'));
   if (records.issuedInvoices) parts.push(plural(records.issuedInvoices, 'sent invoice'));
   return parts;
 }
@@ -33,7 +34,7 @@ export function deletableParts(records: ProjectRecordCounts): string[] {
   if (records.contracts) parts.push(plural(records.contracts, 'contract'));
   if (records.draftInvoices) parts.push(plural(records.draftInvoices, 'draft invoice'));
   if (records.messages) parts.push(plural(records.messages, 'message'));
-  if (records.files) parts.push(plural(records.files, 'uploaded file'));
+  if (records.sharedFiles) parts.push(plural(records.sharedFiles, 'shared file'));
   if (records.activity) parts.push(plural(records.activity, 'activity entry', 'activity entries'));
   return parts;
 }

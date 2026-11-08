@@ -195,7 +195,7 @@ export function StudioControls({ deliverable, context, announce, statusRef, onDe
         {open && (
           <SubmitButton variant="quiet" pendingLabel="Sending…">
             <FiMail aria-hidden="true" />
-            Email {clientName} again
+            {studio?.lastEmailedAt || studio?.lastEmailFailed ? `Email ${clientName} again` : `Email ${clientName}`}
           </SubmitButton>
         )}
       </div>

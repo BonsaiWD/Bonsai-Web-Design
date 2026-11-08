@@ -8,8 +8,10 @@ export function shortSha(sha256: string): string {
   return sha256.slice(0, 12);
 }
 
+// What the client ticks: "fingerprint" rather than the algorithm's name, which the record,
+// the receipt and the studio's statement give in full
 export function signStatement(title: string, filename: string, sha256: string): string {
-  return `I have read ${title} (${filename}, SHA-256 ${shortSha(sha256)}…) and agree to its terms.`;
+  return `I have read ${title} (${filename}, fingerprint ${shortSha(sha256)}…) and agree to its terms.`;
 }
 
 export function studioSignStatement(options: {

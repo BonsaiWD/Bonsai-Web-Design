@@ -5,9 +5,11 @@ import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
 import { activity, file, project, rateLimit, user } from '@/db/schema';
 import type { ProjectFileView } from '@/components/portal/files/types';
+import { plural } from '@/lib/portal-format';
 import { isUuid } from '../access';
+import { ActionError } from '../actions';
 import { projectScope, type AttentionItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
-import { INLINE_TYPES } from '../storage';
+import { INLINE_TYPES, MAX_UPLOAD_BYTES } from '../storage';
 
 /* ---------- Activity ----------
    The file table has no column for the note an uploader writes, so it travels in the
@@ -46,7 +48,14 @@ export const fileAnchor = (fileId: string) => `file-${fileId}`;
 const uploader = alias(user, 'uploader');
 const remover = alias(user, 'remover');
 
-export async function loadProjectFiles(projectId: string, perspective: Perspective, viewerId: string): Promise<ProjectFileView[]> {
+// clientId is the project's client now: after a move to another client, what the previous one
+// shared is theirs, not the new client's ("From you")
+export async function loadProjectFiles(
+  projectId: string,
+  perspective: Perspective,
+  viewerId: string,
+  clientId: string,
+): Promise<ProjectFileView[]> {
   const db = getDb();
   const studio = perspective === 'studio';
 
@@ -101,7 +110,7 @@ export async function loadProjectFiles(projectId: string, perspective: Perspecti
       sizeBytes: row.sizeBytes,
       previewable: INLINE_TYPES.has(row.contentType),
       uploadedAt: row.createdAt.toISOString(),
-      side: row.uploaderRole === 'admin' ? 'studio' : 'client',
+      side: row.uploaderRole === 'admin' ? 'studio' : row.uploadedBy === clientId ? 'client' : 'former',
       // Which of the two of us uploaded it matters to the studio only
       uploadedByName: studio || row.uploaderRole !== 'admin' ? row.uploaderName : 'the studio',
       mine: row.uploadedBy === viewerId,
@@ -140,6 +149,100 @@ export async function releaseUpload(uploadId: string): Promise<void> {
   await getDb()
     .delete(rateLimit)
     .where(eq(rateLimit.key, uploadKey(uploadId)));
+}
+
+/* ---------- Client upload limits ----------
+   How much one client can upload in a day, across the Files tab and signed contract copies,
+   so a looping script or a stolen session can't fill storage. One rate_limit row per measure,
+   as in auth.ts: last_request holds when the 24-hour window started. Studio uploads are not
+   limited. */
+
+export const UPLOAD_QUOTA = { files: 50, bytes: 100 * 1024 * 1024, windowMs: 24 * 60 * 60 * 1000 } as const;
+
+const quotaKey = (measure: 'files' | 'bytes', userId: string) => `portal:upload-quota:${measure}:${userId}`;
+
+export interface QuotaClaim {
+  userId: string;
+  bytes: number;
+  at: number;
+}
+
+function quotaRefusal(waitMs: number): string {
+  const minutes = Math.max(1, Math.ceil(waitMs / 60_000));
+  const when = minutes < 60 ? `in ${plural(minutes, 'minute')}` : `in about ${plural(Math.max(1, Math.round(minutes / 60)), 'hour')}`;
+  const mb = Math.round(UPLOAD_QUOTA.bytes / (1024 * 1024));
+  return `You've reached the upload limit for today (${UPLOAD_QUOTA.files} files or ${mb} MB a day). You can upload more ${when}. If it can't wait, send us a link in Messages.`;
+}
+
+// Counts an upload before it is stored, or refuses it with when the client can try again.
+// Both measures move together: a refusal rolls the transaction back, so it counts nothing.
+export async function claimUploadQuota(userId: string, bytes: number): Promise<QuotaClaim> {
+  const now = Date.now();
+  const expired = now - UPLOAD_QUOTA.windowMs;
+  // storeUpload refuses anything over the per-file limit (and the claim is then refunded), so
+  // counting at most that keeps the number a small integer
+  const size = Math.min(Math.max(0, Math.ceil(bytes)), MAX_UPLOAD_BYTES);
+  await getDb().transaction(async (tx) => {
+    let resetAt = 0;
+    const measures = [
+      ['files', 1, UPLOAD_QUOTA.files],
+      ['bytes', size, UPLOAD_QUOTA.bytes],
+    ] as const;
+    for (const [measure, amount, max] of measures) {
+      const result = await tx.execute<{ count: number; last_request: string }>(sql`
+        INSERT INTO rate_limit (id, key, count, last_request)
+        VALUES (gen_random_uuid()::text, ${quotaKey(measure, userId)}, ${amount}::int, ${now})
+        ON CONFLICT (key) DO UPDATE SET
+          count = CASE WHEN rate_limit.last_request < ${expired} THEN ${amount}::int ELSE rate_limit.count + ${amount}::int END,
+          last_request = CASE WHEN rate_limit.last_request < ${expired} THEN ${now} ELSE rate_limit.last_request END
+        RETURNING count, last_request`);
+      const row = result.rows[0];
+      if (row && Number(row.count) > max) resetAt = Math.max(resetAt, Number(row.last_request) + UPLOAD_QUOTA.windowMs);
+    }
+    if (resetAt) throw new ActionError(quotaRefusal(resetAt - now));
+  });
+  return { userId, bytes: size, at: now };
+}
+
+// An upload that was refused or failed after its claim gives it back (within the same window)
+export async function refundUploadQuota(claim: QuotaClaim): Promise<void> {
+  await getDb()
+    .execute(
+      sql`UPDATE rate_limit
+          SET count = greatest(count - CASE WHEN key = ${quotaKey('files', claim.userId)} THEN 1 ELSE ${claim.bytes}::int END, 0)
+          WHERE key IN (${quotaKey('files', claim.userId)}, ${quotaKey('bytes', claim.userId)}) AND last_request <= ${claim.at}`,
+    )
+    .catch((error) => console.error('[portal files] upload quota refund', error));
+}
+
+/* ---------- Upload emails ----------
+   A client's uploads email the studio at most once per project every 10 minutes; later ones
+   land in the activity feed and the dashboard's "new files" item. The claim is one conditional
+   upsert, so two uploads at the same moment cannot both send. */
+
+const UPLOAD_EMAIL_GAP_MS = 10 * 60 * 1000;
+const uploadEmailKey = (projectId: string) => `portal:upload-email:${projectId}`;
+
+export async function claimUploadEmail(projectId: string): Promise<boolean> {
+  const now = Date.now();
+  const claimed = await getDb()
+    .insert(rateLimit)
+    .values({ id: randomUUID(), key: uploadEmailKey(projectId), count: 1, lastRequest: now })
+    .onConflictDoUpdate({
+      target: rateLimit.key,
+      set: { count: sql`${rateLimit.count} + 1`, lastRequest: now },
+      setWhere: sql`${rateLimit.lastRequest} <= ${now - UPLOAD_EMAIL_GAP_MS}`,
+    })
+    .returning({ id: rateLimit.id });
+  return claimed.length > 0;
+}
+
+// An email that did not go out should not hold back the next one
+export async function releaseUploadEmail(projectId: string): Promise<void> {
+  await getDb()
+    .delete(rateLimit)
+    .where(eq(rateLimit.key, uploadEmailKey(projectId)))
+    .catch(() => undefined);
 }
 
 /* ---------- Attention ---------- */
