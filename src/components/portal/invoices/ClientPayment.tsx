@@ -3,6 +3,7 @@
 import { useId, type RefObject } from 'react';
 import styled from 'styled-components';
 import { reportPayment } from '@/app/portal/_actions/invoices';
+import { NoteBlock } from '@/components/portal/deliverables/parts';
 import { dueInfo, formatMoney } from '@/lib/portal-format';
 import {
   Button,
@@ -29,7 +30,7 @@ import {
 import { HowToPay } from './HowToPay';
 import { invoiceStatus, isOverdue, METHOD_LABELS, METHOD_ORDER } from './labels';
 import { Amount, Inset } from './parts';
-import type { InvoiceDetail, PaymentMethodView } from './types';
+import type { InvoiceDetail, NotReceivedView, PaymentMethodView } from './types';
 
 const RecordText = styled.p`
   ${type.body}
@@ -61,6 +62,34 @@ function MethodField({ methods }: { methods: PaymentMethodView[] }) {
         </Select>
       )}
     </Field>
+  );
+}
+
+// The client reported a payment, and the studio has not seen it arrive: why it is open again
+function NotReceived({ record }: { record: NotReceivedView }) {
+  const how = record.method ? ` (${record.method}${record.reference ? `, ${record.reference}` : ''})` : '';
+  return (
+    <Inset>
+      <RecordText>
+        We haven&apos;t received the payment you reported
+        {record.reportedAt ? (
+          <>
+            {' '}
+            on <LocalTime value={record.reportedAt} />
+          </>
+        ) : null}
+        {how}, so this invoice is open again.
+      </RecordText>
+      {record.note && (
+        <NoteBlock>
+          <h5>Our note</h5>
+          <p>{record.note}</p>
+        </NoteBlock>
+      )}
+      <Meta>
+        Reopened <LocalTime value={record.at} />. Once you&apos;ve checked, pay as below and tell us again, or message us if it&apos;s already gone.
+      </Meta>
+    </Inset>
   );
 }
 
@@ -109,6 +138,7 @@ export function ClientPayment({ projectId, invoice, today, methods, canPay, clie
 
           {invoice.status === 'sent' && (
             <>
+              {invoice.notReceived && <NotReceived record={invoice.notReceived} />}
               <Divider />
               <HowToPay methods={methods} invoiceNumber={invoice.number} />
               <Stack $gap={3} data-print-hide>

@@ -39,11 +39,15 @@ function emailAllowed(to: string): boolean {
     return to.toLowerCase().endsWith('@bonsaiwebdesign.com');
 }
 
+export type EmailStatus = 'sent' | 'failed' | 'skipped' | null;
+
 interface ActivityInput {
     projectId: string;
     actorId: string | null;
     kind: string;
-    summary: string;
+    // A row about an email can depend on whether it went (emailedSummary, receiptSummary),
+    // so the feed never says "Emailed" above a failed one
+    summary: string | ((emailStatus: EmailStatus) => string);
     // A tab inside the project, such as "deliverables"
     target?: string;
     visibility?: 'everyone' | 'studio';
@@ -55,8 +59,8 @@ interface ActivityInput {
  * can fail without undoing anything, and the failure is kept on the activity row, where the
  * studio's dashboard shows it.
  */
-export async function recordActivity(input: ActivityInput): Promise<{ emailStatus: 'sent' | 'failed' | 'skipped' | null }> {
-    let emailStatus: 'sent' | 'failed' | 'skipped' | null = null;
+export async function recordActivity(input: ActivityInput): Promise<{ emailStatus: EmailStatus }> {
+    let emailStatus: EmailStatus = null;
     if (input.email) {
         const { to, subject, content, replyTo } = input.email;
         if (!emailAllowed(to)) {
@@ -80,7 +84,7 @@ export async function recordActivity(input: ActivityInput): Promise<{ emailStatu
                 projectId: input.projectId,
                 actorId: input.actorId,
                 kind: input.kind,
-                summary: input.summary,
+                summary: typeof input.summary === 'function' ? input.summary(emailStatus) : input.summary,
                 target: input.target ?? null,
                 visibility: input.visibility ?? 'everyone',
                 emailTo: input.email?.to ?? null,
@@ -91,6 +95,16 @@ export async function recordActivity(input: ActivityInput): Promise<{ emailStatu
         console.error('[portal activity]', error);
     }
     return { emailStatus };
+}
+
+// "Emailed Jane Doe again about Homepage design", or "Could not email …" when it did not go
+export function emailedSummary(rest: string): (emailStatus: EmailStatus) => string {
+    return (emailStatus) => `${emailStatus === 'sent' ? 'Emailed' : 'Could not email'} ${rest}`;
+}
+
+// Every receipt row: "Receipt emailed to <name>: <what>", or "Receipt not emailed to …"
+export function receiptSummary(name: string, what: string): (emailStatus: EmailStatus) => string {
+    return (emailStatus) => `Receipt ${emailStatus === 'sent' ? 'emailed' : 'not emailed'} to ${name}: ${what}`;
 }
 
 // Emails to the studio name the project in one pattern, since a client can have several:
@@ -116,7 +130,7 @@ export function textFromSummary(summary: string, label: 'Note' | 'Reason', after
 
 // Appended to a success message when the email part failed. `kind` is the activity kind the
 // email was recorded with: only kinds the dashboard flags promise that it is flagged there.
-export function emailNote(status: 'sent' | 'failed' | 'skipped' | null, who: string, kind: string): string {
+export function emailNote(status: EmailStatus, who: string, kind: string): string {
     if (status === 'failed') {
         return isFlaggedEmailKind(kind) ? ` The email to ${who} could not be sent; it is flagged on your dashboard.` : ` The email to ${who} could not be sent.`;
     }

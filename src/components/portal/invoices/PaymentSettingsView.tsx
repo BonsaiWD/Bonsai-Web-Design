@@ -20,6 +20,7 @@ import {
   MetaText,
   Panel,
   PanelHeader,
+  paymentDetail,
   PHONE,
   Rows,
   sansHeading,
@@ -97,9 +98,16 @@ const Footer = styled.div`
   }
 `;
 
-// Two or four lines fit these details; the default box is sized for longer notes
+// Two or four lines fit these details; the default box is sized for longer notes. Typed as
+// they will read on the invoice: monospace, with no character swapped for another.
 const DetailsInput = styled(Textarea)`
   min-height: 0;
+  ${paymentDetail}
+
+  /* The prompt is not a detail: it stays in the portal's face */
+  &::placeholder {
+    font-family: ${({ theme }) => theme.fonts.main};
+  }
 `;
 
 const Unsaved = styled.span`

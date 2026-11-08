@@ -13,6 +13,18 @@ export interface InvoiceLine {
   amountCents: number;
 }
 
+// The studio marked a reported payment "Not received yet", and the invoice is open again
+export interface NotReceivedView {
+  at: string;
+  // When the client reported it
+  reportedAt: string | null;
+  // As the client gave them: the method's label and their reference
+  method: string | null;
+  reference: string | null;
+  // The studio's note to the client
+  note: string | null;
+}
+
 // One row of the invoice list
 export interface InvoiceSummary {
   id: string;
@@ -42,6 +54,8 @@ export interface InvoiceDetail extends InvoiceSummary {
   // What the client said they sent, while the studio checks it arrived
   reported: { method: PaymentMethod; reference: string | null; at: string } | null;
   paid: { on: string; method: PaymentMethod; reference: string | null } | null;
+  // Open again after a reported payment did not arrive
+  notReceived: NotReceivedView | null;
   // Studio perspective only
   studio?: {
     // Changes on every save, so an edit or a send from a stale page is refused

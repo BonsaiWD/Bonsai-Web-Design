@@ -12,7 +12,7 @@ export interface MilestoneFieldValues {
 }
 
 // The fields shared by the add dialog and each row's inline editor
-export default function MilestoneFields({ saved, clientFirst }: { saved: MilestoneFieldValues; clientFirst: string }) {
+export default function MilestoneFields({ saved, clientName }: { saved: MilestoneFieldValues; clientName: string }) {
   return (
     <>
       <Field label="Title" name="title" saved={saved.title}>
@@ -34,7 +34,7 @@ export default function MilestoneFields({ saved, clientFirst }: { saved: Milesto
         name="description"
         optional
         saved={saved.description}
-        hint={`What this step covers and what ${clientFirst} can expect from it.`}
+        hint={`What this step covers and what ${clientName} can expect from it.`}
       >
         {({ id, name, describedBy, invalid, defaultValue }) => (
           <Textarea
@@ -77,9 +77,9 @@ export default function MilestoneFields({ saved, clientFirst }: { saved: Milesto
       <Checkbox
         name="requiresSignoff"
         savedChecked={saved.requiresSignoff}
-        hint={`${clientFirst} is asked to initial it once it's Waiting on client and any linked review is approved. Ask for sign-off on the milestone also emails them.`}
+        hint={`${clientName} is asked to initial it once it's Waiting on client and any linked review is approved. Ask for sign-off on the milestone also emails them.`}
       >
-        Needs {clientFirst}&apos;s initials when done
+        Needs {clientName}&apos;s initials when done
       </Checkbox>
     </>
   );

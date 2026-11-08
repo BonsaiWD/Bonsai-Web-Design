@@ -26,7 +26,7 @@ import {
   VERSION_EMAIL_GAP_MS,
   versionEmailKey,
 } from '@/server/portal/features/deliverables';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
+import { emailedSummary, emailNote, portalOrigin, receiptSummary, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
 import { claimRateSlot, releaseRateSlot } from '@/server/portal/throttle';
@@ -543,7 +543,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
       projectId,
       actorId: actor.user.id,
       kind: deliverableKind('reminded', locked.deliverableId),
-      summary: `Emailed ${clientName}${again ? ' again' : ''} about ${versionName(locked.title, version.version)}`,
+      summary: emailedSummary(`${clientName}${again ? ' again' : ''} about ${versionName(locked.title, version.version)}`),
       target: 'deliverables',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -776,7 +776,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: deliverableKind('receipt', result.deliverableId),
-        summary: `Receipt emailed to ${clientName}: approval of ${versionName(result.title, result.version.version)}`,
+        summary: receiptSummary(clientName, `approval of ${versionName(result.title, result.version.version)}`),
         target: 'deliverables',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },
@@ -877,7 +877,7 @@ export async function requestChanges(_prev: ActionState, formData: FormData): Pr
         projectId,
         actorId: actor.user.id,
         kind: deliverableKind('receipt', result.deliverableId),
-        summary: `Receipt emailed to ${clientName}: changes requested on ${versionName(result.title, result.version.version)}`,
+        summary: receiptSummary(clientName, `changes requested on ${versionName(result.title, result.version.version)}`),
         target: 'deliverables',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },

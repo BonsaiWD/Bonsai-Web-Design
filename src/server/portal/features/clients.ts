@@ -160,12 +160,59 @@ function listNames(names: string[]): string {
     return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
+// 'new': a first invite. 'address_changed': an existing client's sign-in address changed, so
+// the email to the new address says so rather than welcoming them to a portal they already use.
+export type InviteReason = 'new' | 'address_changed';
+
+export const EMAIL_CHANGED_KIND = 'client.email_changed';
+
+export const emailChangedSummary = (name: string, from: string, to: string) => `${name}'s email changed from ${from} to ${to}`;
+
+/*
+ * Which invite Send invite sends: the one Change email would have sent, until they sign in
+ * with the new address. Signing in proves an address (emailVerified) and a change unproves it,
+ * so an unproven address is a changed one when they have signed in before, or when one of
+ * their projects records the change to it. Anything else gets the first invite.
+ */
+export async function inviteReasonFor(client: {
+    id: string;
+    email: string;
+    emailVerified: boolean;
+    lastSignInAt: Date | null;
+}): Promise<InviteReason> {
+    if (client.emailVerified) return 'new';
+    if (client.lastSignInAt) return 'address_changed';
+    const changes = await getDb()
+        .select({ summary: activity.summary })
+        .from(activity)
+        .innerJoin(project, eq(project.id, activity.projectId))
+        .where(and(eq(project.clientId, client.id), eq(activity.kind, EMAIL_CHANGED_KIND)));
+    return changes.some((row) => row.summary.endsWith(` to ${client.email}`)) ? 'address_changed' : 'new';
+}
+
 export async function inviteEmail(
     client: { name: string | null; email: string },
     projectNames: string[],
+    reason: InviteReason = 'new',
 ): Promise<{ subject: string; content: EmailContent }> {
     const name = firstName(client.name);
+    // The sign-in page with the address filled in: they ask for their link from there
     const signIn = `${await portalOrigin()}/portal/sign-in?email=${encodeURIComponent(client.email)}`;
+    if (reason === 'address_changed') {
+        return {
+            subject: `Your sign-in address is now ${client.email}`,
+            content: {
+                heading: 'Your portal sign-in address has changed',
+                paragraphs: [
+                    name ? `Hi ${name},` : 'Hello,',
+                    `We've changed the address you use for your Bonsai Web Design client portal${projectNames.length ? ` (${listNames(projectNames)})` : ''}. From now on, sign in with ${client.email}.`,
+                    `${projectNames.length ? 'Your projects, messages and files are all still there. ' : ''}We email you a link each time you sign in, so there's no password to remember.`,
+                ],
+                action: { label: 'Sign in with this address', url: signIn },
+                footnotes: ["If this isn't your address, you can ignore this email. Nothing happens until someone signs in."],
+            },
+        };
+    }
     return {
         subject: 'Your client portal is ready',
         content: {

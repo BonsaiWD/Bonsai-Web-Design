@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { getDb } from '@/db';
 import { message } from '@/db/schema';
 import { projectHref } from '@/components/portal/tabs';
-import { firstName } from '@/lib/portal-format';
 import { isUuid, projectActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
@@ -95,7 +94,6 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     }
 
     const clientName = actor.project.clientName || actor.project.clientEmail;
-    const clientFirst = firstName(actor.project.clientName) ?? clientName;
     const to = fromStudio ? actor.project.clientEmail : STUDIO_EMAIL;
     const activityBase = { projectId, actorId: actor.user.id, kind: MESSAGE_KIND, summary: `${authorName} sent a message`, target: 'messages' };
 
@@ -109,7 +107,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
       await recordActivity(activityBase);
       return done(
         fromStudio
-          ? `Sent. ${clientFirst} had an email about this conversation in the last 10 minutes, so we didn't send another.`
+          ? `Sent. ${clientName} had an email about this conversation in the last 10 minutes, so we didn't send another.`
           : CLIENT_SENT,
       );
     }
@@ -122,7 +120,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     if (emailStatus !== 'sent' && slot) await releaseRateSlot(slot);
 
     if (!fromStudio) return done(CLIENT_SENT);
-    return done(emailStatus === 'sent' ? `Sent. We emailed ${clientFirst}.` : `Sent.${emailNote(emailStatus, clientFirst, MESSAGE_KIND)}`);
+    return done(emailStatus === 'sent' ? `Sent. We emailed ${clientName}.` : `Sent.${emailNote(emailStatus, clientName, MESSAGE_KIND)}`);
   });
 }
 

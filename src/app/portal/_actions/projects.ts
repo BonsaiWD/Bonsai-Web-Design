@@ -31,7 +31,8 @@ const stage = z.enum(projectStage.enumValues, { error: 'Choose a stage.' });
 const targetLaunch = fields.optionalDate.refine((value) => !value || (value >= '2000-01-01' && value <= '2100-12-31'), {
     error: 'Choose a date between 2000 and 2100.',
 });
-const clientId = z.string().trim().min(1, { error: 'Choose a client.' }).max(200);
+// A select left on its placeholder sends no field at all, so the type check needs the message too
+const clientId = z.string({ error: 'Choose a client.' }).trim().min(1, { error: 'Choose a client.' }).max(200);
 
 function refresh(projectId?: string) {
     if (projectId) revalidatePath(projectHref(projectId), 'layout');

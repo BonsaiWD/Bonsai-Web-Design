@@ -5,7 +5,7 @@ import { getDb } from '@/db';
 import { deliverable, deliverableVersion, milestone, milestoneSignoff, project, rateLimit, user } from '@/db/schema';
 import { asksForInitials } from '@/components/portal/milestones/signoff';
 import type { LinkedDeliverable, MilestoneView, SignoffRecord } from '@/components/portal/milestones/types';
-import { daysBetween, firstName } from '@/lib/portal-format';
+import { daysBetween } from '@/lib/portal-format';
 import { type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
 import { STUDIO_NAME } from '../notify';
@@ -22,8 +22,8 @@ export { asksForInitials };
 
 /* ---------- Activity kinds ----------
    "milestone.<event>:<milestoneId>", like the other features' kinds, so a failed email can
-   link to its milestone and clear once a later email of the same kind reaches the same
-   person. Rows written before used "milestone_<event>" with no id; both match 'milestone%'. */
+   link to its milestone and clear once a later email about the same milestone reaches the
+   client. Rows written before used "milestone_<event>" with no id; both match 'milestone%'. */
 
 const KINDS = {
     added: 'milestone.added',
@@ -238,9 +238,8 @@ const initialsDue = (row: ScopedMilestone) =>
 // What a milestone that is waiting on the client is waiting for, in the studio's words
 function waitingDetail(row: ScopedMilestone): string {
     const client = row.clientName || row.clientEmail;
-    const first = firstName(row.clientName) ?? client;
-    if (row.reviewTitle) return `Waiting on ${first} to review ${row.reviewTitle}`;
-    if (initialsDue(row)) return `Waiting on ${first} to initial`;
+    if (row.reviewTitle) return `Waiting on ${client} to review ${row.reviewTitle}`;
+    if (initialsDue(row)) return `Waiting on ${client} to initial`;
     return `Waiting on ${client}`;
 }
 

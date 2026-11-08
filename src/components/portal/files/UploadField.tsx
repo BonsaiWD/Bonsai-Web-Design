@@ -54,7 +54,10 @@ export function UploadField({
   const [pickedAfter, setPickedAfter] = useState<number | null>(null);
   const [tooLarge, setTooLarge] = useState<{ name: string; size: number } | null>(null);
   const warningId = useId();
-  const cleared = sent && pickedAfter !== state?.at ? sent : null;
+  // Refused for being the wrong type or too big: the error says why, and choosing the same file
+  // again would not help
+  const refused = Boolean(state && !state.ok && state.fieldErrors?.[name]);
+  const cleared = sent && pickedAfter !== state?.at && !refused ? sent : null;
   const limit = `${Math.round(maxUploadBytes / (1024 * 1024))} MB`;
 
   return (

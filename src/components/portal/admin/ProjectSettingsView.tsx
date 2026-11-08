@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { deleteProject, reassignProject, updateProject } from '@/app/portal/_actions/projects';
-import { firstName } from '@/lib/portal-format';
 import {
   ActionForm,
   Button,
@@ -102,20 +101,19 @@ const clientLabel = (client: ClientOption) => [client.name, client.company].filt
 /* ---------- Details ---------- */
 
 function DetailsForm({ settings }: { settings: ProjectSettingsData }) {
-  const clientFirst = firstName(settings.client.name) ?? settings.client.name;
   return (
     <Panel aria-labelledby="settings-details">
       <Stack $gap={6}>
         <SectionHead>
           <H2 id="settings-details">Project details</H2>
-          <Meta>A change of stage or launch date shows on {clientFirst}&apos;s timeline.</Meta>
+          <Meta>A change of stage or launch date shows on {settings.client.name}&apos;s timeline.</Meta>
         </SectionHead>
         {/* Unsaved edits ask before the tabs, the shell's links or a reload discard them */}
         <ActionForm action={updateProject}>
           <FormStack>
             <FreshFields saved={settings.version}>
               <ProjectFields
-                clientFirst={clientFirst}
+                clientName={settings.client.name}
                 saved={{
                   name: settings.name,
                   summary: settings.summary ?? '',
@@ -220,8 +218,8 @@ function ReassignSteps({ settings, others }: { settings: ProjectSettingsData; ot
       {choice && (
         <FormStack>
           <Question>
-            Move {settings.name} from {from} to {choice.name}? {firstName(choice.name) ?? choice.name} will see everything on it, including{' '}
-            {firstName(from) ?? from}&apos;s messages and files, and {firstName(from) ?? from} will no longer see it.
+            Move {settings.name} from {from} to {choice.name}? {choice.name} will see everything on it, including{' '}
+            {from}&apos;s messages and files, and {from} will no longer see it.
           </Question>
           <Actions>
             <SubmitButton variant="secondary" pendingLabel="Moving…">
@@ -235,7 +233,7 @@ function ReassignSteps({ settings, others }: { settings: ProjectSettingsData; ot
                 requestAnimationFrame(() => continueRef.current?.focus());
               }}
             >
-              Keep with {firstName(from) ?? from}
+              Keep with {from}
             </Button>
             <FormMessage />
           </Actions>

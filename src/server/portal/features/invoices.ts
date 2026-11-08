@@ -10,6 +10,7 @@ import type {
   InvoiceHistoryEntry,
   InvoiceLine,
   InvoiceSummary,
+  NotReceivedView,
   PaymentMethodView,
   Perspective,
 } from '@/components/portal/invoices/types';
@@ -18,7 +19,7 @@ import type { EmailContent } from '@/lib/email';
 import { firstName, formatDate, formatMoney, formatUtcMoment } from '@/lib/portal-format';
 import { isUuid } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
-import { portalOrigin, STUDIO_NAME, studioSubject } from '../notify';
+import { portalOrigin, STUDIO_NAME, studioSubject, summaryWithText, textFromSummary } from '../notify';
 import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker } from '../kinds';
 import { failedEmails, failedEmailTitle } from './failed-emails';
 
@@ -58,6 +59,67 @@ export const invoiceKind = kindMaker(KINDS);
 
 // Emails that go to the client (the dashboard flags their failures: FLAGGED_EMAIL_KINDS.invoice)
 const CLIENT_EMAIL_KINDS = [KINDS.sent, KINDS.reminded, KINDS.notReceived, KINDS.paid];
+
+/* ---------- A reported payment that did not arrive ----------
+   The studio's note to the client has no column: it travels at the end of the not_received
+   row's summary ("… so it is open again. Note: <note>"), a row everyone on the project sees,
+   so the client's invoice page, both timelines and the email all carry the same words. */
+
+const NOT_RECEIVED_TAIL = ' has not arrived yet, so it is open again';
+
+// The client's reference comes before the tail, so one that contains the tail itself could
+// pass its own words off as the studio's note; it is kept without it
+function withoutTail(reference: string | null): string | null {
+  let text = reference;
+  while (text?.includes(NOT_RECEIVED_TAIL)) text = text.split(NOT_RECEIVED_TAIL).join(' ');
+  return text?.trim() || null;
+}
+
+export function notReceivedSummary(
+  number: string,
+  reported: { method: PaymentMethod | null; reference: string | null },
+  note: string,
+): string {
+  const reference = withoutTail(reported.reference);
+  const how = reported.method ? ` (${METHOD_LABELS[reported.method]}${reference ? `, ${reference}` : ''})` : '';
+  return summaryWithText(`The payment reported for ${number}${how}${NOT_RECEIVED_TAIL}`, 'Note', note);
+}
+
+// What notReceivedSummary wrote, read back: the method and reference as the client gave them
+function readNotReceived(summary: string, number: string): Pick<NotReceivedView, 'method' | 'reference' | 'note'> {
+  const note = textFromSummary(summary, 'Note', NOT_RECEIVED_TAIL);
+  const head = `The payment reported for ${number}`;
+  const tail = summary.indexOf(NOT_RECEIVED_TAIL);
+  const how = summary.startsWith(head) && tail >= head.length ? summary.slice(head.length, tail) : '';
+  // " (Bitcoin, txid-1)": no method label has ", " in it, so the first one ends the method
+  const inner = how.startsWith(' (') && how.endsWith(')') ? how.slice(2, -1) : '';
+  const comma = inner.indexOf(', ');
+  return {
+    method: inner ? (comma >= 0 ? inner.slice(0, comma) : inner) : null,
+    reference: comma >= 0 ? inner.slice(comma + 2) || null : null,
+    note,
+  };
+}
+
+const reportKinds = (invoiceId: string) => [`${KINDS.reported}:${invoiceId}`, `${KINDS.notReceived}:${invoiceId}`];
+
+// While an invoice is open again after "Not received yet": when and why, for its page and its
+// reminders. Null once the client reports another payment (or never reported one).
+export async function loadNotReceived(projectId: string, invoice: { id: string; number: string }): Promise<NotReceivedView | null> {
+  const rows = await getDb()
+    .select({ kind: activity.kind, summary: activity.summary, at: activity.createdAt })
+    .from(activity)
+    .where(and(eq(activity.projectId, projectId), inArray(activity.kind, reportKinds(invoice.id))))
+    .orderBy(desc(activity.createdAt), desc(activity.id))
+    .limit(2);
+  const [latest, before] = rows;
+  if (!latest?.kind.startsWith(`${KINDS.notReceived}:`)) return null;
+  return {
+    at: latest.at.toISOString(),
+    reportedAt: before?.kind.startsWith(`${KINDS.reported}:`) ? before.at.toISOString() : null,
+    ...readNotReceived(latest.summary, invoice.number),
+  };
+}
 
 /* ---------- Email throttle ----------
    One email to the client per invoice every ten minutes (claimRateSlot), so a double click or
@@ -168,6 +230,7 @@ export const loadInvoice = cache(async (projectId: string, invoiceId: string, pe
         ? { method: row.reportedMethod, reference: row.reportedReference, at: row.reportedAt.toISOString() }
         : null,
     paid: row.status === 'paid' && row.paidOn && row.paidMethod ? { on: row.paidOn, method: row.paidMethod, reference: row.paidReference } : null,
+    notReceived: row.status === 'sent' ? await loadNotReceived(projectId, row) : null,
   };
   if (!studio) return detail;
 
@@ -269,7 +332,7 @@ export function sentEmail(facts: InvoiceFacts): Email {
   };
 }
 
-export function reminderEmail(facts: InvoiceFacts, today: string): Email {
+export function reminderEmail(facts: InvoiceFacts, today: string, notReceived: NotReceivedView | null = null): Email {
   const overdue = Boolean(facts.dueOn && facts.dueOn < today);
   return {
     subject: overdue ? `Invoice ${facts.number} is past due` : `Reminder: invoice ${facts.number}`,
@@ -281,8 +344,11 @@ export function reminderEmail(facts: InvoiceFacts, today: string): Email {
           ? `Invoice ${facts.number} for ${facts.title} was due ${formatDate(facts.dueOn)}, and we haven't received the payment yet.`
           : `This is a reminder about invoice ${facts.number} for ${facts.title}${facts.dueOn ? `, due ${formatDate(facts.dueOn)}` : ''}.`,
         `Amount due: ${formatMoney(facts.totalCents)}`,
-        "If you've already paid, thank you: tell us in the portal and we'll match it up.",
+        ...(notReceived
+          ? [`We still haven't received the payment you told us about${notReceived.method ? ` (${notReceived.method})` : ''}.${notReceived.note ? ' Our note:' : ''}`]
+          : ["If you've already paid, thank you: tell us in the portal and we'll match it up."]),
       ],
+      quote: notReceived?.note ?? undefined,
       action: { label: 'View and pay the invoice', url: facts.url },
     },
   };
@@ -357,6 +423,12 @@ const scopedOpenInvoices = cache(async (context: FeatureContext) => {
       dueOn: invoice.dueOn,
       reportedAt: invoice.reportedAt,
       reportedMethod: invoice.reportedMethod,
+      // When it went to the client: the issue date is set while drafting, often days before
+      sentAt: sql<Date | null>`(select max(${activity.createdAt}) from ${activity} where ${activity.projectId} = ${invoice.projectId} and ${activity.kind} = ${`${KINDS.sent}:`} || ${invoice.id})`.mapWith(
+        activity.createdAt,
+      ),
+      // Whether the studio last turned a reported payment down ("Not received yet")
+      reopened: sql<boolean>`coalesce((select ${activity.kind} like ${`${KINDS.notReceived}:%`} from ${activity} where ${activity.projectId} = ${invoice.projectId} and ${activity.kind} in (${`${KINDS.reported}:`} || ${invoice.id}, ${`${KINDS.notReceived}:`} || ${invoice.id}) order by ${activity.createdAt} desc limit 1), false)`,
       projectId: project.id,
       projectName: project.name,
       clientName: user.name,
@@ -390,9 +462,9 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
         ...base(row),
         key: `invoice-due:${row.id}`,
         title: `Pay invoice ${row.number} (${formatMoney(row.totalCents)})`,
-        detail: row.title,
+        detail: row.reopened ? `We haven't received the payment you reported. Open the invoice for our note.` : row.title,
         due: row.dueOn,
-        since: row.issuedOn ? `${row.issuedOn}T00:00:00.000Z` : null,
+        since: row.sentAt?.toISOString() ?? (row.issuedOn ? `${row.issuedOn}T00:00:00.000Z` : null),
         tone: isOverdue(row.status, row.dueOn, context.today) ? 'alert' : 'action',
       });
     }
@@ -415,7 +487,7 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
       items.push({
         ...base(row),
         key: `invoice-overdue:${row.id}`,
-        title: `Waiting on ${firstName(client) ?? client} to pay ${row.number}`,
+        title: `Waiting on ${client} to pay ${row.number}`,
         detail: `${formatMoney(row.totalCents)} · ${row.title}`,
         due: row.dueOn,
         tone: 'alert',

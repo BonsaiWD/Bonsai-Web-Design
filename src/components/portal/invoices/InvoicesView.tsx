@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import styled from 'styled-components';
 import { FiPlus } from 'react-icons/fi';
 import type { PaymentMethod } from '@/db/schema';
-import { daysBetween, firstName, formatMoney, plural } from '@/lib/portal-format';
+import { daysBetween, formatMoney, plural } from '@/lib/portal-format';
 import { projectHref } from '@/components/portal/tabs';
 import {
   Button,
@@ -26,9 +27,11 @@ import {
   space,
   Stack,
   StatusBadge,
+  StatusLine,
   TextLink,
   tint,
   type,
+  useAnnouncer,
 } from '@/components/portal/ui';
 import { InvoiceEditor } from './InvoiceEditor';
 import { invoiceStatus, isOpen, isOverdue, listMethods } from './labels';
@@ -443,12 +446,23 @@ export interface InvoicesViewProps {
 
 export default function InvoicesView({ projectId, perspective, clientName, today, invoices, enabledMethods }: InvoicesViewProps) {
   const studio = perspective === 'studio';
-  const client = firstName(clientName) ?? clientName;
   const [creating, setCreating] = useState(false);
   const newButton = useRef<HTMLButtonElement>(null);
   const editorPanel = useRef<HTMLElement>(null);
   const editorHeadingId = useId();
   const returnFocus = useRef(false);
+  const { statusRef, message, announce } = useAnnouncer();
+  // Deleting a draft lands here (?deleted=BWD-0008): its own page, and its button, are gone
+  const deleted = useSearchParams().get('deleted');
+
+  useEffect(() => {
+    if (!deleted || !/^[A-Z]+-\d+$/.test(deleted)) return;
+    announce(`Deleted draft ${deleted}.`);
+    // Said once: a reload or Back does not repeat it
+    const url = new URL(window.location.href);
+    url.searchParams.delete('deleted');
+    window.history.replaceState(null, '', url);
+  }, [deleted, announce]);
 
   useEffect(() => {
     if (creating) editorPanel.current?.querySelector<HTMLInputElement>('input:not([type="hidden"])')?.focus();
@@ -486,6 +500,7 @@ export default function InvoicesView({ projectId, perspective, clientName, today
       </SectionHeader>
 
       <Stack $gap={8}>
+        <StatusLine ref={statusRef} message={message} />
         {studio && creating && (
           <Panel ref={editorPanel} aria-labelledby={editorHeadingId}>
             <Stack $gap={6}>
@@ -512,7 +527,7 @@ export default function InvoicesView({ projectId, perspective, clientName, today
         {studio && enabledMethods.length === 0 && (
           <Notice>
             <p>
-              No payment methods are turned on yet, so invoices tell {client} that you&apos;ll send payment details separately.{' '}
+              No payment methods are turned on yet, so invoices tell {clientName} that you&apos;ll send payment details separately.{' '}
               <TextLink href="/portal/admin/settings">Set up payment methods</TextLink>
             </p>
           </Notice>
@@ -524,7 +539,7 @@ export default function InvoicesView({ projectId, perspective, clientName, today
           studio ? (
             !creating && (
               <EmptyState title="No invoices yet" action={startNew}>
-                Create an invoice for {client}: add the lines, check the draft, then send it. {client} gets an email with a link, sees how
+                Create an invoice for {clientName}: add the lines, check the draft, then send it. {clientName} gets an email with a link, sees how
                 to pay{enabledMethods.length ? ` (${listMethods(enabledMethods)})` : ''}, and can tell you once they&apos;ve paid.
               </EmptyState>
             )

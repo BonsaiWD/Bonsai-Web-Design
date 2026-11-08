@@ -9,9 +9,9 @@ import { firstName } from '@/lib/portal-format';
 import type { PortalProject } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
 import { claimRateSlot, type RateSlot } from '../throttle';
-import { STUDIO_NAME, studioSubject } from '../notify';
+import { STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '../notify';
 import { FLAGGED_EMAIL_KINDS } from '../kinds';
-import { failedEmails, failedEmailTitle } from './failed-emails';
+import { failedEmails, failedEmailTitle, reachedClient } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -154,14 +154,11 @@ export async function loadStudioThreadInfo(forProject: Pick<PortalProject, 'id' 
   };
 }
 
-// A failed email stays flagged until a later one to the same address on that project goes out
-function unresolvedFailures<T extends { emailTo: string | null; emailStatus: string | null; projectId?: string }>(rows: T[]): T[] {
+// The rule the dashboard uses (failed-emails.ts): a failed email to the client stays flagged
+// until a later message email reaches the client, at whatever address they had when it went
+function unresolvedFailures<T extends { emailTo: string | null; emailStatus: string | null }>(rows: T[]): T[] {
   return rows.filter(
-    (row, index) =>
-      row.emailStatus === 'failed' &&
-      !rows
-        .slice(index + 1)
-        .some((later) => later.emailStatus === 'sent' && later.emailTo === row.emailTo && later.projectId === row.projectId),
+    (row, index) => row.emailStatus === 'failed' && row.emailTo !== STUDIO_EMAIL && !rows.slice(index + 1).some(reachedClient),
   );
 }
 

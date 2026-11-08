@@ -2,7 +2,7 @@
 
 import styled from 'styled-components';
 import { FiUpload } from 'react-icons/fi';
-import { firstName, plural } from '@/lib/portal-format';
+import { plural } from '@/lib/portal-format';
 import { uploadProjectFile } from '@/app/portal/_actions/files';
 import { formatBytes } from '@/components/portal/deliverables/copy';
 import { Disclosure, DisclosureSummary } from '@/components/portal/deliverables/parts';
@@ -143,7 +143,7 @@ function UploadDialog({
   dialog,
   projectId,
   studio,
-  clientFirst,
+  clientName,
   acceptedExtensions,
   maxUploadBytes,
   onUploaded,
@@ -151,7 +151,7 @@ function UploadDialog({
   dialog: ReturnType<typeof useDialog>;
   projectId: string;
   studio: boolean;
-  clientFirst: string;
+  clientName: string;
   acceptedExtensions: string;
   maxUploadBytes: number;
   onUploaded: (message: string) => void;
@@ -160,10 +160,10 @@ function UploadDialog({
   return (
     <FormDialog
       dialog={dialog}
-      title={studio ? `Share a file with ${clientFirst}` : 'Upload a file'}
+      title={studio ? `Share a file with ${clientName}` : 'Upload a file'}
       description={
         studio
-          ? `It appears in ${clientFirst}'s files straight away.`
+          ? `It appears in ${clientName}'s files straight away.`
           : "Photos, copy, brand files: anything we need for the project. We'll be notified."
       }
       action={uploadProjectFile}
@@ -198,7 +198,7 @@ function UploadDialog({
       </Field>
       {studio && (
         <Checkbox name="emailOther" savedChecked>
-          Email {clientFirst} that it is here
+          Email {clientName} that it is here
         </Checkbox>
       )}
     </FormDialog>
@@ -217,7 +217,6 @@ export default function FilesView({
   const studio = perspective === 'studio';
   const upload = useDialog();
   const { statusRef, message, announce } = useAnnouncer();
-  const clientFirst = firstName(clientName) ?? clientName;
   const mb = Math.round(maxUploadBytes / (1024 * 1024));
 
   const listed = files.filter((item) => !item.removed);
@@ -230,17 +229,17 @@ export default function FilesView({
   const groups = [
     {
       key: 'client',
-      title: studio ? `From ${clientFirst}` : 'From you',
+      title: studio ? `From ${clientName}` : 'From you',
       items: fromClient,
       empty: studio
-        ? `Nothing from ${clientFirst} yet. When they upload something, it appears here and you get an email.`
+        ? `Nothing from ${clientName} yet. When they upload something, it appears here and you get an email.`
         : 'Nothing from you yet. Upload photos, copy or brand files and we will be notified.',
     },
     {
       key: 'studio',
       title: 'From the studio',
       items: fromStudio,
-      empty: studio ? `Nothing shared with ${clientFirst} yet.` : 'Nothing from us yet. Files we share with you appear here.',
+      empty: studio ? `Nothing shared with ${clientName} yet.` : 'Nothing from us yet. Files we share with you appear here.',
     },
     // Only on a project that moved to another client
     ...(fromFormer.length ? [{ key: 'former', title: studio ? 'From previous clients' : 'From a previous client', items: fromFormer, empty: '' }] : []),
@@ -257,10 +256,11 @@ export default function FilesView({
 
   const removeQuestion = (item: ProjectFileView) =>
     studio && item.side === 'client'
-      ? `Remove ${item.filename} from the files? ${clientFirst} will no longer see it.`
+      ? `Remove ${item.filename} from the files? ${clientName} will no longer see it.`
       : studio
-        ? `Remove ${item.filename}? ${clientFirst} will no longer see it.`
-        : `Remove ${item.filename}? It will no longer be listed for either of us.`;
+        ? `Remove ${item.filename}? ${clientName} will no longer see it.`
+        : // The studio keeps removed files (listed under Removed files, still downloadable)
+          `Remove ${item.filename}? It will disappear from your files. The studio keeps a copy for the project record.`;
 
   const uploadButton = canUpload && (
     <Button onClick={upload.openDialog}>
@@ -276,7 +276,7 @@ export default function FilesView({
           <H2>Files</H2>
           <Meta>
             {studio
-              ? `A shared library for this project. ${clientFirst} and the studio can both add files here.`
+              ? `A shared library for this project. ${clientName} and the studio can both add files here.`
               : 'A shared library for this project. Add anything we need, and find what we send you.'}
           </Meta>
         </div>
@@ -306,7 +306,7 @@ export default function FilesView({
               }
             >
               {studio
-                ? `Share files with ${clientFirst} here, and find what they send you. Each upload emails the other side.`
+                ? `Share files with ${clientName} here, and find what they send you. Each upload emails the other side.`
                 : `Share photos, copy, brand files and anything else we need. Files can be up to ${mb} MB each; for anything larger, send us a link in Messages.`}
             </EmptyState>
           ) : (
@@ -370,7 +370,7 @@ export default function FilesView({
                 <H3 id="files-summary">At a glance</H3>
                 <DataList>
                   <div>
-                    <dt>From {clientFirst}</dt>
+                    <dt>From {clientName}</dt>
                     <dd>{fromClient.length}</dd>
                   </div>
                   <div>
@@ -389,7 +389,7 @@ export default function FilesView({
                   </div>
                 </DataList>
                 <Meta>
-                  Removed files disappear for {clientFirst} but stay downloadable for the studio. Files up to {mb} MB; for larger ones, ask
+                  Removed files disappear for {clientName} but stay downloadable for the studio. Files up to {mb} MB; for larger ones, ask
                   for a link in <TextLink href={projectHref(projectId, 'messages')}>Messages</TextLink>.
                 </Meta>
               </Stack>
@@ -430,7 +430,7 @@ export default function FilesView({
           dialog={upload}
           projectId={projectId}
           studio={studio}
-          clientFirst={clientFirst}
+          clientName={clientName}
           acceptedExtensions={acceptedExtensions}
           maxUploadBytes={maxUploadBytes}
           // Focus goes back to the upload button; the message is read out where it is

@@ -5,17 +5,21 @@ import { and, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/db';
 import { project, rateLimit, user } from '@/db/schema';
-import { firstName, plural } from '@/lib/portal-format';
+import { plural } from '@/lib/portal-format';
 import { adminActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import { recordActivity } from '@/server/portal/notify';
 import {
   clientProjectNames,
   displayName,
+  EMAIL_CHANGED_KIND,
+  emailChangedSummary,
   endAccess,
   INVITE_INTERVAL_MS,
   inviteEmail,
+  type InviteReason,
   inviteKey,
+  inviteReasonFor,
   lockClient,
   renameActivitySubject,
   sendStandaloneEmail,
@@ -63,14 +67,13 @@ function takenError(owner: { name: string | null; email: string }): ActionError 
 type InviteOutcome = 'sent' | 'failed' | 'skipped' | 'throttled';
 
 // Sends the invite if the 10-minute slot is free. A failed or skipped send gives the slot back.
-async function sendInvite(client: {
-    id: string;
-    name: string | null;
-    email: string;
-}): Promise<{ outcome: InviteOutcome; waitMinutes?: number }> {
+async function sendInvite(
+    client: { id: string; name: string | null; email: string },
+    reason: InviteReason = 'new',
+): Promise<{ outcome: InviteOutcome; waitMinutes?: number }> {
     const slot = await claimRateSlot(inviteKey(client.id), INVITE_INTERVAL_MS);
     if (!slot.ok) return { outcome: 'throttled', waitMinutes: slot.waitMinutes };
-    const { subject, content } = await inviteEmail(client, await clientProjectNames(client.id));
+    const { subject, content } = await inviteEmail(client, await clientProjectNames(client.id), reason);
     const status = await sendStandaloneEmail(client.email, subject, content);
     if (status !== 'sent') await releaseRateSlot(slot);
     return { outcome: status };
@@ -192,7 +195,7 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
         const actor = await adminActor();
         const input = parseForm(emailSchema, formData);
 
-        let result: { name: string; previous: string; devices: number; projects: string[] };
+        let result: { name: string; givenName: string | null; previous: string; devices: number; projects: string[] };
         try {
             result = await getDb().transaction(async (tx) => {
                 const current = await lockClient(tx, input.clientId);
@@ -213,7 +216,7 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
                 await renameActivitySubject(tx, current.id, [current.email], current.name?.trim() || input.email);
                 const devices = await endAccess(tx, current.id, [current.email, input.email]);
                 const projects = await tx.select({ id: project.id }).from(project).where(eq(project.clientId, current.id));
-                return { name: displayName(current), previous: current.email, devices, projects: projects.map((row) => row.id) };
+                return { name: displayName(current), givenName: current.name, previous: current.email, devices, projects: projects.map((row) => row.id) };
             });
         } catch (error) {
             if (!isUniqueViolation(error)) throw error;
@@ -227,8 +230,8 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
             await recordActivity({
                 projectId,
                 actorId: actor.id,
-                kind: 'client.email_changed',
-                summary: `${result.name}'s email changed from ${result.previous} to ${input.email}`,
+                kind: EMAIL_CHANGED_KIND,
+                summary: emailChangedSummary(result.name, result.previous, input.email),
                 visibility: 'studio',
             });
         }
@@ -239,7 +242,8 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
         if (input.sendInvite) {
             // A new address gets its invite even if the old one had one minutes ago
             await clearRateSlot(inviteKey(input.clientId));
-            const sent = await sendInvite({ id: input.clientId, name: result.name, email: input.email });
+            // Greeted by name, never by their old address
+            const sent = await sendInvite({ id: input.clientId, name: result.givenName, email: input.email }, 'address_changed');
             invite = inviteSentence(sent.outcome, input.email, sent.waitMinutes);
         } else {
             invite = ` Send an invite so they can sign in with it.`;
@@ -277,13 +281,15 @@ export async function inviteClient(_prev: ActionState, formData: FormData): Prom
         const input = parseForm(clientSchema, formData);
 
         const [client] = await getDb()
-            .select({ id: user.id, name: user.name, email: user.email })
+            .select({ id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified, lastSignInAt: user.lastSignInAt })
             .from(user)
             .where(and(eq(user.id, input.clientId), eq(user.role, 'client')));
         if (!client) throw new ActionError(NOT_FOUND);
 
-        const invite = await sendInvite(client);
-        const who = firstName(client.name) ?? client.email;
+        // After Change email, the same invite it would have sent: never a welcome to a client
+        // who already uses the portal
+        const invite = await sendInvite(client, await inviteReasonFor(client));
+        const who = client.name?.trim() || client.email;
         refresh();
         switch (invite.outcome) {
             case 'sent':

@@ -27,10 +27,10 @@ import {
   type LockedContract,
 } from '@/server/portal/features/contracts';
 import { claimUploadQuota, refundUploadQuota } from '@/server/portal/features/files';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
+import { emailedSummary, emailNote, portalOrigin, receiptSummary, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
-import { claimRateSlot, clearRateSlot, releaseRateSlot } from '@/server/portal/throttle';
+import { claimRateSlot, clearRateSlot, forceRateSlot, releaseRateSlot } from '@/server/portal/throttle';
 
 /*
  * Every export here is an endpoint anyone can call with any arguments, so each one starts by
@@ -282,7 +282,8 @@ export async function replaceContractDocument(_prev: ActionState, formData: Form
       await recordActivity({ projectId, actorId: actor.user.id, kind, summary, target: 'contracts' });
       return done(`${replaced} No email was sent.`);
     }
-    const slot = result.requiresSignature ? await claimRateSlot(contractEmailKey(input.contractId), CONTRACT_EMAIL_GAP_MS) : null;
+    // The new version always goes out, and it starts the gap before "Email again"
+    const slot = result.requiresSignature ? await forceRateSlot(contractEmailKey(input.contractId)) : null;
     const { subject, content } = askEmail({
       projectName: actor.project.name,
       clientName: actor.project.clientName,
@@ -462,7 +463,7 @@ export async function emailContractAgain(_prev: ActionState, formData: FormData)
       projectId,
       actorId: actor.user.id,
       kind: contractKind('reminded', input.contractId),
-      summary: `Emailed ${clientName}${again ? ' again' : ''} about signing ${locked.title}`,
+      summary: emailedSummary(`${clientName}${again ? ' again' : ''} about signing ${locked.title}`),
       target: 'contracts',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -740,7 +741,7 @@ export async function signContract(_prev: ActionState, formData: FormData): Prom
         projectId,
         actorId: actor.user.id,
         kind: contractKind('receipt', input.contractId),
-        summary: `Receipt emailed to ${clientName}: signature on ${result.title}`,
+        summary: receiptSummary(clientName, `signature on ${result.title}`),
         target: 'contracts',
         visibility: 'studio',
         email: { to: actor.user.email, ...emails.receipt },

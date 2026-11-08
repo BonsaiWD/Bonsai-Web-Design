@@ -84,7 +84,7 @@ export function AddClientDialog({ dialog, onDone, returnFocusTo }: DialogProps) 
     >
       <NameFields />
       <EmailField hint="We store it in lowercase, as sign-in expects." />
-      <Checkbox name="sendInvite" savedChecked hint="“Your client portal is ready”, with a button that signs them in.">
+      <Checkbox name="sendInvite" savedChecked hint="“Your client portal is ready”, with a link to the sign-in page, their address filled in.">
         Send an invite now
       </Checkbox>
     </FormDialog>
@@ -128,7 +128,7 @@ export function ChangeEmailDialog({ dialog, onDone, returnFocusTo, client }: Dia
         </p>
       </Notice>
       <EmailField hint={`Currently ${client.email}.`} />
-      <Checkbox name="sendInvite" savedChecked hint="So they know which address to use.">
+      <Checkbox name="sendInvite" savedChecked hint="An email to the new address saying it is now the one to sign in with.">
         Send an invite to the new address
       </Checkbox>
     </FormDialog>

@@ -21,7 +21,7 @@ interface FieldsProps {
   studio: boolean;
   internal: boolean;
   onInternalChange: (internal: boolean) => void;
-  clientFirst: string;
+  clientName: string;
   maxLength: number;
   length: number;
   onTyped: (value: string) => void;
@@ -29,15 +29,15 @@ interface FieldsProps {
 }
 
 // Inside the form, so the shortcut can see whether a send is already on its way
-function ComposerFields({ studio, internal, onInternalChange, clientFirst, maxLength, length, onTyped, textareaRef }: FieldsProps) {
+function ComposerFields({ studio, internal, onInternalChange, clientName, maxLength, length, onTyped, textareaRef }: FieldsProps) {
   const { pending } = useFormStatusState();
   const apple = useIsApple();
   const hintId = useId();
-  const label = studio ? (internal ? 'Internal note' : `Message to ${clientFirst}`) : 'Message to the studio';
+  const label = studio ? (internal ? 'Internal note' : `Message to ${clientName}`) : 'Message to the studio';
   const placeholder = studio
     ? internal
       ? 'A note for the studio only'
-      : `Write to ${clientFirst}`
+      : `Write to ${clientName}`
     : 'Ask a question, share feedback or paste a link';
 
   return (
@@ -95,12 +95,12 @@ function ComposerFields({ studio, internal, onInternalChange, clientFirst, maxLe
 interface ComposerProps {
   projectId: string;
   perspective: Perspective;
-  clientFirst: string;
+  clientName: string;
   maxLength: number;
   action: FormAction;
 }
 
-export function Composer({ projectId, perspective, clientFirst, maxLength, action }: ComposerProps) {
+export function Composer({ projectId, perspective, clientName, maxLength, action }: ComposerProps) {
   const studio = perspective === 'studio';
   // One id per message, made when typing starts: a double submit reuses it and posts once
   const [id, setId] = useState<string | null>(null);
@@ -113,7 +113,7 @@ export function Composer({ projectId, perspective, clientFirst, maxLength, actio
     <ComposerArea $internal={internal}>
       <ActionForm
         action={action}
-        aria-label={studio ? `Write to ${clientFirst}` : 'Write to the studio'}
+        aria-label={studio ? `Write to ${clientName}` : 'Write to the studio'}
         onSuccess={() => {
           setId(null);
           setLength(0);
@@ -126,7 +126,7 @@ export function Composer({ projectId, perspective, clientFirst, maxLength, actio
           studio={studio}
           internal={internal}
           onInternalChange={setInternal}
-          clientFirst={clientFirst}
+          clientName={clientName}
           maxLength={maxLength}
           length={length}
           onTyped={(value) => {
