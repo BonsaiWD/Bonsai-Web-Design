@@ -30,7 +30,7 @@ It runs on Neon Postgres through Drizzle ORM, Better Auth for sign-in, Resend fo
 
 1. **Database.** In Vercel, open **Storage**, create a **Neon** database on the free plan (Washington, D.C., Neon Auth off) and connect it to this project for Development, Preview and Production with no variable prefix. That adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
 2. **Sign-in secret.** Add `BETTER_AUTH_SECRET` to the project's environment variables for all three environments. Generate it with `openssl rand -base64 32`.
-3. **File storage.** In **Storage**, create a **Blob** store with **Private** access and connect it to the project for all three environments. That adds `BLOB_READ_WRITE_TOKEN`. Without it, everything but uploads works, and upload forms say storage is not set up.
+3. **File storage.** In **Storage**, create a **Blob** store with **Private** access and connect it to the project for all three environments. That adds `BLOB_READ_WRITE_TOKEN` (newer connections may add `BLOB_STORE_ID` instead; the portal accepts either). Without it, everything but uploads works, and upload forms say storage is not set up.
 4. **Tables.** Apply the migrations in `drizzle/` in order, either with `vercel env pull .env.local && npm run db:migrate`, or by pasting each file into the Neon console's SQL Editor followed by its bookkeeping row (see below).
 5. **Admin account.** `insert into "user" (name, email, role) values ('Your name', 'you@bonsaiwebdesign.com', 'admin');` Then redeploy, because new environment variables only reach new deployments.
 
@@ -54,7 +54,7 @@ Every email comes from admin@bonsaiwebdesign.com and links to the portal page, n
 
 ### Local development
 
-With no `RESEND_API_KEY` in `.env.local`, `npm run dev` prints emails (including sign-in links) to the terminal, and with no `BLOB_READ_WRITE_TOKEN`, uploads are kept in `.data/uploads`. To change the schema, edit `src/db/schema.ts`, run `npm run db:generate`, commit the new file in `drizzle/`, then run `npm run db:migrate`.
+With no `RESEND_API_KEY` in `.env.local`, `npm run dev` prints emails (including sign-in links) to the terminal, and with no `BLOB_READ_WRITE_TOKEN` or `BLOB_STORE_ID`, uploads are kept in `.data/uploads`. To change the schema, edit `src/db/schema.ts`, run `npm run db:generate`, commit the new file in `drizzle/`, then run `npm run db:migrate`.
 
 ## Learn More
 

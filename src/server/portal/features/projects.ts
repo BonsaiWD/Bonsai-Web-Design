@@ -9,6 +9,7 @@ import type { ProjectRecordCounts, ProjectSettingsData } from '@/components/port
 import type { NextMilestoneView, ProjectCardView } from '@/components/portal/dashboard/types';
 import { type Db, type Tx } from '../access';
 import { projectScope, sortAttention, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
+import { blobConfigured } from '../storage';
 import { contractsFeature } from './contracts';
 import { deliverablesFeature } from './deliverables';
 import { failedEmails, failedEmailTitle } from './failed-emails';
@@ -130,7 +131,7 @@ export async function loadProjectSettings(projectId: string): Promise<ProjectSet
 // a failure here leaves orphaned bytes, never a broken project, so it is logged and skipped.
 export async function removeStoredFiles(projectId: string, storageKeys: string[]): Promise<void> {
     try {
-        if (process.env.BLOB_READ_WRITE_TOKEN) {
+        if (blobConfigured()) {
             if (storageKeys.length) await del(storageKeys);
         } else if (process.env.NODE_ENV !== 'production') {
             // The same folder storeUpload writes to when there is no Blob store

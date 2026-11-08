@@ -38,8 +38,14 @@ export const INLINE_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg
 
 const LOCAL_ROOT = path.join(process.cwd(), '.data', 'uploads');
 
+// A connected Blob store gives the project either a read-write token or, on newer
+// connections, a store id that the SDK pairs with Vercel's OIDC token; accept both
+export function blobConfigured(): boolean {
+    return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
 function storageMode(): 'blob' | 'local' {
-    if (process.env.BLOB_READ_WRITE_TOKEN) return 'blob';
+    if (blobConfigured()) return 'blob';
     if (process.env.NODE_ENV !== 'production') return 'local';
     throw new ActionError('File uploads are not set up yet. Connect a Vercel Blob store to the project, then try again.');
 }
@@ -109,7 +115,7 @@ export async function storeUpload(options: {
 
 // The stored bytes as a web stream, for the download route
 export async function readStoredFile(storageKey: string): Promise<ReadableStream<Uint8Array> | null> {
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (blobConfigured()) {
         const result = await get(storageKey, { access: 'private' });
         return (result?.stream as ReadableStream<Uint8Array> | undefined) ?? null;
     }
