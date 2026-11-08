@@ -26,15 +26,21 @@ Clients sign in at `/portal` with an emailed link (no passwords) and see their p
 
 ### One-time setup
 
-1. In Vercel, open the project's **Storage** tab, create a **Neon** database on the free plan and connect it to this project. That adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
-2. Add `BETTER_AUTH_SECRET` to the project's environment variables (Production and Preview). Generate a value with `openssl rand -base64 32`.
+1. In Vercel, open the project's **Storage** tab, create a **Neon** database on the free plan (Washington, D.C. region, Neon Auth off: the portal has its own sign-in) and connect it to this project for Development, Preview and Production with no variable prefix. That adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
+2. Add `BETTER_AUTH_SECRET` to the project's environment variables (all three environments). Generate a value with `openssl rand -base64 32`.
 3. Pull the variables and create the tables:
    ```bash
    vercel env pull .env.local
    npm run db:migrate
    ```
-   Or paste `drizzle/0000_init_portal.sql` into the Neon console's SQL Editor.
-4. Add yourself as an admin (below), deploy, and sign in at `/portal`. Admins see every client's projects.
+   Or, with no local setup, paste `drizzle/0000_init_portal.sql` into the Neon console's SQL Editor and run it, then record it as applied so a later `npm run db:migrate` skips it instead of failing:
+   ```sql
+   create schema if not exists drizzle;
+   create table if not exists drizzle.__drizzle_migrations (id serial primary key, hash text not null, created_at bigint);
+   insert into drizzle.__drizzle_migrations (hash, created_at)
+     values ('2342745be1c1c9ffde533f0daa952135452e766319183618945faff6ce5787e9', 1794094917133);
+   ```
+4. Add yourself as an admin (below), redeploy (new variables only reach new deployments), and sign in at `/portal`. Admins see every client's projects.
 
 If the Neon integration creates a database branch for each preview deployment, those branches copy production, so migrate production first.
 
