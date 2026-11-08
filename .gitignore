@@ -42,3 +42,6 @@ next-env.d.ts
 
 # portal uploads stored locally in development
 /.data
+
+# git worktrees used by parallel agents
+/.claude/worktrees/
