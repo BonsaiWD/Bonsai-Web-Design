@@ -1,44 +1,69 @@
-import { desc, eq } from 'drizzle-orm';
-import { STAGE_LABELS, STAGE_TONES } from '@/components/portal/labels';
-import { projectHref } from '@/components/portal/tabs';
-import { H1, Lead, ListPanel, Page, Row, Rows, Stack, StatusBadge, TextLink } from '@/components/portal/ui';
-import { getDb } from '@/db';
-import { project } from '@/db/schema';
+import type { Metadata } from 'next';
+import ClientDashboard from '@/components/portal/dashboard/ClientDashboard';
+import StudioDashboard from '@/components/portal/dashboard/StudioDashboard';
+import { Page } from '@/components/portal/ui';
+import { firstName } from '@/lib/portal-format';
 import { getViewer } from '@/server/portal/access';
+import { collectAttention, collectDeadlines, featureContext } from '@/server/portal/collect';
+import { loadActivity } from '@/server/portal/features/activity';
+import { hasAnyClient } from '@/server/portal/features/clients';
+import { collectWaitingOnClients, loadProjectCards } from '@/server/portal/features/projects';
 
-// A plain project list until the dashboards are built, so every project is one click away
-export default async function PortalHome() {
+export const metadata: Metadata = { title: 'Overview' };
+
+export default async function PortalHome({ searchParams }: { searchParams: Promise<{ deleted?: string | string[] }> }) {
   const viewer = await getViewer();
-  const projects = await getDb()
-    .select({ id: project.id, name: project.name, stage: project.stage })
-    .from(project)
-    .where(viewer.isAdmin ? undefined : eq(project.clientId, viewer.user.id))
-    .orderBy(desc(project.createdAt));
+  const context = await featureContext();
+  const [attention, deadlines] = await Promise.all([collectAttention(), collectDeadlines()]);
 
+  if (context.perspective === 'studio') {
+    const waiting = await collectWaitingOnClients(context);
+    const [projects, activity, hasClients, params] = await Promise.all([
+      loadProjectCards(context, { attention, deadlines, waitingOnClients: waiting }),
+      loadActivity(context, { limit: 12 }),
+      hasAnyClient(),
+      searchParams,
+    ]);
+    const open = attention.filter((item) => item.tone !== 'info');
+    return (
+      <Page>
+        <StudioDashboard
+          today={context.today}
+          stats={{
+            activeProjects: projects.filter((card) => card.stage !== 'launched' && card.stage !== 'on_hold').length,
+            totalProjects: projects.length,
+            waitingOnClients: waiting.length,
+            clientsWaitedOn: new Set(waiting.map((item) => item.projectId)).size,
+            waitingOnUs: open.length,
+            overdue: deadlines.filter((item) => item.date < context.today).length,
+          }}
+          attention={attention}
+          waiting={waiting}
+          deadlines={deadlines}
+          projects={projects}
+          activity={activity}
+          hasClients={hasClients}
+          deleted={params.deleted === '1'}
+        />
+      </Page>
+    );
+  }
+
+  const projects = await loadProjectCards(context, { attention, deadlines });
+  // An admin previewing sees every client's projects: greet the client when there is only one
+  const single = new Set(projects.map((card) => card.client.id)).size === 1 ? projects[0].client : null;
+  const greetName = viewer.isAdmin ? (single ? firstName(single.name) : null) : firstName(viewer.user.name);
+  const eyebrow = viewer.isAdmin && !single ? (projects.length ? 'Preview of every client' : null) : (projects[0]?.client.company ?? null);
   return (
     <Page>
-      <Stack $gap={6}>
-        <Stack $gap={2}>
-          <H1>Projects</H1>
-          <Lead>The full dashboard is on its way. Open a project to see its milestones and deliverables.</Lead>
-        </Stack>
-        {projects.length > 0 ? (
-          <ListPanel>
-            <Rows>
-              {projects.map((item) => (
-                <li key={item.id}>
-                  <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <TextLink href={projectHref(item.id, 'milestones')}>{item.name}</TextLink>
-                    <StatusBadge tone={STAGE_TONES[item.stage]}>{STAGE_LABELS[item.stage]}</StatusBadge>
-                  </Row>
-                </li>
-              ))}
-            </Rows>
-          </ListPanel>
-        ) : (
-          <Lead>Your project appears here once we have set it up.</Lead>
-        )}
-      </Stack>
+      <ClientDashboard
+        firstName={greetName}
+        eyebrow={eyebrow}
+        today={context.today}
+        attention={attention}
+        deadlines={deadlines}
+        projects={projects}
+      />
     </Page>
   );
 }
