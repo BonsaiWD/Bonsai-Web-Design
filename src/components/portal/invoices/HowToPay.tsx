@@ -79,6 +79,13 @@ const DetailValue = styled.span`
   user-select: all;
 `;
 
+// A sentence such as "We send bank details with your invoice": read, not copied
+const Prose = styled.span`
+  ${type.body}
+  color: ${({ theme }) => theme.colors.text};
+  overflow-wrap: anywhere;
+`;
+
 const CopyButton = styled(Button)`
   flex-shrink: 0;
 
@@ -161,11 +168,29 @@ async function copyText(value: string): Promise<boolean> {
   return copied;
 }
 
+/*
+ * Worth a Copy button: a "Label: value" line, or a value that is one token (an address, an
+ * email, a handle, an account number) or a number grouped with spaces (a phone or routing
+ * number). Anything else is an instruction in words.
+ */
+function isCopyable(detail: PaymentDetail): boolean {
+  if (detail.label) return true;
+  return /^\S+$/.test(detail.value) || (/\d/.test(detail.value) && /^[\d\s+().-]+$/.test(detail.value));
+}
+
 function Detail({ detail, noun, onResult }: { detail: PaymentDetail; noun: string; onResult: (text: string) => void }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const what = detail.label ? detail.label.toLocaleLowerCase('en-US') : noun;
+
+  if (!isCopyable(detail)) {
+    return (
+      <li>
+        <Prose>{detail.value}</Prose>
+      </li>
+    );
+  }
 
   return (
     <li>

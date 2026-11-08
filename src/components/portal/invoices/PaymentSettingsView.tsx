@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import styled from 'styled-components';
 import type { PaymentMethod } from '@/db/schema';
 import { savePaymentSettings } from '@/app/portal/_actions/settings';
@@ -29,6 +29,7 @@ import {
   Textarea,
   tint,
   type,
+  useUnsavedChanges,
   VisuallyHidden,
 } from '@/components/portal/ui';
 import { HowToPay } from './HowToPay';
@@ -160,15 +161,8 @@ export default function PaymentSettingsView({ methods, version }: { methods: Pay
   }
   const dirty = methods.some((method) => draft[method.method].enabled !== method.enabled || draft[method.method].instructions.trim() !== method.instructions);
 
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  // Leaving with unsaved details asks first: a reload, the shell's links or the tabs
+  useUnsavedChanges(dirty);
 
   const set = (method: PaymentMethod, patch: Partial<Draft[PaymentMethod]>) =>
     setDraft((current) => ({ ...current, [method]: { ...current[method], ...patch } }));
@@ -185,7 +179,7 @@ export default function PaymentSettingsView({ methods, version }: { methods: Pay
         <H1>Payment settings</H1>
         <Lead>
           Choose how clients can pay. The methods you turn on appear under How to pay on every invoice you send, with a Copy button for each
-          detail.
+          address, number or labelled detail.
         </Lead>
       </Header>
 
@@ -276,7 +270,8 @@ export default function PaymentSettingsView({ methods, version }: { methods: Pay
               <H3 as="h2">Writing payment details</H3>
               <Tips>
                 <li>
-                  <strong>One detail per line.</strong> Each line gets its own Copy button.
+                  <strong>One detail per line.</strong> Lines like &ldquo;Label: value&rdquo;, or a single address, number or handle, get a
+                  Copy button. A sentence is shown as written.
                 </li>
                 <li>
                   <strong>Label a line</strong> with a colon, such as &ldquo;Routing number: …&rdquo;, and clients copy just the number.

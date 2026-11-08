@@ -10,7 +10,7 @@ import { METHOD_LABELS } from '@/components/portal/invoices/labels';
 import { invoiceTotalCents, MAX_LINES, parseDollars, parseQuantity } from '@/components/portal/invoices/money';
 import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate, formatMoney, todayIso } from '@/lib/portal-format';
-import { projectActor, type ProjectActor } from '@/server/portal/access';
+import { assertStillClient, projectActor, type ProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
   activityKind,
@@ -25,7 +25,6 @@ import {
   reminderEmail,
   sentEmail,
   studioProjectActor,
-  type Tx,
 } from '@/server/portal/features/invoices';
 import { emailNote, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
 
@@ -551,6 +550,8 @@ export async function reportPayment(_prev: ActionState, formData: FormData): Pro
     const thanks = "Thanks. We'll confirm when your payment arrives and email you a receipt.";
 
     const result = await getDb().transaction(async (tx) => {
+      // First, before the invoice lock: the project may have moved to another client since
+      await assertStillClient(tx, actor);
       const row = await lockInvoice(tx, projectId, input.invoiceId);
       // Drafts are invisible to clients, so one looks like a missing invoice
       if (row.status === 'draft') throw new ActionError(NOT_FOUND);

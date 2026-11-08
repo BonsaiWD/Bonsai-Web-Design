@@ -23,6 +23,7 @@ import {
   tint,
   type,
   useField,
+  useUnsavedChanges,
   VisuallyHidden,
   type ActionState,
 } from '@/components/portal/ui';
@@ -315,16 +316,8 @@ export function InvoiceEditor({ mode, projectId, clientName, today, saved, onCan
   const addButton = useRef<HTMLButtonElement>(null);
   const focusNext = useRef<string | 'add' | null>(null);
 
-  // Leaving the page with unsaved lines asks first
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  // Leaving with unsaved lines asks first: a reload, the tabs, the shell's or the list's links
+  useUnsavedChanges(dirty);
 
   // After adding or removing a line, focus lands somewhere sensible rather than on the page
   useEffect(() => {

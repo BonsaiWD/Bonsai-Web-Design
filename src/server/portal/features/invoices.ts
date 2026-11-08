@@ -17,12 +17,11 @@ import type {
 import { projectHref } from '@/components/portal/tabs';
 import type { EmailContent } from '@/lib/email';
 import { firstName, formatDate, formatMoney } from '@/lib/portal-format';
-import { adminActor, isUuid, projectActor } from '../access';
+import { adminActor, isUuid, projectActor, type Tx } from '../access';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { portalOrigin } from '../notify';
 
 type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export const STUDIO_NAME = 'Bonsai Web Design';
 

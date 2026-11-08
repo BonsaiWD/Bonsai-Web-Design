@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FiPlus } from 'react-icons/fi';
 import type { PaymentMethod } from '@/db/schema';
-import { firstName, formatMoney, plural } from '@/lib/portal-format';
+import { daysBetween, firstName, formatMoney, plural } from '@/lib/portal-format';
 import { projectHref } from '@/components/portal/tabs';
 import {
   Button,
@@ -13,6 +12,7 @@ import {
   DueText,
   EmptyState,
   focusRing,
+  GuardedLink,
   H2,
   H3,
   ListPanel,
@@ -205,7 +205,8 @@ const Table = styled.table`
   }
 `;
 
-const InvoiceLink = styled(Link)`
+// Guarded: the studio's new-invoice editor sits on the same page as these links
+const InvoiceLink = styled(GuardedLink)`
   display: inline-flex;
   flex-direction: column;
   gap: 0.125rem;
@@ -218,11 +219,12 @@ const InvoiceLink = styled(Link)`
     ${type.figures}
   }
 
+  /* Underlined at rest, as TextLink and the studio's project names are: touch screens never hover */
   strong {
     ${type.label}
     overflow-wrap: anywhere;
     text-decoration: underline;
-    text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 0)};
+    text-decoration-color: ${({ theme }) => tint(theme.colors.primary, 45)};
     text-underline-offset: 0.2em;
     transition: text-decoration-color 0.2s;
   }
@@ -279,12 +281,15 @@ function WhenCell({ item, today }: { item: InvoiceSummary; today: string }) {
 
 function InvoiceTable({
   title,
+  whenLabel,
   items,
   projectId,
   perspective,
   today,
 }: {
   title: string;
+  // Open invoices show when they are due; closed ones when they were paid or cancelled
+  whenLabel: string;
   items: InvoiceSummary[];
   projectId: string;
   perspective: Perspective;
@@ -304,7 +309,7 @@ function InvoiceTable({
               Invoice
             </th>
             <th role="columnheader" scope="col" className="when">
-              Due
+              {whenLabel}
             </th>
             <th role="columnheader" scope="col" className="amount">
               Amount
@@ -343,6 +348,14 @@ function InvoiceTable({
   );
 }
 
+// "In 11 days", "Tomorrow", "2 days overdue"; with the amount when several invoices are open
+function whenDue(dueOn: string, today: string, amount: string | null): string {
+  const days = daysBetween(today, dueOn);
+  if (days < 0) return amount ? `${amount}, ${plural(-days, 'day')} overdue` : `${plural(-days, 'day')} overdue`;
+  const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+  return amount ? `${amount} due ${when}` : when.charAt(0).toUpperCase() + when.slice(1);
+}
+
 function Summary({ invoices, perspective, today }: { invoices: InvoiceSummary[]; perspective: Perspective; today: string }) {
   const sum = (items: InvoiceSummary[]) => items.reduce((total, item) => total + item.totalCents, 0);
   const sent = invoices.filter((item) => item.status === 'sent');
@@ -366,7 +379,12 @@ function Summary({ invoices, perspective, today }: { invoices: InvoiceSummary[];
           <div>
             <dt>Next due</dt>
             <dd>{nextDue ? <DateText value={nextDue} /> : 'None'}</dd>
-            <dd>{nextDue ? <DueText value={nextDue} today={today} /> : 'No due dates coming up'}</dd>
+            {/* The date is the figure above; this line says how far off it is */}
+            <dd>
+              {nextDue
+                ? whenDue(nextDue, today, sent.length > 1 ? formatMoney(sum(sent.filter((item) => item.dueOn === nextDue))) : null)
+                : 'No due dates coming up'}
+            </dd>
           </div>
           {reported.length > 0 && (
             <div>
@@ -518,10 +536,13 @@ export default function InvoicesView({ projectId, perspective, clientName, today
           )
         ) : (
           <>
-            {open.length > 0 && <InvoiceTable title="Open" items={open} projectId={projectId} perspective={perspective} today={today} />}
+            {open.length > 0 && (
+              <InvoiceTable title="Open" whenLabel="Due" items={open} projectId={projectId} perspective={perspective} today={today} />
+            )}
             {closed.length > 0 && (
               <InvoiceTable
                 title={studio ? 'Paid and void' : 'Paid and cancelled'}
+                whenLabel="Date"
                 items={closed}
                 projectId={projectId}
                 perspective={perspective}
