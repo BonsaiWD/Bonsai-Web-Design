@@ -341,7 +341,9 @@ export async function deleteMilestone(_prev: ActionState, formData: FormData): P
 
 /* ---------- Studio: ask for and record sign-offs ---------- */
 
-const askSchema = z.object({ id: fields.uuid, projectId: fields.uuid });
+// confirmReopen comes from the two-step confirm a finished milestone shows, so a button
+// rendered before the step was marked done cannot reopen it in one click
+const askSchema = z.object({ id: fields.uuid, projectId: fields.uuid, confirmReopen: checkbox });
 
 export async function askForSignoff(_prev: ActionState, formData: FormData): Promise<ActionState> {
     return runAction(formData, async () => {
@@ -369,6 +371,9 @@ export async function askForSignoff(_prev: ActionState, formData: FormData): Pro
                 .from(milestoneSignoff)
                 .where(eq(milestoneSignoff.milestoneId, current.id));
             if (signed) throw new ActionError(`${current.title} is already signed off.`);
+            if (current.status === 'done' && !input.confirmReopen) {
+                throw new ActionError(`${current.title} is done now. Reload the page; asking again will move it back to Waiting on client.`);
+            }
             // The client cannot initial while a linked review is open, so an email now would
             // ask for something they cannot do yet
             const review = await pendingReview(tx, current.id);

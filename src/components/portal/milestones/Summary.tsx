@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';
 import MetaDot from '@/components/common/MetaDot';
 import { dueInfo, firstName } from '@/lib/portal-format';
 import { projectHref } from '../tabs';
-import { DateText, DueText, Eyebrow, focusRing, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
+import { DateText, DueText, Eyebrow, focusRing, GuardedLink, MetaText, PHONE, Panel, space, tint, type, VisuallyHidden } from '../ui';
 import { asksForInitials } from './signoff';
 import type { MilestoneView } from './types';
 
@@ -252,10 +251,11 @@ export default function Summary({ projectId, milestones, today, forClient, clien
                       <span>{item.label}</span>
                     </a>
                   ) : (
-                    <Link href={item.href}>
+                    // Leaves the tab, so it asks first when a milestone has unsaved edits
+                    <GuardedLink href={item.href}>
                       <FiArrowRight aria-hidden="true" />
                       <span>{item.label}</span>
-                    </Link>
+                    </GuardedLink>
                   )}
                   {item.due && (
                     <DueLine>

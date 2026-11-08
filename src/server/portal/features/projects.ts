@@ -2,21 +2,21 @@ import 'server-only';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { del } from '@vercel/blob';
-import { and, asc, desc, eq, gte, inArray, like, ne, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, notInArray, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { activity, milestone, milestoneSignoff, project, user } from '@/db/schema';
+import { milestone, milestoneSignoff, project, user } from '@/db/schema';
 import type { ProjectRecordCounts, ProjectSettingsData } from '@/components/portal/admin/types';
 import type { NextMilestoneView, ProjectCardView } from '@/components/portal/dashboard/types';
-import { adminActor, projectActor } from '../access';
+import { adminActor, projectActor, type Tx } from '../access';
 import { projectScope, sortAttention, type AttentionItem, type DeadlineItem, type FeatureContext, type PortalFeature } from '../attention';
 import { contractsFeature } from './contracts';
 import { deliverablesFeature } from './deliverables';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 import { filesFeature } from './files';
 import { invoicesFeature } from './invoices';
-import { milestonesFeature } from './milestones';
+import { linkedReviewTitle, milestonesFeature } from './milestones';
 
 type Db = ReturnType<typeof getDb>;
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /* ---------- Shared by the pages and the actions ---------- */
 
@@ -156,6 +156,7 @@ async function nextMilestones(projectIds: string[]): Promise<Map<string, NextMil
             dueDate: milestone.dueDate,
             requiresSignoff: milestone.requiresSignoff,
             signoffId: milestoneSignoff.id,
+            reviewTitle: linkedReviewTitle(),
         })
         .from(milestone)
         .leftJoin(milestoneSignoff, eq(milestoneSignoff.milestoneId, milestone.id))
@@ -172,6 +173,7 @@ async function nextMilestones(projectIds: string[]): Promise<Map<string, NextMil
                 dueDate: row.dueDate,
                 requiresSignoff: row.requiresSignoff,
                 signed: Boolean(row.signoffId),
+                reviewPending: row.reviewTitle !== null,
             },
         ]),
     );
@@ -272,38 +274,19 @@ export async function collectWaitingOnClients(context: FeatureContext): Promise<
 
 /* ---------- Attention and deadlines ---------- */
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 export const projectsFeature: PortalFeature = {
-    // A project email (the "New project" note) that never arrived, so the studio can follow up
+    // A project email (the "New project" note) that never arrived, flagged as every feature
+    // flags them (failed-emails.ts). It said the project is in the portal, so any later email
+    // that reaches the same person on that project makes up for it.
     async attention(context) {
         if (context.perspective !== 'studio') return [];
-        const rows = await getDb()
-            .select({
-                id: activity.id,
-                summary: activity.summary,
-                emailTo: activity.emailTo,
-                createdAt: activity.createdAt,
-                projectId: project.id,
-                projectName: project.name,
-            })
-            .from(activity)
-            .innerJoin(project, eq(project.id, activity.projectId))
-            .where(
-                and(
-                    projectScope(context),
-                    like(activity.kind, 'project.%'),
-                    eq(activity.emailStatus, 'failed'),
-                    gte(activity.createdAt, new Date(Date.now() - SEVEN_DAYS_MS)),
-                ),
-            )
-            .orderBy(desc(activity.createdAt));
-        return rows.map((row) => ({
+        const emails = await failedEmails(context, { kinds: ['project.'], clearedBy: [''], subjectOf: () => 'project' });
+        return emails.map((row) => ({
             key: `project-email:${row.id}`,
             projectId: row.projectId,
             projectName: row.projectName,
             tab: 'overview' as const,
-            title: `An email to ${row.emailTo ?? 'the client'} could not be sent`,
+            title: failedEmailTitle(row.who, row.projectName),
             detail: row.summary,
             since: row.createdAt.toISOString(),
             tone: 'alert' as const,

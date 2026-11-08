@@ -6,6 +6,7 @@ import { dueInfo } from '@/lib/portal-format';
 import { MetaLine } from '../dashboard/parts';
 import type { NextMilestoneView, Perspective } from '../dashboard/types';
 import { MILESTONE_LABELS } from '../labels';
+import { asksForInitials } from '../milestones/signoff';
 import { projectHref } from '../tabs';
 import { ButtonLink, DateText, DueText, H2, H3, MetaText, Panel, space, StatusBadge, Text, TextLink, tint, type } from '../ui';
 
@@ -118,8 +119,9 @@ export default function NextMilestone({ projectId, perspective, today, clientFir
             {next.dueDate && <DueText value={next.dueDate} today={today} />}
             {/* "Due Mar 4, 2027" already names the day; the relative labels need it added */}
             {next.dueDate && due && due.tone !== 'later' && <DateText value={next.dueDate} />}
-            {/* Initials are asked for only once the step is waiting on the client */}
-            {next.requiresSignoff && !next.signed && next.status === 'waiting_on_client' && (
+            {/* Initials are asked for only once the step waits on the client and no linked
+                review is open, the same rule as the Milestones tab and the attention items */}
+            {asksForInitials(next) && (
               <StatusBadge tone="action">{client ? 'Your sign-off is needed' : `Waiting for ${clientFirst}'s initials`}</StatusBadge>
             )}
           </MetaLine>

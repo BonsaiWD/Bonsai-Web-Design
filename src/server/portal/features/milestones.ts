@@ -1,14 +1,14 @@
 import 'server-only';
-import { and, asc, desc, eq, gte, inArray, isNotNull, like, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/db';
-import { activity, deliverable, deliverableVersion, milestone, milestoneSignoff, project, rateLimit, user } from '@/db/schema';
+import { deliverable, deliverableVersion, milestone, milestoneSignoff, project, rateLimit, user } from '@/db/schema';
 import { asksForInitials } from '@/components/portal/milestones/signoff';
 import type { LinkedDeliverable, MilestoneView, SignoffRecord } from '@/components/portal/milestones/types';
 import { daysBetween, firstName } from '@/lib/portal-format';
 import { adminActor, isUuid, projectActor, type Tx } from '../access';
-import { STUDIO_EMAIL } from '../notify';
 import { projectScope, type AttentionItem, type DeadlineItem, type FeatureContext, type Perspective, type PortalFeature } from '../attention';
+import { failedEmails, failedEmailTitle } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -211,6 +211,19 @@ async function loadLinkedDeliverables(projectId: string): Promise<Map<string, Li
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+// For a query over milestones: the title of the first linked deliverable whose newest
+// version is still in review, or null. Every screen that asks for initials reads this.
+export function linkedReviewTitle() {
+    return sql<string | null>`(
+        SELECT ${deliverable.title} FROM ${deliverable}
+        JOIN ${deliverableVersion} ON ${deliverableVersion.deliverableId} = ${deliverable.id}
+            AND ${deliverableVersion.version} = ${deliverable.latestVersion}
+        WHERE ${deliverable.milestoneId} = ${milestone.id} AND ${deliverableVersion.status} = 'in_review'
+        ORDER BY ${deliverable.createdAt}
+        LIMIT 1
+    )`;
+}
+
 async function scopedMilestones(context: FeatureContext) {
     return getDb()
         .select({
@@ -229,14 +242,7 @@ async function scopedMilestones(context: FeatureContext) {
             signedAt: milestoneSignoff.signedAt,
             // A linked deliverable still in review: its card asks for that review, and the
             // milestone waits for it before asking for anything itself
-            reviewTitle: sql<string | null>`(
-                SELECT ${deliverable.title} FROM ${deliverable}
-                JOIN ${deliverableVersion} ON ${deliverableVersion.deliverableId} = ${deliverable.id}
-                    AND ${deliverableVersion.version} = ${deliverable.latestVersion}
-                WHERE ${deliverable.milestoneId} = ${milestone.id} AND ${deliverableVersion.status} = 'in_review'
-                ORDER BY ${deliverable.createdAt}
-                LIMIT 1
-            )`,
+            reviewTitle: linkedReviewTitle(),
         })
         .from(milestone)
         .innerJoin(project, eq(project.id, milestone.projectId))
@@ -317,65 +323,29 @@ async function attention(context: FeatureContext): Promise<AttentionItem[]> {
         }
     }
 
-    items.push(...(await failedEmails(context, rows, recent)));
+    items.push(...(await failedEmailItems(context, rows)));
     return items;
 }
 
-/*
- * Sign-off requests and receipts that never arrived, so the studio can follow up. A failure
- * clears once a later email of the same kind about the same milestone reaches the same
- * address (rows from before kinds carried the id match on kind and address alone), and a
- * request clears once the milestone is signed off or deleted.
- */
-async function failedEmails(context: FeatureContext, milestones: ScopedMilestone[], since: Date): Promise<AttentionItem[]> {
-    const emails = await getDb()
-        .select({
-            id: activity.id,
-            kind: activity.kind,
-            summary: activity.summary,
-            emailTo: activity.emailTo,
-            emailStatus: activity.emailStatus,
-            createdAt: activity.createdAt,
-            projectId: project.id,
-            projectName: project.name,
-            clientName: user.name,
-            clientEmail: user.email,
-        })
-        .from(activity)
-        .innerJoin(project, eq(project.id, activity.projectId))
-        .innerJoin(user, eq(user.id, project.clientId))
-        .where(
-            and(
-                projectScope(context),
-                like(activity.kind, 'milestone%'),
-                isNotNull(activity.emailTo),
-                inArray(activity.emailStatus, ['sent', 'failed']),
-                gte(activity.createdAt, since),
-            ),
-        )
-        .orderBy(asc(activity.createdAt));
-
+// Sign-off requests, copies and receipts that never arrived, flagged as every feature flags
+// them (failed-emails.ts). A request no longer matters once the milestone is signed off or
+// deleted; rows from before kinds carried the milestone's id match on their kind alone.
+async function failedEmailItems(context: FeatureContext, milestones: ScopedMilestone[]): Promise<AttentionItem[]> {
+    const emails = await failedEmails(context, { kinds: ['milestone'], subjectOf: (kind) => parseKind(kind).milestoneId });
     const byId = new Map(milestones.map((row) => [row.id, row]));
     const items: AttentionItem[] = [];
-    for (const [index, row] of emails.entries()) {
-        if (row.emailStatus !== 'failed') continue;
+    for (const row of emails) {
         const { event, milestoneId } = parseKind(row.kind);
-        const resolved = emails.slice(index + 1).some((later) => {
-            if (later.emailStatus !== 'sent' || later.emailTo !== row.emailTo || later.projectId !== row.projectId) return false;
-            const next = parseKind(later.kind);
-            return next.event === event && (milestoneId === null || next.milestoneId === milestoneId);
-        });
-        if (resolved) continue;
         const target = milestoneId ? byId.get(milestoneId) : undefined;
-        if (event === 'signoff_requested' && milestoneId && (!target || target.signoffId)) continue;
-        const who = row.emailTo === row.clientEmail ? row.clientName || row.clientEmail : row.emailTo === STUDIO_EMAIL ? 'the studio' : row.emailTo;
+        if (milestoneId && !target) continue;
+        if (event === 'signoff_requested' && target?.signoffId) continue;
         items.push({
             key: `milestone-email:${row.id}`,
             projectId: row.projectId,
             projectName: row.projectName,
             tab: 'milestones',
             ...(target ? { anchor: anchorOf(target.id) } : {}),
-            title: target ? `The email to ${who} about ${target.title} could not be sent` : `The email to ${who} could not be sent`,
+            title: failedEmailTitle(row.who, target?.title),
             detail: row.summary,
             since: row.createdAt.toISOString(),
             tone: 'alert',

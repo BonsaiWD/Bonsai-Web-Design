@@ -567,6 +567,7 @@ export default function MilestoneItem({
             </AskConfirm>
             <input type="hidden" name="id" value={m.id} />
             <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="confirmReopen" value="on" />
           </ActionForm>
         )}
 

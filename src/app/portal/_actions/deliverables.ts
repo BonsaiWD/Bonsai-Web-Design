@@ -15,10 +15,11 @@ import {
   approvalEmails,
   changesEmails,
   claimEmailSlot,
-  currentVersionStatus,
+  currentVersion,
   deliverableAnchor,
   eventForLinked,
   lockMilestones,
+  recheckMilestone,
   recordedApprovalEmail,
   releaseEmailSlot,
   shareEmail,
@@ -279,6 +280,8 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
         }
         // Deliverable first, then its old and new milestones, as every deliverable action does
         if (!isNew) await lockLinked([row.milestoneId, input.milestoneId]);
+        // What the milestones saw of this deliverable before this version
+        const before = isNew ? null : await currentVersion(tx, input.deliverableId);
 
         const next = row.latestVersion + 1;
         // One version in review at a time: the new one replaces any still waiting
@@ -303,12 +306,16 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
           reviewBy: input.needsApproval ? input.reviewBy : null,
           sharedBy: actor.user.id,
         });
+        const moved = row.milestoneId !== input.milestoneId;
         if (input.milestoneId) {
-          await syncMilestone(tx, projectId, input.milestoneId, input.needsApproval ? 'shared' : 'recheck');
+          if (input.needsApproval) await syncMilestone(tx, projectId, input.milestoneId, 'shared');
+          // A handoff version ends the review of the version it replaces; anything else about
+          // a handoff is not something the milestone waits for
+          else if (!moved) await recheckMilestone(tx, projectId, input.milestoneId, before?.status === 'in_review' ? before : null);
         }
         // Moved to another milestone (or none) with this version: the old one may be finished
         // now, or back with the studio
-        if (row.milestoneId && row.milestoneId !== input.milestoneId) await syncMilestone(tx, projectId, row.milestoneId, 'recheck');
+        if (moved && row.milestoneId) await recheckMilestone(tx, projectId, row.milestoneId, before);
         return { version: next, title: row.title };
       });
     } catch (error) {
@@ -385,11 +392,12 @@ export async function editDeliverable(_prev: ActionState, formData: FormData): P
         .set({ title: input.title, description: input.description, milestoneId: input.milestoneId })
         .where(eq(deliverable.id, input.deliverableId));
       if (row.milestoneId === input.milestoneId) return;
-      // Moving it changes what both milestones are waiting for
-      if (row.milestoneId) await syncMilestone(tx, projectId, row.milestoneId, 'recheck');
-      if (input.milestoneId) {
-        await syncMilestone(tx, projectId, input.milestoneId, eventForLinked(await currentVersionStatus(tx, input.deliverableId)));
-      }
+      // Moving it changes what both milestones are waiting for, when it is a review or an
+      // approval; a handoff or a draft moves without touching either
+      const current = await currentVersion(tx, input.deliverableId);
+      if (row.milestoneId) await recheckMilestone(tx, projectId, row.milestoneId, current);
+      const event = eventForLinked(current);
+      if (input.milestoneId && event) await syncMilestone(tx, projectId, input.milestoneId, event);
     });
     refresh(projectId);
     await recordActivity({
@@ -473,7 +481,9 @@ export async function withdrawVersion(_prev: ActionState, formData: FormData): P
             (SELECT min(shared_at) FROM deliverable_version WHERE deliverable_id = ${locked.deliverableId} AND version > ${version.version}),
             'infinity'
           )`);
-      if (locked.milestoneId) await syncMilestone(tx, projectId, locked.milestoneId, 'recheck');
+      if (locked.milestoneId) {
+        await recheckMilestone(tx, projectId, locked.milestoneId, { status: version.status, needsApproval: version.needsApproval });
+      }
       return locked;
     });
 
@@ -645,6 +655,7 @@ export async function deleteDeliverable(_prev: ActionState, formData: FormData):
           `Can't delete: version ${decided.version} has a decision from the client. Decided versions are kept on record.`,
         );
       }
+      const before = await currentVersion(tx, input.deliverableId);
       const files = await tx
         .select({ fileId: deliverableVersion.fileId })
         .from(deliverableVersion)
@@ -653,8 +664,8 @@ export async function deleteDeliverable(_prev: ActionState, formData: FormData):
       const fileIds = files.map((entry) => entry.fileId).filter((id): id is string => Boolean(id));
       // The bytes stay in storage for the studio; the files no longer show anywhere
       if (fileIds.length) await tx.update(file).set({ removedAt: new Date() }).where(inArray(file.id, fileIds));
-      // Its milestone may have been waiting on it alone
-      if (row.milestoneId) await syncMilestone(tx, projectId, row.milestoneId, 'recheck');
+      // Its milestone may have been waiting on its review alone
+      if (row.milestoneId) await recheckMilestone(tx, projectId, row.milestoneId, before);
       return row.title;
     });
 
