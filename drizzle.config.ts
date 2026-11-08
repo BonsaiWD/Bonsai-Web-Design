@@ -1,4 +1,5 @@
 import { defineConfig } from 'drizzle-kit';
+import { withVerifiedSsl } from './src/db/ssl';
 
 // drizzle-kit does not read Next's env files; `vercel env pull .env.local` writes this one
 try {
@@ -13,6 +14,6 @@ export default defineConfig({
     out: './drizzle',
     dbCredentials: {
         // Neon recommends its direct (unpooled) connection for schema migrations
-        url: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ?? '',
+        url: withVerifiedSsl(process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ?? ''),
     },
 });

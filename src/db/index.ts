@@ -2,6 +2,7 @@ import { attachDatabasePool } from '@vercel/functions';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
+import { withVerifiedSsl } from './ssl';
 
 function createDb() {
     // Neon's pooled connection string; read at first use so a missing value fails the
@@ -10,7 +11,7 @@ function createDb() {
     if (!connectionString) {
         throw new Error('DATABASE_URL is not set');
     }
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({ connectionString: withVerifiedSsl(connectionString) });
     // Lets Vercel close idle clients before a function instance is suspended
     attachDatabasePool(pool);
     return drizzle({ client: pool, schema });
