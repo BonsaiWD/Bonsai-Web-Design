@@ -9,7 +9,7 @@ import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate, formatUtcMoment } from '@/lib/portal-format';
 import { assertStillClient, projectActor, studioProjectActor, type Tx } from '@/server/portal/access';
 import { ActionError, done, fields, lf, parseForm, runAction, type ActionState } from '@/server/portal/actions';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '@/server/portal/notify';
+import { emailNote, portalOrigin, receiptSummary, recordActivity, STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import {
   milestoneKind,
@@ -612,7 +612,7 @@ export async function signOffMilestone(_prev: ActionState, formData: FormData): 
             projectId,
             actorId: actor.user.id,
             kind: milestoneKind('signoff_receipt', input.id),
-            summary: `Receipt emailed to ${name}: sign-off of ${result.title}`,
+            summary: receiptSummary(name, `sign-off of ${result.title}`),
             target: 'milestones',
             // The client already sees their sign-off on the timeline; this row tracks the email
             visibility: 'studio',

@@ -45,6 +45,21 @@ export async function claimRateSlot(key: string, gapMs: number, db: Db | Tx = ge
   return { ok: false, key, waitMinutes: Math.max(1, Math.ceil((last + gapMs - now) / 60_000)) };
 }
 
+/*
+ * For an email that goes out whatever the gap (a receipt, a reopened invoice, a replaced
+ * document): the slot is taken now, so the next gap counts from this email. If it then fails,
+ * releaseRateSlot forgets the slot altogether (previousAt is null), so "Email again" works at
+ * once instead of waiting out the gap of the email before it.
+ */
+export async function forceRateSlot(key: string, db: Db | Tx = getDb()): Promise<RateSlot> {
+  const now = Date.now();
+  await db
+    .insert(rateLimit)
+    .values({ id: randomUUID(), key, count: 1, lastRequest: now })
+    .onConflictDoUpdate({ target: rateLimit.key, set: { count: sql`${rateLimit.count} + 1`, lastRequest: now } });
+  return { ok: true, key, claimedAt: now, previousAt: null };
+}
+
 // Gives back a claim whose purpose did not happen. Only this claim is touched (a later one
 // stays), a refused claim is left alone, and a failure here never fails the request.
 export async function releaseRateSlot(slot: RateSlot): Promise<void> {

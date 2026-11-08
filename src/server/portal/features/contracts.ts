@@ -15,7 +15,7 @@ import type { EmailContent } from '@/lib/email';
 import { firstName, formatUtcMoment } from '@/lib/portal-format';
 import { type Db, type PortalProject, type Tx } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
-import { STUDIO_EMAIL, studioSubject, summaryWithText, textFromSummary } from '../notify';
+import { emailedSummary, STUDIO_EMAIL, studioSubject, summaryWithText, textFromSummary, type EmailStatus } from '../notify';
 import { INLINE_TYPES } from '../storage';
 import { failedEmails, failedEmailTitle } from './failed-emails';
 import { FLAGGED_EMAIL_KINDS, kindItemId, kindMaker, parseKind } from '../kinds';
@@ -59,8 +59,8 @@ export const contractAnchor = (contractId: string) => `contract-${contractId}`;
    studio-only row, so the timeline every viewer reads (including a later client, should the
    project move) says only that it was sent back. */
 
-export function returnedNoteSummary(clientName: string, title: string, reason: string): string {
-  return summaryWithText(`Emailed ${clientName} why we sent back the signed copy of ${title}`, 'Reason', reason);
+export function returnedNoteSummary(clientName: string, title: string, reason: string): (emailStatus: EmailStatus) => string {
+  return (emailStatus) => summaryWithText(emailedSummary(`${clientName} why we sent back the signed copy of ${title}`)(emailStatus), 'Reason', reason);
 }
 
 export function contractStatus(input: {
@@ -761,7 +761,7 @@ async function studioAttention(context: FeatureContext): Promise<AttentionItem[]
       tab: 'contracts',
       anchor: contractAnchor(about.id),
       title: failedEmailTitle(row.who, about.title),
-      detail: asking && waiting.has(about.id) ? `Sent to ${row.emailTo}. Use "Email again" on the contract to retry.` : row.summary,
+      detail: asking && waiting.has(about.id) ? `Sent to ${row.emailTo}. Use "Email ${row.clientName} again" on the contract to retry.` : row.summary,
       since: row.createdAt.toISOString(),
       tone: 'alert',
     });

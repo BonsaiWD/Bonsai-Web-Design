@@ -9,9 +9,9 @@ import { firstName } from '@/lib/portal-format';
 import type { PortalProject } from '../access';
 import { projectScope, type AttentionItem, type FeatureContext, type PortalFeature } from '../attention';
 import { claimRateSlot, type RateSlot } from '../throttle';
-import { STUDIO_NAME, studioSubject } from '../notify';
+import { STUDIO_EMAIL, STUDIO_NAME, studioSubject } from '../notify';
 import { FLAGGED_EMAIL_KINDS } from '../kinds';
-import { failedEmails, failedEmailTitle } from './failed-emails';
+import { failedEmails, failedEmailTitle, reachedSameRecipient } from './failed-emails';
 
 /* ---------- Shared by the page, the provider and the actions ---------- */
 
@@ -149,19 +149,19 @@ export async function loadStudioThreadInfo(forProject: Pick<PortalProject, 'id' 
   return {
     clientReadAt: read?.at.toISOString() ?? null,
     lastEmailedClientAt: lastToClient?.createdAt.toISOString() ?? null,
-    failedEmails: unresolvedFailures(emails).map((row) => ({ id: row.id, to: row.emailTo ?? '', at: row.createdAt.toISOString() })),
+    failedEmails: unresolvedFailures(emails, forProject.clientEmail).map((row) => ({ id: row.id, to: row.emailTo ?? '', at: row.createdAt.toISOString() })),
     internalCount: internal?.total ?? 0,
   };
 }
 
-// A failed email stays flagged until a later one to the same address on that project goes out
-function unresolvedFailures<T extends { emailTo: string | null; emailStatus: string | null; projectId?: string }>(rows: T[]): T[] {
+// The rule the dashboard uses (failed-emails.ts): a failed email to the client stays flagged
+// until a later one reaches them, at that address or the one they have now
+function unresolvedFailures<T extends { emailTo: string | null; emailStatus: string | null }>(rows: T[], clientEmail: string): T[] {
   return rows.filter(
     (row, index) =>
       row.emailStatus === 'failed' &&
-      !rows
-        .slice(index + 1)
-        .some((later) => later.emailStatus === 'sent' && later.emailTo === row.emailTo && later.projectId === row.projectId),
+      row.emailTo !== STUDIO_EMAIL &&
+      !rows.slice(index + 1).some((later) => later.emailStatus === 'sent' && reachedSameRecipient(later.emailTo, row.emailTo, clientEmail)),
   );
 }
 
