@@ -22,56 +22,39 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Client portal
 
-Clients sign in at `/portal` with an emailed link (no passwords) and see their projects, stage and milestones. It runs on Neon Postgres through Drizzle ORM, with Better Auth for sign-in and Resend for the emails.
+Clients sign in at `/portal` with an emailed link (no passwords). Each project has an overview, milestones with deadlines and initial sign-offs, deliverables with versioned approvals, contracts to download and sign, private messages, invoices with your payment methods, and a shared file library. The studio runs everything from the same screens: clients, new projects, project settings and payment settings live under the portal's Clients and Settings pages, and **View as client** shows any page exactly as the client sees it.
+
+It runs on Neon Postgres through Drizzle ORM, Better Auth for sign-in, Resend for email and a private Vercel Blob store for uploaded files.
 
 ### One-time setup
 
-1. In Vercel, open the project's **Storage** tab, create a **Neon** database on the free plan (Washington, D.C. region, Neon Auth off: the portal has its own sign-in) and connect it to this project for Development, Preview and Production with no variable prefix. That adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
-2. Add `BETTER_AUTH_SECRET` to the project's environment variables (all three environments). Generate a value with `openssl rand -base64 32`.
-3. Pull the variables and create the tables:
-   ```bash
-   vercel env pull .env.local
-   npm run db:migrate
-   ```
-   Or, with no local setup, paste `drizzle/0000_init_portal.sql` into the Neon console's SQL Editor and run it, then record it as applied so a later `npm run db:migrate` skips it instead of failing:
-   ```sql
-   create schema if not exists drizzle;
-   create table if not exists drizzle.__drizzle_migrations (id serial primary key, hash text not null, created_at bigint);
-   insert into drizzle.__drizzle_migrations (hash, created_at)
-     values ('2342745be1c1c9ffde533f0daa952135452e766319183618945faff6ce5787e9', 1794094917133);
-   ```
-4. Add yourself as an admin (below), redeploy (new variables only reach new deployments), and sign in at `/portal`. Admins see every client's projects.
+1. **Database.** In Vercel, open **Storage**, create a **Neon** database on the free plan (Washington, D.C., Neon Auth off) and connect it to this project for Development, Preview and Production with no variable prefix. That adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
+2. **Sign-in secret.** Add `BETTER_AUTH_SECRET` to the project's environment variables for all three environments. Generate it with `openssl rand -base64 32`.
+3. **File storage.** In **Storage**, create a **Blob** store with **Private** access and connect it to the project for all three environments. That adds `BLOB_READ_WRITE_TOKEN`. Without it, everything but uploads works, and upload forms say storage is not set up.
+4. **Tables.** Apply the migrations in `drizzle/` in order, either with `vercel env pull .env.local && npm run db:migrate`, or by pasting each file into the Neon console's SQL Editor followed by its bookkeeping row (see below).
+5. **Admin account.** `insert into "user" (name, email, role) values ('Your name', 'you@bonsaiwebdesign.com', 'admin');` Then redeploy, because new environment variables only reach new deployments.
 
-If the Neon integration creates a database branch for each preview deployment, those branches copy production, so migrate production first.
-
-### Adding clients, projects and milestones
-
-Until the portal has its own admin screens, add rows in the Neon console (Tables or SQL Editor). Emails must be lowercase; the database rejects anything else.
+Applying a migration by hand: wrap the file in `BEGIN; ... COMMIT;` and add, before `COMMIT`, a row recording it so a later `npm run db:migrate` skips it:
 
 ```sql
--- You, as an admin
-insert into "user" (name, email, role) values ('Your name', 'you@bonsaiwebdesign.com', 'admin');
-
--- A client and their project
-insert into "user" (name, email) values ('Jane Doe', 'jane@example.com');
-insert into project (client_id, name, summary, stage, target_launch)
-  select id, 'Website redesign', 'A five-page site with online booking.', 'design', '2027-03-01'
-  from "user" where email = 'jane@example.com';
-
--- Milestones, listed in position order
-insert into milestone (project_id, title, status, due_date, position)
-  select id, 'Design direction', 'in_progress', '2026-12-01', 1
-  from project where name = 'Website redesign';
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('<sha256 of the file>', <the file's "when" in drizzle/meta/_journal.json>);
 ```
 
-- Project `stage`: `discovery`, `design`, `development`, `review`, `launched`, `on_hold`
-- Milestone `status`: `upcoming`, `in_progress`, `waiting_on_client` (shown to the client as "Waiting on you"), `done`
+`sha256sum drizzle/<file>.sql` gives the hash. The first migration also needs `create schema if not exists drizzle; create table if not exists drizzle.__drizzle_migrations (id serial primary key, hash text not null, created_at bigint);` first.
 
-Only addresses already in the `user` table are sent a link; anyone else sees the same "check your email" reply and nothing is sent.
+### Signed records
+
+Milestone sign-offs, deliverable approvals and change requests, and contract signatures are permanent: the database refuses to change or delete them, and each records the exact statement shown, who signed, when (from the database clock) and, for files, the file's SHA-256. The signer also gets an emailed receipt. Projects or clients with records cannot be deleted or reassigned; set the stage to On hold instead.
+
+To remove test data, including records: `select purge_project('<project id>');` in the SQL Editor, then delete the test user if you like. Uploaded file bytes in Blob are not removed by this.
+
+### Email
+
+Every email comes from admin@bonsaiwebdesign.com and links to the portal page, never to an outside link. Previews share the production database, so a preview only emails bonsaiwebdesign.com addresses; a plus address such as `admin+demo@bonsaiwebdesign.com` makes a good test client. Each send is recorded on the project's activity, and a failed email is flagged on the studio dashboard.
 
 ### Local development
 
-With no `RESEND_API_KEY` in `.env.local`, `npm run dev` prints sign-in links to the terminal instead of emailing them. To change the schema, edit `src/db/schema.ts`, run `npm run db:generate`, commit the new file in `drizzle/`, then run `npm run db:migrate`.
+With no `RESEND_API_KEY` in `.env.local`, `npm run dev` prints emails (including sign-in links) to the terminal, and with no `BLOB_READ_WRITE_TOKEN`, uploads are kept in `.data/uploads`. To change the schema, edit `src/db/schema.ts`, run `npm run db:generate`, commit the new file in `drizzle/`, then run `npm run db:migrate`.
 
 ## Learn More
 
