@@ -263,6 +263,14 @@ export async function loadProjectCards(
  */
 const CLIENT_FACING: PortalFeature[] = [milestonesFeature, deliverablesFeature, contractsFeature, invoicesFeature, filesFeature];
 
+// A studio follow-up ("Waiting on Jane to pay BWD-0002") about the same item as one on the
+// client's list ("Pay invoice BWD-0002") says one thing twice: the client's list keeps it
+export function withoutListedFollowUps(attention: AttentionItem[], waiting: AttentionItem[]): AttentionItem[] {
+    const where = (item: AttentionItem) => (item.anchor ? `${item.projectId}/${item.tab}#${item.anchor}` : null);
+    const listed = new Set(waiting.map(where).filter(Boolean));
+    return attention.filter((item) => item.blockedOn !== 'client' || !listed.has(where(item)));
+}
+
 export async function collectWaitingOnClients(context: FeatureContext): Promise<AttentionItem[]> {
     if (!context.viewer.isAdmin) return [];
     const asClient: FeatureContext = { ...context, perspective: 'client' };
@@ -311,9 +319,13 @@ export const projectsFeature: PortalFeature = {
     },
 
     // Target launches of projects still under way; a launched or paused project has none. A
-    // milestone still to do on the same day (usually "Launch") already lists that date, so the
-    // launch is left out rather than shown twice.
+    // launch milestone still to do on the same day ("Launch", "Site launch", "Go live") is the
+    // same date already listed, so the target launch is left out rather than shown twice.
+    // Any other milestone due that day is a different thing, and both rows stay.
     async deadlines(context) {
+        // "Launch", "Site launch", "Launch day", "Go live", but not "Pre-launch review"
+        // (a Postgres regular expression, matched case-insensitively)
+        const launchTitle = '(^|\\s)(launch|go[ -]?live)(\\s|$)';
         const rows = await getDb()
             .select({ id: project.id, name: project.name, targetLaunch: project.targetLaunch })
             .from(project)
@@ -322,7 +334,7 @@ export const projectsFeature: PortalFeature = {
                     projectScope(context),
                     notInArray(project.stage, ['launched', 'on_hold']),
                     sql`${project.targetLaunch} IS NOT NULL`,
-                    sql`NOT EXISTS (SELECT 1 FROM milestone m WHERE m.project_id = ${project.id} AND m.status <> 'done' AND m.due_date = ${project.targetLaunch})`,
+                    sql`NOT EXISTS (SELECT 1 FROM milestone m WHERE m.project_id = ${project.id} AND m.status <> 'done' AND m.due_date = ${project.targetLaunch} AND m.title ~* ${launchTitle})`,
                 ),
             );
         return rows.map((row) => ({

@@ -270,8 +270,8 @@ export default function PaymentSettingsView({ methods, version }: { methods: Pay
               <H3 as="h2">Writing payment details</H3>
               <Tips>
                 <li>
-                  <strong>One detail per line.</strong> Lines like &ldquo;Label: value&rdquo;, or a single address, number or handle, get a
-                  Copy button. A sentence is shown as written.
+                  <strong>One detail per line.</strong> Each line gets its own Copy button, so clients can paste an account name, a
+                  number or an address as it is. A line written as a sentence is shown as written.
                 </li>
                 <li>
                   <strong>Label a line</strong> with a colon, such as &ldquo;Routing number: …&rdquo;, and clients copy just the number.

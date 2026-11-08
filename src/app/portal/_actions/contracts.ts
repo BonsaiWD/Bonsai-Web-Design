@@ -8,7 +8,7 @@ import { contract, contractFile, contractSignature, file, rateLimit } from '@/db
 import { signStatement, studioSignStatement } from '@/components/portal/contracts/copy';
 import { projectHref } from '@/components/portal/tabs';
 import { plural } from '@/lib/portal-format';
-import { adminActor, projectActor, type PortalUser, type ProjectActor } from '@/server/portal/access';
+import { adminActor, projectActor, type ProjectActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
 import {
   askEmail,
@@ -24,7 +24,7 @@ import {
   type LockedContract,
   type Tx,
 } from '@/server/portal/features/contracts';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
 
@@ -68,7 +68,6 @@ function refresh(projectId: string) {
 }
 
 const clientNameOf = (actor: ProjectActor) => actor.project.clientName || actor.project.clientEmail;
-const personName = (person: PortalUser) => person.name || person.email;
 const isSigned = (locked: LockedContract) => locked.status === 'signed' || locked.status === 'countersigned';
 
 async function contractUrl(projectId: string, contractId: string) {
@@ -495,7 +494,8 @@ export async function recordContractSignature(_prev: ActionState, formData: Form
     const upload = chosenFile(formData);
     const projectId = actor.project.id;
     const clientName = clientNameOf(actor);
-    const recordedBy = personName(actor.user);
+    // The statement and the receipt are the client's to read: no name means the studio's, not an address
+    const recordedBy = actor.user.name?.trim() || null;
     const meta = await requestMeta();
     const recorded = (title: string) => `Recorded ${clientName}'s signature on ${title}.`;
 
@@ -571,7 +571,7 @@ export async function recordContractSignature(_prev: ActionState, formData: Form
     refresh(projectId);
     const { subject, content } = recordedSignatureEmail({
       clientName: actor.project.clientName,
-      recordedBy,
+      recordedBy: recordedBy ?? STUDIO_NAME,
       title: result.title,
       filename: result.filename,
       sha256: result.sha256,

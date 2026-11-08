@@ -12,14 +12,17 @@ export function signStatement(title: string, filename: string, sha256: string): 
   return `I have read ${title} (${filename}, SHA-256 ${shortSha(sha256)}…) and agree to its terms.`;
 }
 
+// recordedBy: the studio member's name, or null when they have none (the client then reads the
+// studio's name, never a member's address)
 export function studioSignStatement(options: {
-  recordedBy: string;
+  recordedBy: string | null;
   clientName: string;
   title: string;
   filename: string;
   sha256: string;
 }): string {
-  return `${options.recordedBy} recorded for the studio that ${options.clientName} signed ${options.title} (${options.filename}, SHA-256 ${shortSha(options.sha256)}…) outside the portal.`;
+  const recorder = options.recordedBy ? `${options.recordedBy} recorded for the studio` : 'Bonsai Web Design recorded';
+  return `${recorder} that ${options.clientName} signed ${options.title} (${options.filename}, SHA-256 ${shortSha(options.sha256)}…) outside the portal.`;
 }
 
 // What each kind of file in a contract's history is, from either side

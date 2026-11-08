@@ -386,7 +386,7 @@ export function shareEmail(input: ShareEmailInput): { subject: string; content: 
 
   if (!input.needsApproval) {
     return {
-      subject: input.reminder ? `In your portal: ${input.title}, version ${input.version}` : `Delivered: ${input.title}, version ${input.version}`,
+      subject: input.reminder ? `In your portal: ${input.title} (version ${input.version})` : `Delivered: ${input.title} (version ${input.version})`,
       content: {
         heading: `${input.title} is in your portal`,
         paragraphs: [
@@ -404,7 +404,7 @@ export function shareEmail(input: ShareEmailInput): { subject: string; content: 
   return {
     subject: input.reminder
       ? `Reminder: ${input.title} is waiting for your review`
-      : `Ready for your review: ${input.title}, version ${input.version}`,
+      : `Ready for your review: ${input.title} (version ${input.version})`,
     content: {
       heading: input.reminder ? `${input.title} is waiting for your review` : `${input.title} is ready for your review`,
       paragraphs: [
@@ -440,7 +440,7 @@ export function approvalEmails(input: DecisionEmailInput) {
   const signed = `${input.signedName ?? input.clientName} (${input.signerEmail})`;
   return {
     studio: {
-      subject: `${input.clientName} approved ${input.title}, version ${input.version}`,
+      subject: `${input.clientName} approved ${input.title} (version ${input.version})`,
       content: {
         heading: `${input.clientName} approved ${input.title}`,
         paragraphs: [
@@ -453,7 +453,7 @@ export function approvalEmails(input: DecisionEmailInput) {
       } satisfies EmailContent,
     },
     receipt: {
-      subject: `Your approval of ${input.title}, version ${input.version}`,
+      subject: `Your approval of ${input.title} (version ${input.version})`,
       content: {
         heading: `You approved version ${input.version} of ${input.title}`,
         paragraphs: [

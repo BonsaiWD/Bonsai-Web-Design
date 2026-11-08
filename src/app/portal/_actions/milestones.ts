@@ -10,7 +10,7 @@ import { projectHref } from '@/components/portal/tabs';
 import { firstName, formatDate } from '@/lib/portal-format';
 import { projectActor } from '@/server/portal/access';
 import { ActionError, done, fields, parseForm, runAction, type ActionState } from '@/server/portal/actions';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import {
     formatUtc,
@@ -415,7 +415,8 @@ export async function recordSignoff(_prev: ActionState, formData: FormData): Pro
         const input = parseForm(recordSchema, formData);
         const projectId = actor.project.id;
         const clientName = actor.project.clientName || actor.project.clientEmail;
-        const recordedBy = actor.user.name || actor.user.email;
+        // The statement and its email are the client's to read, and a studio member's address is not
+        const recordedBy = actor.user.name?.trim() || STUDIO_NAME;
         const meta = await requestMeta();
 
         const record = await getDb().transaction(async (tx) => {

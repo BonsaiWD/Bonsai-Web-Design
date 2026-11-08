@@ -22,7 +22,7 @@ import {
   syncMilestone,
   type Tx,
 } from '@/server/portal/features/deliverables';
-import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL } from '@/server/portal/notify';
+import { emailNote, portalOrigin, recordActivity, STUDIO_EMAIL, STUDIO_NAME } from '@/server/portal/notify';
 import { requestMeta } from '@/server/portal/request';
 import { storeUpload } from '@/server/portal/storage';
 
@@ -217,7 +217,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
       .from(deliverableVersion)
       .innerJoin(deliverable, eq(deliverable.id, deliverableVersion.deliverableId))
       .where(and(eq(deliverableVersion.id, input.versionId), eq(deliverable.projectId, projectId)));
-    if (already) return done(`Shared version ${already.version} of ${already.title}.`);
+    if (already) return done(`Shared ${already.title} (version ${already.version}).`);
 
     // Cheap checks before the upload, so a stale form does not store a file for nothing
     const [existing] = await db
@@ -313,7 +313,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     const summary = `Shared ${shared.title} (version ${shared.version})`;
     if (!input.emailClient) {
       await recordActivity({ projectId, actorId: actor.user.id, kind, summary, target: 'deliverables' });
-      return done(`Shared version ${shared.version} of ${shared.title}. No email was sent.`);
+      return done(`${summary}. No email was sent.`);
     }
 
     // Starts the 10-minute gap before "Email again" can send another
@@ -338,7 +338,7 @@ export async function shareDeliverable(_prev: ActionState, formData: FormData): 
     });
     if (emailStatus !== 'sent') await releaseEmailSlot(input.versionId);
     return done(
-      `Shared version ${shared.version} of ${shared.title}.${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`,
+      `${summary}.${emailStatus === 'sent' ? ` We emailed ${clientName}.` : emailNote(emailStatus, clientName)}`,
     );
   });
 }
@@ -418,7 +418,7 @@ export async function fixVersionLink(_prev: ActionState, formData: FormData): Pr
       projectId,
       actorId: actor.user.id,
       kind: activityKind('linkFixed', result.deliverableId),
-      summary: `Updated the link for version ${result.version.version} of ${result.title}`,
+      summary: `Updated the link for ${result.title} (version ${result.version.version})`,
       target: 'deliverables',
     });
     return done(`Saved the new link for version ${result.version.version}.`);
@@ -450,7 +450,7 @@ export async function withdrawVersion(_prev: ActionState, formData: FormData): P
       projectId,
       actorId: actor.user.id,
       kind: activityKind('withdrawn', result.deliverableId),
-      summary: `Withdrew version ${result.version.version} of ${result.title}`,
+      summary: `Withdrew ${result.title} (version ${result.version.version})`,
       target: 'deliverables',
       visibility: 'studio',
     });
@@ -499,7 +499,7 @@ export async function emailClientAgain(_prev: ActionState, formData: FormData): 
       projectId,
       actorId: actor.user.id,
       kind: activityKind('reminded', locked.deliverableId),
-      summary: `Emailed ${clientName} again about version ${version.version} of ${locked.title}`,
+      summary: `Emailed ${clientName} again about ${locked.title} (version ${version.version})`,
       target: 'deliverables',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },
@@ -520,7 +520,7 @@ export async function recordApproval(_prev: ActionState, formData: FormData): Pr
     const projectId = actor.project.id;
     const clientName = clientNameOf(actor);
     // The statement is shown to the client, who never sees a studio member's address
-    const recordedBy = admin.name?.trim() || 'Bonsai Web Design';
+    const recordedBy = admin.name?.trim() || STUDIO_NAME;
     const meta = await requestMeta();
 
     const result = await getDb().transaction(async (tx) => {
@@ -574,7 +574,7 @@ export async function recordApproval(_prev: ActionState, formData: FormData): Pr
       projectId,
       actorId: admin.id,
       kind: activityKind('approved', result.deliverableId),
-      summary: `Recorded ${clientName}'s approval of version ${result.version.version} of ${result.title}, given outside the portal`,
+      summary: `Recorded ${clientName}'s approval of ${result.title} (version ${result.version.version}), given outside the portal`,
       target: 'deliverables',
       email: { to: actor.project.clientEmail, subject, content },
     });
@@ -695,7 +695,7 @@ export async function approveVersion(_prev: ActionState, formData: FormData): Pr
       return { ...locked, statement, duplicate: false as const, decidedAt: updated[0].decidedAt ?? new Date() };
     });
 
-    const thanks = `Thanks, version ${result.version.version} of ${result.version.titleSnapshot} is approved.`;
+    const thanks = `Thanks, ${result.version.titleSnapshot} (version ${result.version.version}) is approved.`;
     if (result.duplicate) return done(thanks);
 
     refresh(projectId);

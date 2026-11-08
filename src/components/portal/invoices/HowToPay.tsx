@@ -169,13 +169,17 @@ async function copyText(value: string): Promise<boolean> {
 }
 
 /*
- * Worth a Copy button: a "Label: value" line, or a value that is one token (an address, an
- * email, a handle, an account number) or a number grouped with spaces (a phone or routing
- * number). Anything else is an instruction in words.
+ * Every detail gets a Copy button except a sentence, such as "We send bank details with your
+ * invoice." A sentence has words in lower case ("with", "your") and either ends like one or runs
+ * past a few words. An account name ("Bonsai Web Design LLC"), a bank, an IBAN in groups or a
+ * street address has none of that, so it stays copyable.
  */
 function isCopyable(detail: PaymentDetail): boolean {
   if (detail.label) return true;
-  return /^\S+$/.test(detail.value) || (/\d/.test(detail.value) && /^[\d\s+().-]+$/.test(detail.value));
+  const value = detail.value.trim();
+  const words = value.split(/\s+/);
+  const inWords = words.some((word) => /^[a-z]{2,}/.test(word));
+  return !(inWords && (/[.!?]$/.test(value) || words.length > 6));
 }
 
 function Detail({ detail, noun, onResult }: { detail: PaymentDetail; noun: string; onResult: (text: string) => void }) {

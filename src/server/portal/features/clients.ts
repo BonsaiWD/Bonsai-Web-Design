@@ -2,16 +2,31 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, asc, count, eq, gt, inArray, like, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { project, rateLimit, session, user, verification } from '@/db/schema';
+import { activity, project, rateLimit, session, user, verification } from '@/db/schema';
 import type { ClientOption, ClientView, StudioMemberView } from '@/components/portal/admin/types';
 import { sendEmail, type EmailContent } from '@/lib/email';
 import { firstName } from '@/lib/portal-format';
+import type { Tx } from '../access';
 import { portalOrigin } from '../notify';
 
-type Db = ReturnType<typeof getDb>;
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
-
 export const displayName = (row: { name: string | null; email: string }) => row.name?.trim() || row.email;
+
+/*
+ * A client's own activity rows start with the name they went by ("Jane Doe approved ..."), and
+ * the feeds turn that subject into "You" for the client. When their name or address changes,
+ * those rows take the new one in the same transaction, so a feed never reads a client in the
+ * third person beside "You", or under a name they no longer use. Signed records keep the name
+ * as it was; these rows are only the timeline's wording.
+ */
+export async function renameActivitySubject(tx: Tx, clientId: string, from: (string | null)[], to: string): Promise<void> {
+    const subjects = new Set(from.filter((name): name is string => Boolean(name) && name !== to));
+    for (const old of subjects) {
+        await tx
+            .update(activity)
+            .set({ summary: sql`${to}::text || substr(${activity.summary}, char_length(${old}::text) + 1)` })
+            .where(and(eq(activity.actorId, clientId), sql`left(${activity.summary}, char_length(${old}::text) + 1) = ${`${old} `}::text`));
+    }
+}
 
 /* ---------- The clients page ---------- */
 

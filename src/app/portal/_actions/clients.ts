@@ -18,6 +18,7 @@ import {
     inviteKey,
     lockClient,
     releaseInviteSlot,
+    renameActivitySubject,
     sendStandaloneEmail,
 } from '@/server/portal/features/clients';
 
@@ -178,6 +179,8 @@ export async function updateClient(_prev: ActionState, formData: FormData): Prom
             if (!current) throw new ActionError(NOT_FOUND);
             if (current.name === input.name && (current.company ?? null) === input.company) return false;
             await tx.update(user).set({ name: input.name, company: input.company }).where(eq(user.id, current.id));
+            // Rows written while they were nameless start with their address
+            await renameActivitySubject(tx, current.id, [current.name, current.name?.trim() ?? null, current.email], input.name);
             return true;
         });
 
@@ -213,6 +216,8 @@ export async function changeClientEmail(_prev: ActionState, formData: FormData):
 
                 // Proving the new address happens at the next sign-in, which needs a link sent to it
                 await tx.update(user).set({ email: input.email, emailVerified: false }).where(eq(user.id, current.id));
+                // A nameless client's rows start with their address
+                await renameActivitySubject(tx, current.id, [current.email], current.name?.trim() || input.email);
                 const devices = await endAccess(tx, current.id, [current.email, input.email]);
                 const projects = await tx.select({ id: project.id }).from(project).where(eq(project.clientId, current.id));
                 return { name: displayName(current), previous: current.email, devices, projects: projects.map((row) => row.id) };

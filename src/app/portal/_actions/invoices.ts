@@ -400,7 +400,8 @@ export async function emailInvoiceAgain(_prev: ActionState, formData: FormData):
       projectId,
       actorId: actor.user.id,
       kind: activityKind('reminded', row.id),
-      summary: receipt ? `Receipt for ${row.number} emailed again` : `Reminder about ${row.number} emailed to ${clientName}`,
+      // Worded as every other receipt row: "Receipt emailed to <name>: <what>"
+      summary: receipt ? `Receipt emailed to ${clientName} again: payment of ${row.number}` : `Reminder about ${row.number} emailed to ${clientName}`,
       target: 'invoices',
       visibility: 'studio',
       email: { to: actor.project.clientEmail, subject, content },

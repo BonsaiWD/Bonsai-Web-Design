@@ -4,7 +4,7 @@ import { requireProject } from '@/server/portal/access';
 import { collectAttention, collectDeadlines, featureContext } from '@/server/portal/collect';
 import { loadActivity } from '@/server/portal/features/activity';
 import { loadClientContact } from '@/server/portal/features/clients';
-import { collectWaitingOnClients, loadNextMilestone } from '@/server/portal/features/projects';
+import { collectWaitingOnClients, loadNextMilestone, withoutListedFollowUps } from '@/server/portal/features/projects';
 import { projectTabMetadata } from '@/server/portal/metadata';
 
 export const generateMetadata = projectTabMetadata('Overview');
@@ -35,7 +35,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ proje
       clientFirst={firstName(clientName) ?? clientName}
       summary={project.summary}
       startedOn={project.createdAt.toISOString().slice(0, 10)}
-      attention={attention}
+      attention={withoutListedFollowUps(attention, waiting)}
       waiting={waiting}
       deadlines={deadlines}
       activity={activity}
