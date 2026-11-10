@@ -60,6 +60,13 @@ export const projects: Project[] = [
     url: 'https://eliasarjan.com',
   },
   {
+    title: 'Summus Laser Pod',
+    tags: ['Medical Device', 'Product Site'],
+    description:
+      'The product site for the first full‑body Class IV laser: the science, a revenue model for providers, an interactive 3D Pod and demo booking.',
+    url: 'https://thelaserpod.com',
+  },
+  {
     title: 'Casa Verde',
     tags: ['Vacation Rental', 'Booking Site'],
     description:
